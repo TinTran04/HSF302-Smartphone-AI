@@ -1,0 +1,8 @@
+TÀI LIỆU MINH HỌA SMARTPHONE AI
+
+Tài liệu này chỉ phục vụ kiểm tra giao diện RAG và hiển thị nguồn tham khảo.
+Đây không phải chính sách bán hàng, bảo hành, đổi trả hoặc giao hàng có hiệu lực.
+
+Khi tích hợp hệ thống thực tế, quản trị viên cần tải lên chính sách chính thức.
+Câu trả lời AI phải được Backend tạo từ tài liệu được phép truy cập.
+Các trang tham khảo và số liệu không được tự tạo bởi Frontend.
