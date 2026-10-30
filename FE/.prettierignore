@@ -1,0 +1,9 @@
+node_modules
+dist
+.npm-cache
+package-lock.json
+test-results
+playwright-report
+src/design/stitch
+docs/stitch-audit.json
+scripts/stitch-assets.json
