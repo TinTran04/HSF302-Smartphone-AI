@@ -88,7 +88,7 @@ export function AppHeader() {
                   <Icon name="auto_awesome" />
                   Lịch sử AI
                 </Link>
-                {user.role !== 'CUSTOMER' && (
+                {user.role === 'ADMIN' && (
                   <Link to="/admin">
                     <Icon name="dashboard" />
                     Trang quản trị

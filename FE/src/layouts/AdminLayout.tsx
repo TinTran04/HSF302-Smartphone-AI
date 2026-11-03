@@ -10,7 +10,7 @@ const links = [
   { to: '/admin', name: 'Tổng quan', icon: 'dashboard' },
   { to: '/admin/products', name: 'Quản lý sản phẩm', icon: 'smartphone' },
   { to: '/admin/brands', name: 'Thương hiệu', icon: 'category' },
-  { to: '/admin/admins', name: 'Phân quyền & nhân sự', icon: 'manage_accounts' },
+  { to: '/admin/admins', name: 'Quản trị viên', icon: 'manage_accounts' },
   { to: '/admin/maintenance', name: 'Bảo trì', icon: 'settings' },
   { to: '/admin/orders', name: 'Quản lý đơn hàng', icon: 'receipt_long' },
   { to: '/admin/knowledge', name: 'Kho kiến thức AI', icon: 'dataset' },
@@ -45,17 +45,7 @@ export function AdminLayout() {
           <p className="eyebrow !mb-0 ml-12 mt-1">Admin Portal</p>
         </div>
         <nav className="admin-nav" aria-label="Quản trị">
-          {links
-            .filter((l) => {
-              if (user?.role === 'STAFF') {
-                return ['/admin', '/admin/products', '/admin/orders'].includes(l.to);
-              }
-              if (user?.role === 'MANAGER') {
-                return ['/admin', '/admin/products', '/admin/brands', '/admin/orders', '/admin/knowledge'].includes(l.to);
-              }
-              return true;
-            })
-            .map((l) => (
+          {links.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.to === '/admin'}>
                 <Icon name={l.icon} />
                 {l.name}
@@ -70,13 +60,7 @@ export function AdminLayout() {
           <div className="bg-surface-container-low p-4 rounded-xl">
             <p className="text-sm font-semibold">{user?.fullName}</p>
             <p className="help-text mt-1">
-              {user?.role === 'STAFF'
-                ? 'Nhân viên'
-                : user?.role === 'MANAGER'
-                ? 'Quản lý'
-                : user?.role === 'ADMIN'
-                ? 'Quản trị viên'
-                : 'Người dùng'}
+              Quản trị viên
             </p>
             <Button
               className="mt-3 !px-0 !min-h-0"

@@ -21,10 +21,34 @@ class PhoneAssistanceIntegrationTest {
         for (int i=0; i<100; i++) save("Catalog " + i, 100, true);
         var first = save("Later A", 100, true);
         var second = save("Later B", 200, true);
-        var service = new PhoneAssistanceService(products, mock(AiProviderService.class), new ObjectMapper());
+        var provider = mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenReturn("Later B có giá cao hơn Later A.");
+        var service = new PhoneAssistanceService(products, provider, new ObjectMapper());
         var result = service.compare("Compare", java.util.List.of(),
                 java.util.List.of(first.getId().toString(), second.getId().toString()));
         assertEquals(2, result.comparedProducts().size());
+        assertEquals("Later B có giá cao hơn Later A.", result.text());
+        verify(provider).chat(argThat(prompt -> prompt.contains("Later A") && prompt.contains("Later B") && !prompt.contains("Catalog 0")));
+    }
+    @Test void consultationUsesSelectedProductAsContext() {
+        var selected=save("Selected Phone", 9000000L, true);
+        var provider=mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenReturn("{\"ids\":[\""+selected.getId()+"\"]}");
+        var phones=new PhoneAssistanceService(products,provider,new ObjectMapper());
+        var responder=new com.smartphoneai.service.ChatResponder(provider,new ObjectMapper(),phones,mock(com.smartphoneai.service.RagService.class));
+        var answer=responder.answer("PHONE_CONSULTATION","Máy này phù hợp không?",java.util.List.of(),java.util.List.of(selected.getId().toString()));
+        assertEquals(selected.getId().toString(),answer.recommendedProducts().getFirst().id());
+        verify(provider).chat(argThat(prompt -> prompt.contains("Sản phẩm khách đang xem") && prompt.contains("Selected Phone")));
+    }
+    @Test void consultationAnswersQuestionUsingSelectedProductData() {
+        var product=save("Battery Phone", 9000000L, true);
+        product.getSpecifications().put("Pin", "5000 mAh"); products.saveAndFlush(product);
+        var provider=mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenReturn("{\"ids\":[\""+product.getId()+"\"]}", "Pin 5000 mAh.");
+        var service=new PhoneAssistanceService(products,provider,new ObjectMapper());
+        var result=service.consult("Pin máy bao nhiêu?",java.util.List.of(),java.util.List.of(product.getId().toString()));
+        assertEquals("Pin 5000 mAh.",result.text());
+        verify(provider).chat(argThat(prompt -> prompt.contains("Pin máy bao nhiêu?") && prompt.contains("5000 mAh") && !prompt.contains("Chỉ trả JSON")));
     }
     @Test void recommendationsUseRealActiveProductsAndHonorExplicitBudget() {
         var affordable=save("Demo A", 9000000L, true);

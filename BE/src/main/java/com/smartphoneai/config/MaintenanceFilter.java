@@ -17,7 +17,11 @@ public class MaintenanceFilter extends OncePerRequestFilter {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         boolean shopApi = path.startsWith("/api/") && !path.startsWith("/api/auth/")
                 && !path.startsWith("/api/admin/") && !path.equals("/api/maintenance");
-        if (shopApi && maintenance.isEnabled()) {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean adminProfile = (path.equals("/api/users/me") || path.equals("/api/users/me/password")) && authentication != null
+                && authentication.getPrincipal() instanceof AccountPrincipal
+                && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (shopApi && !adminProfile && maintenance.isEnabled()) {
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");

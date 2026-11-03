@@ -3,6 +3,8 @@ import net from 'node:net';
 import http from 'node:http';
 let latest = '';
 net.createServer(socket => {
+  // A test backend may disconnect mid-message when a run is interrupted.
+  socket.on('error', () => {});
   socket.write('220 localhost test SMTP\r\n');
   let buffer = '';
   let data = false;

@@ -47,6 +47,7 @@ public class AdminProductService {
         var product = new Product();
         applyProduct(product, input);
         for (var data : input.variants()) { var variant = new ProductVariant(); applyVariant(variant, data); product.addVariant(variant); }
+        validateVariants(product);
         products.saveAndFlush(product);
         return ProductService.toResponse(product);
     }
@@ -66,6 +67,7 @@ public class AdminProductService {
             if (data.id() == null) { var variant = new ProductVariant(); applyVariant(variant, data); product.addVariant(variant); }
             else applyVariant(locked.get(data.id()), data);
         }
+        validateVariants(product);
         products.flush();
         return ProductService.toResponse(product);
     }
@@ -74,6 +76,15 @@ public class AdminProductService {
         var product = products.findLocked(id).orElseThrow(ProductNotFoundException::new);
         product.setActive("ACTIVE".equals(status));
         return ProductService.toResponse(product);
+    }
+    private void validateVariants(Product product) {
+        var seen = new java.util.HashSet<java.util.List<String>>();
+        for (var variant : product.getVariants()) {
+            if (!variant.isActive()) continue;
+            var key = java.util.List.of(variant.getColor().trim().toLowerCase(java.util.Locale.ROOT),
+                    variant.getStorage().trim().toLowerCase(java.util.Locale.ROOT));
+            if (!seen.add(key)) throw new CatalogConflictException();
+        }
     }
     private void applyProduct(Product product, ProductMutationRequest input) {
         product.setName(input.name().trim());

@@ -38,9 +38,18 @@ class AdminManagementIntegrationTest {
                 .content("{\"identifier\":\"owner\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isOk()).andReturn();
         String rootId = mapper.readTree(rootLogin.getResponse().getContentAsString()).path("user").path("id").asText();
+        mvc.perform(post("/api/admin/admin-invitations").session(rootSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"staff@example.com\",\"fullName\":\"Staff\",\"role\":\"STAFF\"}"))
+                .andExpect(status().isBadRequest());
         var invited = mvc.perform(post("/api/admin/admin-invitations").session(rootSession).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"admin@example.com\",\"fullName\":\"Admin Two\"}"))
                 .andExpect(status().isAccepted()).andReturn();
+        var pendingList = mvc.perform(get("/api/admin/admins").session(rootSession)).andReturn();
+        var entries = mapper.readTree(pendingList.getResponse().getContentAsString());
+        String pendingId = "";
+        for (var entry : entries) if ("admin@example.com".equals(entry.path("user").path("email").asText())) pendingId=entry.path("user").path("id").asText();
+        mvc.perform(patch("/api/admin/admins/" + pendingId + "/role").session(rootSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"CUSTOMER\"}")).andExpect(status().isForbidden());
         String oldToken = token.get();
         String invitationId = mapper.readTree(invited.getResponse().getContentAsString()).path("id").asText();
         var list = mvc.perform(get("/api/admin/admins").session(rootSession)).andExpect(status().isOk()).andReturn();
@@ -64,8 +73,7 @@ class AdminManagementIntegrationTest {
         mvc.perform(delete("/api/admin/admins/" + rootId).session(adminSession).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(patch("/api/admin/admins/" + adminId + "/role").session(rootSession).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STAFF\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("STAFF"));
+                .andExpect(status().isForbidden());
         mvc.perform(patch("/api/admin/admins/" + adminId + "/role").session(rootSession).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"CUSTOMER\"}"))
                 .andExpect(status().isOk())

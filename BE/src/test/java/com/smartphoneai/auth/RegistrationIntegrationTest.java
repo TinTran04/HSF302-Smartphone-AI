@@ -48,6 +48,41 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test void pendingCustomerCanResumeRegistrationAfterLeavingOtpPage() throws Exception {
+        var sent = new AtomicReference<String>();
+        doAnswer(inv -> { sent.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
+        String body = "{\"email\":\"resume@example.com\",\"password\":\"Goodpass123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}";
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted());
+        jdbc.update("UPDATE otp_challenges SET issued_at = ? WHERE email = ?", java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(61)), "resume@example.com");
+        mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"resume@example.com\",\"password\":\"wrongpass\"}"))
+                .andExpect(status().isUnauthorized());
+        var resumed = mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"resume@example.com\",\"password\":\"Goodpass123!\"}"))
+                .andExpect(status().isAccepted()).andReturn();
+        String id = mapper.readTree(resumed.getResponse().getContentAsString()).path("challengeId").asText();
+        mvc.perform(post("/api/auth/otp/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", sent.get()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("resume@example.com"));
+    }
+
+    @Test void unverifiedCustomerCanResetPasswordWithoutActivatingAccount() throws Exception {
+        var code = new AtomicReference<String>();
+        doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"pending-reset@example.com\",\"password\":\"Oldpassword123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
+                .andExpect(status().isAccepted());
+        var reset = mvc.perform(post("/api/auth/password-reset").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"pending-reset@example.com\"}")).andExpect(status().isAccepted()).andReturn();
+        String id=mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
+        mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId",id,"code",code.get(),"newPassword","Newpassword123!"))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
+    }
+
     @Test void customerCanResetPasswordWithEmailOtp() throws Exception {
         var sent = new AtomicReference<String>();
         doAnswer(inv -> { sent.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());

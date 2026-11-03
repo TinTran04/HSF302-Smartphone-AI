@@ -4,7 +4,9 @@ import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview } from '..
 
 type ServerCart = { items: (CartEntry & { product: Product | null; variant: CartItem['variant'] | null; unavailable: boolean; priceAtAdd: number })[]; total: number };
 function mapCart(cart: ServerCart): Cart {
-  return { total: cart.total, unavailableVariantIds: cart.items.filter(i => i.unavailable).map(i => i.variantId),
+  return { total: cart.total,
+    unavailableItems: cart.items.filter(i => i.unavailable).map(({ variantId, quantity, product, variant }) => ({ variantId, quantity, product, variant })),
+    unavailableVariantIds: cart.items.filter(i => i.unavailable).map(i => i.variantId),
     items: cart.items.filter(i => !i.unavailable && i.product && i.variant) as CartItem[] };
 }
 type ServerOrder = Omit<Order, 'items'> & { items: { variantId: string; productName: string; color: string; storage: string; quantity: number; unitPrice: number }[] };
@@ -82,7 +84,12 @@ export const realApi: Api = {
     http(`/${admin ? 'admin/' : ''}products/${encodeURIComponent(id)}`),
   brands: () => http('/brands'),
   cart: async () => mapCart(await http<ServerCart>('/cart')),
-  resolveCart: async (entries) => entries.length ? mapCart(await post<ServerCart>('/cart/resolve', { items: entries })) : { items: [], unavailableVariantIds: [], total: 0 },
+  resolveCart: async (entries) => {
+    const batches = [];
+    for (let i = 0; i < entries.length; i += 100) batches.push(entries.slice(i, i + 100));
+    const results = await Promise.all(batches.map(items => post<ServerCart>('/cart/resolve', { items })));
+    return mapCart({ items: results.flatMap(result => result.items), total: results.reduce((sum, result) => sum + result.total, 0) });
+  },
   addCart: async (entry) => mapCart(await post<ServerCart>('/cart/items', entry)),
   updateCart: (id, quantity) =>
     http<ServerCart>(`/cart/items/${encodeURIComponent(id)}`, {
@@ -148,7 +155,11 @@ export const realApi: Api = {
           }),
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
-    return (['OPENAI', 'GEMINI'] as const).map(provider => configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', active: false });
+    return (['OPENAI', 'GEMINI'] as const).map(provider => {
+      const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', active: false };
+      const active = configs.find(c => c.provider === provider && c.active);
+      return { ...latest, ...(active ? { activeModel: active.model } : {}) };
+    });
   },
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
   testAiConnection: (data) => post('/admin/ai-settings/test', data),

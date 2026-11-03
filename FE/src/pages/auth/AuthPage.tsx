@@ -77,13 +77,17 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
       if (!isDemo) clearGuestToken();
       auth.setUser(user);
       const from = location.state?.from;
-      navigate(from ? safeReturnPath(from) : user.role !== 'CUSTOMER' ? '/admin' : '/', {
+      navigate(from ? safeReturnPath(from) : user.role === 'ADMIN' ? '/admin' : '/', {
         replace: true,
       });
     },
   });
   const verify = useMutation({
-    mutationFn: () => realAuth.verify(challenge!.challengeId, code, readGuestCart()),
+    mutationFn: () => {
+      const guestCart = readGuestCart();
+      if (guestCart.length > 100) throw new Error('Giỏ hàng có quá 100 phiên bản. Hãy quay lại giỏ và xóa bớt trước khi đăng nhập.');
+      return realAuth.verify(challenge!.challengeId, code, guestCart);
+    },
     onSuccess: ({ user }) => {
       clearGuestCart(); clearGuestToken(); auth.setUser(user);
       navigate(location.state?.from ? safeReturnPath(location.state.from) : '/', { replace: true });
@@ -159,7 +163,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
           {challenge ? <form onSubmit={(event) => { event.preventDefault(); verify.mutate(); }}>
             <p className="notice mt-6">Nhập mã OTP được gửi đến email của bạn. Mã có hiệu lực trong 5 phút.</p>
             <label className="form-field">Mã OTP<input required inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} /></label>
-            {verify.error && <ErrorState error={verify.error} />}
+            {verify.error && <><ErrorState error={verify.error} /><Link className="text-link" to="/cart">Quay lại giỏ hàng</Link></>}
             {resend.error && <ErrorState error={resend.error} />}
             {resend.isSuccess && <p role="status">Đã gửi lại mã xác minh.</p>}
             <Button type="submit" className="w-full mt-4" busy={verify.isPending}>Xác minh OTP</Button>
@@ -238,6 +242,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
               <Icon name="arrow_forward" />
             </Button>
           </form>}
+          {!register && !challenge && <p className="help-text mt-4">Nếu chưa hoàn tất đăng ký, hãy đăng nhập bằng email và mật khẩu đã đăng ký để nhận lại mã OTP.</p>}
           {!register && !challenge && <p className="mt-4 text-right"><Link className="text-link text-sm" to="/forgot-password">Quên mật khẩu?</Link></p>}
           <p className="help-text mt-6 text-center">
             {register ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}

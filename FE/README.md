@@ -6,13 +6,14 @@
 
 Yêu cầu Node.js 22.12 trở lên; đã kiểm tra với Node.js 24.
 
+Mở PowerShell tại thư mục `FE` của dự án:
+
 ```powershell
-cd E:\HSF\smartphone-ai\FE
 npm install
 npm run dev
 ```
 
-Mở **http://localhost:5173**. Không mở `index.html` bằng cách nhấp đúp; ứng dụng cần Vite.
+Mở **http://localhost:5173**. Nếu cổng 5173 đã được sử dụng, xem địa chỉ Vite in trong terminal. Không mở `index.html` bằng cách nhấp đúp; ứng dụng cần Vite.
 
 Ứng dụng mặc định dùng backend thật qua Vite proxy. Để xem giao diện với dữ liệu demo, đặt `VITE_ENABLE_MOCK_API=true` trong `.env.local` rồi khởi động lại Vite. Thanh thông báo trên trang hiển thị rõ chế độ demo.
 
@@ -28,7 +29,7 @@ Mở **http://localhost:5173**. Không mở `index.html` bằng cách nhấp đ�
 - JSX thuần cho toàn bộ 14 bản thiết kế tại `src/design/stitch`, xem đối chiếu ở **`/design`** khi chạy development. Khu vực này là bản mẫu tĩnh, không phải màn nghiệp vụ.
 - Ứng dụng chính refactor theo `layouts / pages / features / shared`, với header, footer, sidebar, thẻ sản phẩm, bảng so sánh, hộp thoại và thông báo dùng chung.
 - Trang chủ, danh mục tìm kiếm/lọc/sắp xếp qua URL, chi tiết chọn màu/dung lượng/số lượng, so sánh tối đa 3 mẫu máy.
-- Đăng nhập/đăng ký, hồ sơ, giỏ khách, hợp nhất giỏ qua API đăng nhập demo, checkout COD hai bước kiểm tra giá và xác nhận, lịch sử/chi tiết/hủy đơn PENDING.
+- Đăng nhập/đăng ký, hồ sơ, giỏ Guest, hợp nhất giỏ sau xác thực, checkout COD hai bước kiểm tra giá và xác nhận, lịch sử/chi tiết/hủy đơn PENDING.
 - Một giao diện AI với 4 chủ đề, lịch sử theo phiên/tài khoản, gợi ý sản phẩm, bảng so sánh, nguồn RAG, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
 - Admin: dashboard, danh sách/thêm/sửa/ẩn sản phẩm và biến thể, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt OpenAI hoặc Gemini.
 - Bổ sung các màn chưa có bản Stitch riêng: hồ sơ, danh sách/chi tiết đơn và form sản phẩm. File `dang_ki` ban đầu có cả panel đăng nhập lẫn đăng ký; React tách thành `/login` và `/register`.
@@ -57,7 +58,7 @@ FE/
 
 ## Kết nối Spring Boot
 
-Adapter trong `src/shared/api/realApi.ts` kết nối Spring Boot theo hợp đồng 1.1. Các luồng quản trị, đăng ký OTP, giỏ Guest và đặt COD đã được kiểm thử cùng BE với H2 và SMTP giả cục bộ.
+Adapter trong `src/shared/api/realApi.ts` kết nối Spring Boot theo hợp đồng API. Các luồng quản trị, đăng ký OTP, giỏ Guest và đặt COD đã được kiểm thử cùng BE với cơ sở dữ liệu và SMTP giả cục bộ.
 
 Tạo `.env.local` với nội dung:
 
@@ -67,9 +68,13 @@ VITE_API_BASE_URL=/api
 VITE_API_TARGET=http://localhost:8080
 ```
 
-Khởi động lại Vite. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie phiên. Không có API Key nhà cung cấp trong biến môi trường Frontend.
+Khởi động lại Vite. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie phiên. Không đặt API key, mật khẩu hay thông tin database vào biến `VITE_*` vì chúng có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
 
-`npm run build` mặc định dùng API thật và loại mã mock khỏi bundle, trừ khi bạn chủ động đặt `VITE_ENABLE_MOCK_API=true`. Không sao chép cấu hình bật demo vào build tích hợp. Xem [API_INTEGRATION.md](docs/API_INTEGRATION.md) trước khi nối Backend.
+`npm run build` sử dụng cấu hình Vite hiện có; không bật demo khi muốn dùng API thật. `VITE_API_TARGET` chỉ cấu hình proxy khi chạy Vite; môi trường khác cần có proxy tương ứng. Xem `docs/API_INTEGRATION.md` nếu tài liệu có trên máy.
+
+## AI và RAG
+
+Màn hình AI có bốn chủ đề: tư vấn mua điện thoại, so sánh điện thoại, hỗ trợ cửa hàng và trò chuyện cùng AI. **Hỗ trợ cửa hàng** sử dụng tài liệu do Admin tải lên; hai chủ đề về điện thoại sử dụng dữ liệu sản phẩm. Trước khi kiểm thử AI thật, Admin cần cấu hình chat model, embedding model và tải tài liệu PDF/TXT đến trạng thái `READY`. FE không gọi trực tiếp OpenAI/Gemini.
 
 ## Kiểm tra
 
@@ -80,9 +85,9 @@ npm run test:e2e
 npm run format:check
 ```
 
-Kiểm thử E2E dùng Chrome được cài trên máy, khởi động Vite tự động ở chế độ demo. Kiểm thử trong `tests/integration` dùng BE Spring Boot và cơ sở dữ liệu thử nghiệm; PostgreSQL/pgvector, SMTP và nhà cung cấp AI thực tế vẫn cần được kiểm thử trên môi trường dự án.
+Kiểm thử E2E dùng Chrome được cài trên máy, khởi động Vite tự động ở chế độ demo. Kiểm thử trong `tests/integration` dùng BE Spring Boot và cơ sở dữ liệu thử nghiệm; Gmail và nhà cung cấp AI thực tế vẫn cần được kiểm thử trên môi trường dự án.
 
-Để chạy riêng kiểm thử tích hợp bằng H2 và SMTP giả **chỉ trên máy local**, mở ba terminal:
+Để chạy riêng kiểm thử tích hợp bằng H2 và SMTP giả **chỉ trên máy local**, mở ba terminal. Test tạo dữ liệu: không trỏ vào database cửa hàng.
 
 ```powershell
 # Terminal 1, trong FE: hộp thư SMTP giả trên cổng 12525/12526
@@ -100,6 +105,8 @@ Tài khoản và dịch vụ SMTP trên chỉ dành cho kiểm thử; tắt hai 
 ## Đối chiếu và chuyển lại từ Stitch
 
 Xem [STITCH_MAPPING.md](docs/STITCH_MAPPING.md) để biết màn gốc tương ứng với route React. Thư mục HTML và ZIP ban đầu vẫn được giữ nguyên bên ngoài `FE`.
+
+Thư mục `docs/` hiện bị Git bỏ qua theo cấu hình dự án, nên các file đặc tả trong `FE/docs` hoặc `../docs` có thể không có trong bản clone nếu chưa được chia sẻ riêng.
 
 ```powershell
 npm run import:stitch

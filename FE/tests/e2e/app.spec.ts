@@ -168,3 +168,15 @@ test('14 converted design screens render and public routes fit desktop and table
   await page.screenshot({ path: 'test-results/home-1440.png', fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test('comparison picker pages through products and resets paging on search', async ({ page }) => {
+  await page.goto('/compare');
+  await page.getByRole('button', { name: 'Chọn điện thoại', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Trang 1 / 2')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Sau', exact: true }).click();
+  await expect(dialog.getByText('Trang 2 / 2')).toBeVisible();
+  await expect(dialog.getByText('vivo X100 Pro')).toBeVisible();
+  await dialog.getByLabel('Tìm máy so sánh').fill('iPhone');
+  await expect(dialog.getByText('iPhone 16 Pro Max')).toBeVisible();
+});

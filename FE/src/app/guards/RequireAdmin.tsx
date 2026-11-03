@@ -3,8 +3,7 @@ import { useAuth } from '../../features/auth/AuthProvider';
 import { EmptyState } from '../../shared/components/Ui';
 export function RequireAdmin() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'STAFF';
-  return isStaff ? (
+  return user?.role === 'ADMIN' ? (
     <Outlet />
   ) : (
     <div className="container page">

@@ -7,7 +7,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class UserAccount {
-    public enum Role { CUSTOMER, STAFF, MANAGER, ADMIN }
+    public enum Role { CUSTOMER, ADMIN }
     @Id private UUID id;
     @Column(unique = true) private String email;
     @Column(unique = true) private String username;
@@ -51,12 +51,8 @@ public class UserAccount {
     }
 
     public static UserAccount invitedAdmin(String email, String name) {
-        return invitedUser(email, name, Role.ADMIN);
-    }
-
-    public static UserAccount invitedUser(String email, String name, Role role) {
         var user = pendingCustomer(email, name, "", "!");
-        user.role = role == null ? Role.ADMIN : role;
+        user.role = Role.ADMIN;
         return user;
     }
 

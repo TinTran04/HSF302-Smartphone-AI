@@ -26,7 +26,8 @@ class RootAdminIntegrationTest {
         var session = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"rootadmin\",\"password\":\"TestRootPassword123!\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("ADMIN"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("ADMIN"))
+                .andExpect(jsonPath("$.user.email").doesNotExist());
         mvc.perform(get("/api/users/me").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.role").value("ADMIN"));
         mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)

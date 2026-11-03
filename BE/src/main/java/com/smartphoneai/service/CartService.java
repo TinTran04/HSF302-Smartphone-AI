@@ -77,7 +77,8 @@ public class CartService {
         lockUser(userId);
         if (!carts.existsById(userId)) carts.saveAndFlush(new Cart(userId));
         for (var entry : guestItems) {
-            var variant = variants.findById(entry.variantId()).orElseThrow(CartActionException::new);
+            var variant = variants.findById(entry.variantId()).orElse(null);
+            if (variant == null) continue;
             var item = items.findByUserIdAndVariantId(userId, entry.variantId()).orElse(null);
             if (item == null) items.saveAndFlush(new CartItem(userId, variant, entry.quantity()));
             else {

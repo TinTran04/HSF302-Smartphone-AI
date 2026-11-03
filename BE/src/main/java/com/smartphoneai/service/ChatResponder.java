@@ -21,9 +21,9 @@ public class ChatResponder {
         this.provider=provider; this.mapper=mapper; this.phones=phones; this.rag=rag;
     }
     public Answer answer(String topic, String question, List<ChatMessageResponse> history, List<String> productIds) {
-        if ("SHOP_SUPPORT".equals(topic)) return rag.answer(question);
+        if ("SHOP_SUPPORT".equals(topic)) return rag.answer(question,history);
         if ("PHONE_CONSULTATION".equals(topic)) {
-            var result=phones.consult(question,history);
+            var result=phones.consult(question,history,productIds);
             return new Answer(result.text(),List.of(),result.recommendedProducts(),List.of());
         }
         if ("PHONE_COMPARISON".equals(topic)) {

@@ -26,6 +26,30 @@ describe('real backend contract', () => {
     expect(cart.unavailableVariantIds).toEqual(['7']);
   });
 
+  it('preserves product details for unavailable cart items', async () => {
+    const product = { id: '1', name: 'Điện thoại A', images: [], variants: [], status: 'INACTIVE' };
+    const variant = { id: '7', color: 'Đen', storage: '128GB', price: 100, status: 'INACTIVE' };
+    vi.mocked(http).mockResolvedValueOnce({ items: [{ variantId: '7', quantity: 2, unavailable: true, product, variant }], total: 0 });
+    const cart = await realApi.resolveCart([{ variantId: '7', quantity: 2 }]);
+    expect(cart.unavailableItems).toEqual([{ variantId: '7', quantity: 2, product, variant }]);
+    expect(cart.items).toEqual([]);
+  });
+
+  it('retains the active model while exposing a newer draft configuration', async () => {
+    vi.mocked(http).mockResolvedValueOnce([
+      { provider: 'OPENAI', model: 'draft', maskedKey: '***', active: false },
+      { provider: 'OPENAI', model: 'active', maskedKey: '***', active: true },
+    ]);
+    const settings = await realApi.aiSettings();
+    expect(settings[0]).toMatchObject({ model: 'draft', active: false, activeModel: 'active' });
+  });
+
+  it('resolves an oversized guest cart in batches so users can remove items', async () => {
+    vi.mocked(http).mockResolvedValue({ items: [], total: 0 });
+    await realApi.resolveCart(Array.from({length: 101}, (_, i) => ({ variantId: String(i + 1), quantity: 1 })));
+    expect(vi.mocked(http)).toHaveBeenCalledTimes(2);
+  });
+
   it('sends selected variant IDs when requesting an order preview', async () => {
     vi.mocked(http).mockResolvedValueOnce({ previewId: 'p', items: [], total: 0, priceChanged: false });
     const shipping = { fullName: 'An', phone: '0900000000', address: 'Address 123', note: '' };

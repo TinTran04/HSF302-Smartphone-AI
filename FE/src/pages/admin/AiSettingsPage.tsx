@@ -53,7 +53,7 @@ export default function AiSettingsPage() {
                       </span>
                     </span>
                   </span>
-                  {s.active && <span className="badge badge-success">Đang hoạt động</span>}
+                  {(s.active || s.activeModel) && <span className="badge badge-success">Đang hoạt động: {s.activeModel || s.model}</span>}
                 </button>
               ))}
             </div>
@@ -157,6 +157,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
             </div>
           </label>
         </div>
+        {setting.activeModel && !setting.active && <p className="notice mt-7">Model đang hoạt động: {setting.activeModel}. Cấu hình bên dưới chưa được kích hoạt.</p>}
         <div className="notice mt-7">
           Thay đổi nhà cung cấp Chat không tự thay đổi Embedding Model. Backend sẽ quyết định có cần
           lập chỉ mục lại tài liệu hay không.

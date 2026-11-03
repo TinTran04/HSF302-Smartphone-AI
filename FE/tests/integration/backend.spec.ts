@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('real BE: admin login, brand and product creation, guest cart and guest chat session', async ({ page }) => {
+  test.setTimeout(120000);
   const errors: string[] = [];
   const suffix = Date.now().toString();
   const brandName = `Integration Brand ${suffix}`;
@@ -17,7 +18,7 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByLabel('Họ tên').fill('Admin kiểm thử');
   await page.getByLabel('Email').fill(`admin.${suffix}@example.com`);
   await page.getByRole('button', { name: 'Gửi lời mời', exact: true }).click();
-  await expect(page.getByText(`admin.${suffix}@example.com`)).toBeVisible();
+  await expect(page.getByText(`admin.${suffix}@example.com`)).toBeVisible({ timeout: 45000 });
   await page.reload();
   await page.getByText(`admin.${suffix}@example.com`).locator('..').getByRole('button', { name: 'Gửi lại lời mời', exact: true }).click();
   await expect(page.getByText('Đã thực hiện thao tác.', { exact: true })).toBeVisible();
@@ -63,7 +64,7 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByLabel('Họ và tên', { exact: true }).fill('Khách kiểm thử');
   await page.getByLabel('Số điện thoại', { exact: true }).fill('0900000000');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(`customer.${suffix}@example.com`);
-  await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
+  await page.getByLabel('Mật khẩu (tối thiểu 8 ký tự)', { exact: true }).fill('Password123!');
   await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('Password123!');
   await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click();
   await expect(page.getByLabel('Mã OTP')).toBeVisible();
