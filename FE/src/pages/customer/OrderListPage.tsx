@@ -8,7 +8,14 @@ import { EmptyState, ErrorState, PageHeading, Skeleton } from '../../shared/comp
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
 export default function OrderListPage() {
   const { user } = useAuth();
-  const orders = useQuery({ queryKey: ['orders', user?.id], queryFn: () => api.orders() });
+  const orders = useQuery({
+    queryKey: ['orders', user?.id],
+    queryFn: () => api.orders(),
+    refetchInterval: (q) => {
+      const hasActive = q.state.data?.some((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+      return hasActive ? 5000 : false;
+    },
+  });
   const [status, setStatus] = useState('');
   const filtered = orders.data?.filter((o) => !status || o.status === status);
   return (

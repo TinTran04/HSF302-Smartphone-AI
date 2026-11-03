@@ -1088,6 +1088,9 @@
   .timeline-item.complete {
     border-color: var(--success);
   }
+  .timeline-item.cancelled {
+    border-color: var(--error);
+  }
   .timeline-item p {
     font-size: 11px;
     color: var(--text-secondary);

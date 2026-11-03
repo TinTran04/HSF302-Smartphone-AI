@@ -41,7 +41,7 @@ public class AdminManagementService {
 
     @Transactional(readOnly = true)
     public List<AdminView> list() {
-        return users.findAllByRoleAndDeletedFalse(UserAccount.Role.ADMIN).stream()
+        return users.findAllByDeletedFalse().stream()
                 .map(u -> {
                     var invitation = u.isActive() ? null : invitations.findByUserId(u.getId()).orElse(null);
                     return new AdminView(UserResponse.from(u), u.isRoot(), u.isActive(),
@@ -52,7 +52,12 @@ public class AdminManagementService {
     public InvitationResult invite(AdminInvitationRequest input) {
         String email = input.email().trim().toLowerCase(Locale.ROOT);
         if (users.existsByEmail(email)) throw new EmailAlreadyExistsException();
-        var user = users.save(UserAccount.invitedAdmin(email, input.fullName()));
+        UserAccount.Role targetRole = UserAccount.Role.ADMIN;
+        if (input.role() != null && !input.role().isBlank()) {
+            try { targetRole = UserAccount.Role.valueOf(input.role().trim().toUpperCase(Locale.ROOT)); }
+            catch (IllegalArgumentException ignored) {}
+        }
+        var user = users.save(UserAccount.invitedUser(email, input.fullName(), targetRole));
         String token = token();
         var invitation = invitations.save(new AdminInvitation(user.getId(), hash(token), clock.instant().plusSeconds(86400)));
         sender.send(email, token);
@@ -62,7 +67,7 @@ public class AdminManagementService {
     public InvitationResult resend(UUID invitationId) {
         var invitation = invitations.findLockedById(invitationId).orElseThrow(InvalidInvitationException::new);
         var user = users.findLockedById(invitation.getUserId()).orElseThrow(InvalidInvitationException::new);
-        if (user.isActive() || user.isDeleted() || user.getRole() != UserAccount.Role.ADMIN) throw new InvalidInvitationException();
+        if (user.isActive() || user.isDeleted() || user.getRole() == UserAccount.Role.CUSTOMER) throw new InvalidInvitationException();
         String token = token();
         invitation.replace(hash(token), clock.instant().plusSeconds(86400));
         sender.send(user.getEmail(), token);
@@ -73,7 +78,7 @@ public class AdminManagementService {
         if (password.getBytes(StandardCharsets.UTF_8).length > 72) throw new InvalidPasswordException();
         var invitation = invitations.findLockedByTokenHash(hash(token)).orElseThrow(InvalidInvitationException::new);
         var user = users.findLockedById(invitation.getUserId()).orElseThrow(InvalidInvitationException::new);
-        if (user.isActive() || user.isDeleted() || user.getRole() != UserAccount.Role.ADMIN || !invitation.consume(clock.instant()))
+        if (user.isActive() || user.isDeleted() || user.getRole() == UserAccount.Role.CUSTOMER || !invitation.consume(clock.instant()))
             throw new InvalidInvitationException();
         user.changePasswordHash(passwords.encode(password));
         user.activate();
@@ -85,13 +90,23 @@ public class AdminManagementService {
     }
     @Transactional
     public UserResponse demoteAdmin(UUID actorId, UUID targetId) {
+        return changeRole(actorId, targetId, "CUSTOMER");
+    }
+    @Transactional
+    public UserResponse changeRole(UUID actorId, UUID targetId, String roleName) {
         var target = manageableTarget(actorId, targetId);
-        target.demoteToCustomer();
+        UserAccount.Role newRole;
+        try {
+            newRole = UserAccount.Role.valueOf(roleName.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception ex) {
+            throw new ProtectedAccountException();
+        }
+        target.changeRole(newRole);
         return UserResponse.from(target);
     }
     private UserAccount manageableTarget(UUID actorId, UUID targetId) {
         var target = users.findLockedById(targetId).orElseThrow(ProtectedAccountException::new);
-        if (actorId.equals(targetId) || target.isRoot() || target.isDeleted() || target.getRole() != UserAccount.Role.ADMIN)
+        if (actorId.equals(targetId) || target.isRoot() || target.isDeleted())
             throw new ProtectedAccountException();
         return target;
     }

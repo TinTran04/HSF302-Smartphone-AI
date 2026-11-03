@@ -25,7 +25,7 @@ public class LoginService {
         var user = (identifier.contains("@") ? users.findLockedByEmail(identifier) : users.findLockedByUsername(identifier)).orElse(null);
         if (user == null || !user.isActive()
                 || !passwords.matches(request.password(), user.getPasswordHash())) throw new InvalidCredentialsException();
-        if (user.getRole() == UserAccount.Role.ADMIN) return new LoginResult(user, null);
+        if (user.getRole() != UserAccount.Role.CUSTOMER) return new LoginResult(user, null);
         return new LoginResult(null, otp.issue(user.getEmail(), "LOGIN"));
     }
 }

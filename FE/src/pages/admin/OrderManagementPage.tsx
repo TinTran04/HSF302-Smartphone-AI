@@ -6,7 +6,11 @@ import { OrderStatus } from '../../features/orders/OrderStatus';
 import { EmptyState, ErrorState, PageHeading, Skeleton, Button } from '../../shared/components/Ui';
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
 export default function OrderManagementPage() {
-  const query = useQuery({ queryKey: ['orders', 'admin'], queryFn: () => api.orders(true) });
+  const query = useQuery({
+    queryKey: ['orders', 'admin'],
+    queryFn: () => api.orders(true),
+    refetchInterval: 5000,
+  });
   const [status, setStatus] = useState('');
   const [keyword, setKeyword] = useState('');
   const orders = query.data?.filter(

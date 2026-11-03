@@ -13,8 +13,14 @@ import org.springframework.data.repository.query.Param;
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
     Optional<UserAccount> findByEmail(String email);
     boolean existsByEmail(String email);
-    boolean existsByRootKey(String rootKey);
+    Optional<UserAccount> findByRootKey(String rootKey);
+    default boolean existsByRootKey(String rootKey) {
+        return findByRootKey(rootKey).isPresent();
+    }
     List<UserAccount> findAllByRoleAndDeletedFalse(UserAccount.Role role);
+    List<UserAccount> findAllByRoleInAndDeletedFalse(List<UserAccount.Role> roles);
+    List<UserAccount> findAllByDeletedFalse();
+    Optional<UserAccount> findByEmailIgnoreCaseAndDeletedFalse(String email);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserAccount u where u.email = :email")
     Optional<UserAccount> findLockedByEmail(@Param("email") String email);
