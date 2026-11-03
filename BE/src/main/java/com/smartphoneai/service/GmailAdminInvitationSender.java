@@ -14,16 +14,9 @@ public class GmailAdminInvitationSender implements AdminInvitationSender {
             @Value("${app.admin-invitation-url:http://localhost:5173/admin/invite}") String inviteUrl) {
         this.mail = mail; this.sender = sender; this.inviteUrl = inviteUrl;
     }
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GmailAdminInvitationSender.class);
-
     @Override public void send(String email, String token) {
         String link = inviteUrl + "?token=" + token;
-        if (sender.isBlank()) {
-            log.info("================================================================================");
-            log.info("[ADMIN INVITATION SENDER] Gui loi moi quan tri den {}: >>> {} <<< (Chua cau hinh SMTP_USERNAME)", email, link);
-            log.info("================================================================================");
-            return;
-        }
+        if (sender.isBlank()) throw new IllegalStateException("SMTP username is not configured");
         var message = new SimpleMailMessage();
         message.setFrom(sender); message.setTo(email); message.setSubject("Lời mời quản trị SmartPhone AI");
         message.setText("Đặt mật khẩu trong 24 giờ: " + link);

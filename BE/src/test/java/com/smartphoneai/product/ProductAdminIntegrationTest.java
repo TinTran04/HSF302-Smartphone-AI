@@ -39,6 +39,11 @@ class ProductAdminIntegrationTest {
         mvc.perform(post("/api/admin/products").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(invalid))).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        var duplicate = new java.util.HashMap<String, Object>(input);
+        duplicate.put("variants", List.of(Map.of("color","Black","storage","256GB","price",1,"status","ACTIVE"),
+                Map.of("color"," black ","storage","256GB","price",2,"status","ACTIVE")));
+        mvc.perform(post("/api/admin/products").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(duplicate))).andExpect(status().isConflict());
         var created = mvc.perform(post("/api/admin/products").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(input))).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.variants[0].price").value(12000000)).andReturn();

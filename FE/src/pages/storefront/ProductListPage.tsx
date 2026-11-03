@@ -29,7 +29,7 @@ export function sanitizeCatalogParams(input: URLSearchParams) {
     params.delete('maxPrice');
   const page = Number(input.get('page'));
   if (Number.isSafeInteger(page) && page > 1) params.set('page', String(page));
-  if (['price,asc', 'price,desc', 'name,asc'].includes(input.get('sort') || ''))
+  if (['price,asc', 'price,desc', 'name,asc', 'name,desc'].includes(input.get('sort') || ''))
     params.set('sort', input.get('sort')!);
   return params;
 }
@@ -101,6 +101,7 @@ export default function ProductListPage() {
               <option value="price,asc">Giá: Thấp đến cao</option>
               <option value="price,desc">Giá: Cao đến thấp</option>
               <option value="name,asc">Tên: A–Z</option>
+              <option value="name,desc">Tên: Z–A</option>
             </select>
           </div>
           {products.isPending ? (

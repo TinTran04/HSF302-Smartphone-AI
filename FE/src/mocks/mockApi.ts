@@ -95,11 +95,13 @@ const save = () => {
 };
 function resolveCart(entries: CartEntry[]): Cart {
   const unavailableVariantIds: string[] = [];
+  const unavailableItems: Cart['unavailableItems'] = [];
   const items = entries.flatMap((entry) => {
     const product = products.find((p) => p.variants.some((v) => v.id === entry.variantId));
     const variant = product?.variants.find((v) => v.id === entry.variantId);
     if (!product || !variant || product.status !== 'ACTIVE' || variant.status !== 'ACTIVE') {
       unavailableVariantIds.push(entry.variantId);
+      unavailableItems.push({ ...entry, product: product ?? null, variant: variant ?? null });
       return [];
     }
     return [{ ...entry, product, variant }];
@@ -107,6 +109,7 @@ function resolveCart(entries: CartEntry[]): Cart {
   return {
     items,
     unavailableVariantIds,
+    unavailableItems,
     total: items.reduce((sum, i) => sum + i.variant.price * i.quantity, 0),
   };
 }

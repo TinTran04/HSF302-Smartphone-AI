@@ -57,6 +57,7 @@ export function CartProvider({ children }: PropsWithChildren) {
           next = current.filter((i) => i.variantId !== action.variantId);
         else {
           const existing = current.find((i) => i.variantId === action.variantId);
+          if (!existing && current.length >= 100) throw new Error('Giỏ hàng chỉ hỗ trợ tối đa 100 phiên bản.');
           const quantity =
             action.kind === 'add' ? (existing?.quantity || 0) + action.quantity! : action.quantity!;
           if (!Number.isSafeInteger(quantity) || quantity < 1)

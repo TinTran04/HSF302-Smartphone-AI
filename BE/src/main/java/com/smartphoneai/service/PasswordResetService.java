@@ -25,7 +25,10 @@ public class PasswordResetService {
     public OtpChallenge begin(String requestedEmail) {
         String email = requestedEmail.trim().toLowerCase(Locale.ROOT);
         var user = users.findLockedByEmail(email).orElse(null);
-        return otp.issue(email, "PASSWORD_RESET", user != null && user.isActive());
+        return otp.issue(email, "PASSWORD_RESET", eligible(user));
+    }
+    private static boolean eligible(com.smartphoneai.entity.UserAccount user) {
+        return user != null && !user.isDeleted() && (user.isActive() || user.getRole() == com.smartphoneai.entity.UserAccount.Role.CUSTOMER);
     }
     @Transactional
     public boolean confirm(UUID challengeId, String code, String newPassword) {
@@ -33,7 +36,7 @@ public class PasswordResetService {
         var challenge = challenges.findById(challengeId).orElse(null);
         if (challenge == null || !"PASSWORD_RESET".equals(challenge.getPurpose()) || !challenge.isDeliverable()) return false;
         var user = users.findLockedByEmail(challenge.getEmail()).orElse(null);
-        if (user == null || !user.isActive()) return false;
+        if (!eligible(user)) return false;
         if (otp.verify(challengeId, "PASSWORD_RESET", code) != OtpChallenge.Result.SUCCESS) return false;
         user.changePasswordHash(passwords.encode(newPassword));
         return true;

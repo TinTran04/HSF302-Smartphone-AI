@@ -2,6 +2,8 @@
 
 Website bán điện thoại có trợ lý AI, gồm giao diện React và backend Spring Boot. Dự án được thiết kế để chạy local, hỗ trợ thanh toán khi nhận hàng (COD) và miễn phí giao hàng.
 
+Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin gốc đăng nhập bằng username và mật khẩu; Gmail được cấu hình riêng để gửi OTP và lời mời Admin.
+
 ## Chức năng chính
 
 - **Cửa hàng:** xem, tìm kiếm và lọc điện thoại; xem phiên bản; so sánh sản phẩm; dùng giỏ hàng và đặt hàng COD.
@@ -37,9 +39,11 @@ smartphone-ai/
 - Tài khoản Gmail và mật khẩu ứng dụng để gửi OTP và lời mời Admin. Các tính năng này cần SMTP hoạt động.
 - API key của OpenAI hoặc Gemini nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
 
+**Nếu database đã có dữ liệu:** sao lưu và thử trên bản sao trước khi khởi động BE. Migration V20 xóa các tài khoản STAFF/MANAGER cũ cùng dữ liệu liên quan của chính các tài khoản đó. Chi tiết tại [README backend](BE/README.md).
+
 ## Chạy dự án local
 
-Các lệnh sau dùng PowerShell và giả sử bạn đang ở thư mục gốc `E:\HSF\smartphone-ai`.
+Các lệnh sau dùng PowerShell và giả sử bạn đang ở thư mục gốc dự án. Nếu thư mục đã được đổi tên hoặc di chuyển, mở terminal tại vị trí mới.
 
 ### 1. Cấu hình và chạy backend
 
@@ -68,7 +72,7 @@ $rng.GetBytes($aiKeyBytes)
 [Convert]::ToBase64String($aiKeyBytes)
 ```
 
-Lưu khóa ở nơi an toàn và sử dụng **cùng một khóa** cho các lần chạy sau để đọc được cấu hình AI đã mã hóa. Admin gốc được tạo khi khởi động lần đầu; thay đổi biến môi trường sau khi tài khoản đã được tạo không tự đổi mật khẩu đã lưu. Flyway sẽ áp dụng migration khi backend khởi động.
+Lưu khóa ở nơi an toàn và sử dụng **cùng một khóa** cho các lần chạy sau để đọc được cấu hình AI đã mã hóa. Admin gốc được tạo nếu chưa tồn tại và đã cấu hình username/mật khẩu; thay đổi biến môi trường sau khi tài khoản đã được tạo không tự đổi mật khẩu đã lưu. Flyway sẽ áp dụng migration khi backend khởi động. Các biến `$env:` chỉ tồn tại trong terminal PowerShell hiện tại.
 
 Backend mặc định phục vụ API tại `http://localhost:8080/api`. Tham khảo [hướng dẫn backend](BE/README.md) để biết chi tiết cấu hình và kiểm thử.
 
@@ -91,6 +95,15 @@ VITE_ENABLE_MOCK_API=false
 ```
 
 Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite. Không đưa mật khẩu hay API key vào biến `VITE_*`. Cấu hình proxy này dùng cho Vite khi phát triển; môi trường triển khai cần cấu hình proxy tương ứng.
+
+## Cấu hình AI và RAG
+
+1. Đăng nhập Admin, mở **Cấu hình AI**, lưu cấu hình OpenAI/Gemini, kiểm tra kết nối rồi kích hoạt chat model.
+2. Mở **Cấu hình embedding**, nhập provider, model, số chiều và API key phù hợp; kiểm tra và lưu.
+3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
+4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
+
+Tư vấn và so sánh điện thoại dùng dữ liệu sản phẩm; trò chuyện chung dùng chat model. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 
 ### Chế độ demo giao diện
 
@@ -123,3 +136,5 @@ Kiểm thử giao diện dùng Chrome cài trên máy và chạy ở chế độ
 - [Hướng dẫn frontend](FE/README.md) và [tích hợp API](FE/docs/API_INTEGRATION.md)
 - [Hướng dẫn backend](BE/README.md)
 - [Đặc tả frontend](FE/docs/FE_SPEC.md)
+
+Thư mục `docs/` đang được `.gitignore` bỏ qua, gồm cả các thư mục có tên `docs` bên trong dự án. Các tài liệu ở đó có thể không xuất hiện trong bản clone nếu chưa được chia sẻ riêng.

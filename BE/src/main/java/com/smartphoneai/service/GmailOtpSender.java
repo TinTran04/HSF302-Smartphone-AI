@@ -13,14 +13,8 @@ public class GmailOtpSender implements OtpSender {
         this.mail = mail;
         this.sender = sender;
     }
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GmailOtpSender.class);
     @Override public void send(String email, String code) {
-        if (sender.isBlank()) {
-            log.info("================================================================================");
-            log.info("[OTP CONSOLE SENDER] Gui ma OTP den {}: >>> {} <<< (Chua cau hinh SMTP_USERNAME)", email, code);
-            log.info("================================================================================");
-            return;
-        }
+        if (sender.isBlank()) throw new IllegalStateException("SMTP username is not configured");
         var message = new SimpleMailMessage();
         message.setFrom(sender);
         message.setTo(email);

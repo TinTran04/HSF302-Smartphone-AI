@@ -15,6 +15,21 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class RagServiceTest {
+    @Test void shopSupportIncludesPreviousQuestionForFollowUpRetrieval() {
+        var docs=mock(KnowledgeDocumentRepository.class); var chunks=mock(KnowledgeChunkRepository.class);
+        var vectors=mock(KnowledgeVectorStore.class); var ai=mock(AiProviderService.class);
+        var doc=new KnowledgeDocument("policy.txt",10,"[]",Instant.now()); doc.ready("v1");
+        var chunk=new KnowledgeChunk(doc.getId(),null,"Bảo hành 12 tháng", "v1");
+        when(docs.findAllByStatus("READY")).thenReturn(List.of(doc)); when(vectors.currentVersion()).thenReturn("v1");
+        when(vectors.search(anyString(),anySet(),eq("v1"))).thenReturn(List.of(new KnowledgeVectorStore.Hit(chunk.getId(),0.9)));
+        when(chunks.findById(chunk.getId())).thenReturn(Optional.of(chunk));
+        when(ai.chat(anyString())).thenReturn("{\"answer\":\"12 tháng\",\"citedChunkIds\":[\""+chunk.getId()+"\"]}");
+        var rag=new RagService(docs,chunks,vectors,ai,new ObjectMapper());
+        var responder=new ChatResponder(ai,new ObjectMapper(),mock(PhoneAssistanceService.class),rag);
+        var history=List.of(new com.smartphoneai.dto.response.ChatMessageResponse("1","user","Chính sách bảo hành?",List.of(),List.of(),List.of()));
+        responder.answer("SHOP_SUPPORT","Áp dụng bao lâu?",history,List.of());
+        verify(vectors).search(argThat(q -> q.contains("Chính sách bảo hành") && q.contains("Áp dụng bao lâu")),anySet(),eq("v1"));
+    }
     @Test void newerEvidenceIsPresentedFirstAndOnlyRetrievedIdsMayBeCited() {
         var docs=mock(KnowledgeDocumentRepository.class);
         var chunks=mock(KnowledgeChunkRepository.class);

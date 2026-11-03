@@ -1,4 +1,4 @@
-export type Role = 'CUSTOMER' | 'STAFF' | 'MANAGER' | 'ADMIN';
+export type Role = 'CUSTOMER' | 'ADMIN';
 export interface User {
   id: string;
   fullName: string;
@@ -47,7 +47,12 @@ export interface CartItem extends CartEntry {
   product: Product;
   variant: ProductVariant;
 }
+export interface UnavailableCartItem extends CartEntry {
+  product: Product | null;
+  variant: ProductVariant | null;
+}
 export interface Cart {
+  unavailableItems: UnavailableCartItem[];
   items: CartItem[];
   unavailableVariantIds: string[];
   total: number;
@@ -135,6 +140,7 @@ export interface AiSettings {
   model: string;
   maskedKey: string;
   active: boolean;
+  activeModel?: string;
 }
 export interface Dashboard {
   products: number;

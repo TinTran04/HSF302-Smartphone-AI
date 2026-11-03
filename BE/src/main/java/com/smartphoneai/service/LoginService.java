@@ -23,9 +23,12 @@ public class LoginService {
     public LoginResult beginLogin(LoginRequest request) {
         String identifier = request.identifier().trim().toLowerCase(Locale.ROOT);
         var user = (identifier.contains("@") ? users.findLockedByEmail(identifier) : users.findLockedByUsername(identifier)).orElse(null);
-        if (user == null || !user.isActive()
-                || !passwords.matches(request.password(), user.getPasswordHash())) throw new InvalidCredentialsException();
-        if (user.getRole() != UserAccount.Role.CUSTOMER) return new LoginResult(user, null);
+        if (user == null || user.isDeleted() || !passwords.matches(request.password(), user.getPasswordHash())) throw new InvalidCredentialsException();
+        if (!user.isActive()) {
+            if (user.getRole() != UserAccount.Role.CUSTOMER) throw new InvalidCredentialsException();
+            return new LoginResult(null, otp.issue(user.getEmail(), "REGISTER"));
+        }
+        if (user.getRole() == UserAccount.Role.ADMIN) return new LoginResult(user, null);
         return new LoginResult(null, otp.issue(user.getEmail(), "LOGIN"));
     }
 }

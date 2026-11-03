@@ -34,6 +34,11 @@ class MaintenanceIntegrationTest {
         mvc.perform(get("/api/maintenance")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
         mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk());
         mvc.perform(get("/api/admin/admins").session(session)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isOk());
+        mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{}" )).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/products").session(session)).andExpect(status().isServiceUnavailable());
+        mvc.perform(get("/api/users/me")).andExpect(status().isServiceUnavailable());
         mvc.perform(put("/api/admin/maintenance").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"enabled\":false}"))
                 .andExpect(status().isOk());

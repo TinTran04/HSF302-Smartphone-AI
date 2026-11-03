@@ -56,7 +56,7 @@ class CartIntegrationTest {
         String challengeId = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
         mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get(),
-                        "guestCart", java.util.List.of(Map.of("variantId", variantId, "quantity", 2))))))
+                        "guestCart", java.util.List.of(Map.of("variantId", variantId, "quantity", 2), Map.of("variantId", "999999999", "quantity", 1))))))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/cart").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(2));
