@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductFiltersIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ProductRepository products;
+    @Autowired com.smartphoneai.repository.BrandRepository brands;
 
     @Test void filtersRamAndSortsByLowestActiveVariantPrice() throws Exception {
         save("Expensive", "8 GB", 200);
@@ -27,6 +28,19 @@ class ProductFiltersIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(2))
                 .andExpect(jsonPath("$.items[0].name").value("Cheap"))
                 .andExpect(jsonPath("$.items[1].name").value("Expensive"));
+    }
+
+    @Test void filtersByBrandIdWithNullRamAndStorage() throws Exception {
+        var apple = new com.smartphoneai.entity.Brand();
+        apple.setName("AppleBrandTest");
+        brands.saveAndFlush(apple);
+        var p = new Product();
+        p.setName("iPhone 16 BrandTest"); p.setActive(true); p.setBrand(apple);
+        products.saveAndFlush(p);
+
+        mvc.perform(get("/api/products").param("brandId", apple.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].name").value("iPhone 16 BrandTest"));
     }
 
     @Test @WithMockUser(roles = "ADMIN")

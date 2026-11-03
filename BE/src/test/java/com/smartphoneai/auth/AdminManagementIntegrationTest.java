@@ -63,8 +63,13 @@ class AdminManagementIntegrationTest {
         String adminId = mapper.readTree(adminLogin.getResponse().getContentAsString()).path("user").path("id").asText();
         mvc.perform(delete("/api/admin/admins/" + rootId).session(adminSession).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(patch("/api/admin/admins/" + adminId + "/role").session(rootSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STAFF\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("STAFF"));
+        mvc.perform(patch("/api/admin/admins/" + adminId + "/role").session(rootSession).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"CUSTOMER\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("CUSTOMER"));
         mvc.perform(get("/api/admin/admins").session(adminSession)).andExpect(status().isUnauthorized());
     }
 }

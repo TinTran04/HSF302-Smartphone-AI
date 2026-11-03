@@ -21,8 +21,13 @@ public class AdminCatalogController {
     @PutMapping("/brands/{id}") public BrandResponse updateBrand(@PathVariable Long id, @Valid @RequestBody BrandRequest input) { return brands.update(id,input.name()); }
     @DeleteMapping("/brands/{id}") public ResponseEntity<Void> deleteBrand(@PathVariable Long id) { brands.delete(id); return ResponseEntity.noContent().build(); }
     @GetMapping("/products") public PageResponse<ProductResponse> products(@RequestParam(defaultValue="1") int page,
-            @RequestParam(defaultValue="20") int size, @RequestParam(defaultValue="") String q,
-            @RequestParam(required=false) String status) { return products.list(q,status,page,size); }
+            @RequestParam(defaultValue="20") int size,
+            @RequestParam(defaultValue="") String q,
+            @RequestParam(required=false) String keyword,
+            @RequestParam(required=false) String status) {
+        String searchTerm = (q != null && !q.isBlank()) ? q : (keyword != null ? keyword : "");
+        return products.list(searchTerm,status,page,size);
+    }
     @GetMapping("/products/{id}") public ProductResponse product(@PathVariable Long id) { return products.get(id); }
     @PostMapping("/products") public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductMutationRequest input) { return ResponseEntity.status(201).body(products.create(input)); }
     @PutMapping("/products/{id}") public ProductResponse update(@PathVariable Long id, @Valid @RequestBody ProductMutationRequest input) { return products.update(id,input); }

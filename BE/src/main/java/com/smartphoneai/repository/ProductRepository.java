@@ -25,12 +25,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         and (:brandId is null or p.brand.id = :brandId)
         and (:ram is null or exists (select 1 from Product rp join rp.specifications spec
           where rp = p and lower(key(spec)) = 'ram'
-          and lower(replace(spec, ' ', '')) = lower(replace(:ram, ' ', ''))))
+          and lower(replace(spec, ' ', '')) = :ram))
         and (:filterVariants = false or exists (select v.id from ProductVariant v
           where v.product = p and v.active = true
           and (:minPrice is null or v.price >= :minPrice)
           and (:maxPrice is null or v.price <= :maxPrice)
-          and (:storage is null or lower(v.storage) = lower(:storage))))
+          and (:storage is null or lower(v.storage) = :storage)))
         order by
           case when :sort in ('price,asc', 'price,desc') and (select min(v.price) from ProductVariant v where v.product = p and v.active = true) is null then 1 else 0 end asc,
           case when :sort = 'price,asc' then (select min(v.price) from ProductVariant v where v.product = p and v.active = true) end asc,

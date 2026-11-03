@@ -98,6 +98,107 @@ class OrderIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
+    @Test void staffAndManagerOrderLifecycleWorkflow() throws Exception {
+        var product = new Product(); product.setName("Galaxy AI"); product.setActive(true);
+        var v = variant("Silver", 20000000L);
+        product.addVariant(v); products.saveAndFlush(product);
+
+        var code = new AtomicReference<String>();
+        doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
+
+        // 1. Register customer & staff users
+        var custSession = new MockHttpSession();
+        var custReg = mvc.perform(post("/api/auth/register").session(custSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"buyer@example.com\",\"password\":\"Password123!\",\"fullName\":\"Khach Hang\",\"phone\":\"0911222333\"}"))
+                .andExpect(status().isAccepted()).andReturn();
+        String custChallenge = mapper.readTree(custReg.getResponse().getContentAsString()).path("challengeId").asText();
+        var custLogin = mvc.perform(post("/api/auth/otp/verify").session(custSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("challengeId", custChallenge, "code", code.get())))).andExpect(status().isOk()).andReturn();
+        String custId = mapper.readTree(custLogin.getResponse().getContentAsString()).path("user").path("id").asText();
+
+        var staffSession = new MockHttpSession();
+        var staffReg = mvc.perform(post("/api/auth/register").session(staffSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"staff@example.com\",\"password\":\"Password123!\",\"fullName\":\"Nhan Vien\",\"phone\":\"0944555666\"}"))
+                .andExpect(status().isAccepted()).andReturn();
+        String staffChallenge = mapper.readTree(staffReg.getResponse().getContentAsString()).path("challengeId").asText();
+        var staffLogin = mvc.perform(post("/api/auth/otp/verify").session(staffSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("challengeId", staffChallenge, "code", code.get())))).andExpect(status().isOk()).andReturn();
+        String staffId = mapper.readTree(staffLogin.getResponse().getContentAsString()).path("user").path("id").asText();
+
+        // Admin logs in and promotes staff@example.com to STAFF
+        var rootSession = new MockHttpSession();
+        mvc.perform(post("/api/auth/login").session(rootSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"orderadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+        mvc.perform(patch("/api/admin/admins/" + staffId + "/role").session(rootSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STAFF\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("STAFF"));
+
+        // Staff logs in with updated role
+        var activeStaffSession = new MockHttpSession();
+        mvc.perform(post("/api/auth/login").session(activeStaffSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"staff@example.com\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("STAFF"));
+
+        // 2. Customer adds product to cart, previews, and places order
+        mvc.perform(post("/api/cart/items").session(custSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("variantId", v.getId().toString(), "quantity", 1)))).andExpect(status().isOk());
+        var shipping = Map.of("fullName", "Khach Hang", "phone", "0911222333", "address", "456 Le Loi", "note", "Giao gio hanh chinh");
+        var preview = mvc.perform(post("/api/orders/preview").session(custSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("variantIds", List.of(v.getId().toString()), "shipping", shipping, "paymentMethod", "COD"))))
+                .andExpect(status().isOk()).andReturn();
+        String previewId = mapper.readTree(preview.getResponse().getContentAsString()).path("previewId").asText();
+
+        var place = mvc.perform(post("/api/orders").session(custSession).with(csrf()).header("Idempotency-Key", "staff-flow-order")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("previewId", previewId, "shipping", shipping, "paymentMethod", "COD"))))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+        String orderId = mapper.readTree(place.getResponse().getContentAsString()).path("id").asText();
+
+        // 3. Staff lists orders in /api/admin/orders, verifies status is PENDING
+        mvc.perform(get("/api/admin/orders").session(activeStaffSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '" + orderId + "')].status").value("PENDING"));
+
+        // 4. Staff approves order: PENDING -> CONFIRMED
+        mvc.perform(patch("/api/admin/orders/" + orderId + "/status").session(activeStaffSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CONFIRMED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        // 5. Admin promotes staff to MANAGER to verify MANAGER can also manage orders
+        mvc.perform(patch("/api/admin/admins/" + staffId + "/role").session(rootSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"MANAGER\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("MANAGER"));
+
+        var activeManagerSession = new MockHttpSession();
+        mvc.perform(post("/api/auth/login").session(activeManagerSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"staff@example.com\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("MANAGER"));
+
+        // Manager transitions: CONFIRMED -> SHIPPING
+        mvc.perform(patch("/api/admin/orders/" + orderId + "/status").session(activeManagerSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"SHIPPING\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SHIPPING"));
+
+        // Manager transitions: SHIPPING -> COMPLETED
+        mvc.perform(patch("/api/admin/orders/" + orderId + "/status").session(activeManagerSession).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        // 6. Customer checks /api/orders and /api/orders/{id}
+        mvc.perform(get("/api/orders").session(custSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '" + orderId + "')].status").value("COMPLETED"));
+
+        var custOrder = mvc.perform(get("/api/orders/" + orderId).session(custSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.history.length()").value(4))
+                .andExpect(jsonPath("$.history[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.history[1].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.history[2].status").value("SHIPPING"))
+                .andExpect(jsonPath("$.history[3].status").value("COMPLETED")).andReturn();
+
+        // Customer cannot cancel an already completed order
+        mvc.perform(post("/api/orders/" + orderId + "/cancel").session(custSession).with(csrf()))
+                .andExpect(status().isConflict());
+    }
+
     private ProductVariant variant(String color, long price) {
         var variant = new ProductVariant(); variant.setColor(color); variant.setStorage("256GB");
         variant.setPrice(price); variant.setActive(true); return variant;

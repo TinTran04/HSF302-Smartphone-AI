@@ -41,8 +41,8 @@ public class ProductService {
                 || (minPrice != null && maxPrice != null && minPrice > maxPrice)
                 || (sort != null && !sort.isBlank() && !java.util.Set.of("price,asc", "price,desc", "name,asc", "name,desc").contains(sort)))
             throw new InvalidPaginationException();
-        String normalizedStorage = storage == null || storage.isBlank() ? null : storage.trim();
-        String normalizedRam = ram == null || ram.isBlank() ? null : ram.trim();
+        String normalizedStorage = storage == null || storage.isBlank() ? null : storage.trim().toLowerCase();
+        String normalizedRam = ram == null || ram.isBlank() ? null : ram.replaceAll("\\s+", "").toLowerCase();
         var found = products.searchActive(query == null ? "" : query.trim(), brandId,
                 minPrice != null || maxPrice != null || normalizedStorage != null,
                 minPrice, maxPrice, normalizedStorage, normalizedRam, sort == null ? "" : sort,

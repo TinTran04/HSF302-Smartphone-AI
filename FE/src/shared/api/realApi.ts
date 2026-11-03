@@ -71,8 +71,13 @@ export const realApi: Api = {
   register: (data) => post('/auth/register', { email: data.email, password: data.password, fullName: data.fullName, phone: data.phone }),
   logout: () => post('/auth/logout'),
   updateProfile: (data) => http('/users/me', { method: 'PUT', body: jsonBody(data) }),
-  products: (params = new URLSearchParams(), admin = false) =>
-    http(`/${admin ? 'admin/' : ''}products?${params}`),
+  products: (params = new URLSearchParams(), admin = false) => {
+    const searchParams = new URLSearchParams(params);
+    if (searchParams.has('keyword') && !searchParams.has('q')) {
+      searchParams.set('q', searchParams.get('keyword')!);
+    }
+    return http(`/${admin ? 'admin/' : ''}products?${searchParams}`);
+  },
   product: (id, admin = false) =>
     http(`/${admin ? 'admin/' : ''}products/${encodeURIComponent(id)}`),
   brands: () => http('/brands'),
@@ -112,7 +117,14 @@ export const realApi: Api = {
   saveProduct: (product, creating) =>
     http(`/admin/products${creating ? '' : `/${encodeURIComponent(product.id)}`}`, {
       method: creating ? 'POST' : 'PUT',
-      body: jsonBody({ ...product, variants: product.variants.map(v => ({ ...v, id: /^\d+$/.test(v.id) ? v.id : undefined })) }),
+      body: jsonBody({
+        ...product,
+        brandId: Number(product.brandId),
+        variants: product.variants.map(v => ({
+          ...v,
+          id: /^\d+$/.test(v.id) ? Number(v.id) : undefined,
+        })),
+      }),
     }),
   productStatus: (id, status) =>
     http(`/admin/products/${encodeURIComponent(id)}/status`, {

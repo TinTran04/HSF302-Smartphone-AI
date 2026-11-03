@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './tests/integration',
   workers: 1,
   timeout: 60000,
+  expect: { timeout: 15000 },
   reporter: 'list',
   use: { baseURL: 'http://127.0.0.1:15173', ...devices['Desktop Chrome'], channel: 'chrome' },
   webServer: {

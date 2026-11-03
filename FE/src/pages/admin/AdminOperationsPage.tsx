@@ -13,6 +13,7 @@ export default function AdminOperationsPage({ section }: { section: 'brands' | '
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [invitationId, setInvitationId] = useState('');
+  const [inviteRole, setInviteRole] = useState<'STAFF' | 'MANAGER' | 'ADMIN'>('STAFF');
   const [provider, setProvider] = useState('OPENAI');
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -24,7 +25,7 @@ export default function AdminOperationsPage({ section }: { section: 'brands' | '
     setName(''); setEmail(''); setApiKey(''); void client.invalidateQueries({ queryKey: ['admin-ops', section] });
   } });
   const act = (url: string, method: string, body?: unknown) => mutation.mutate({ url, method, body });
-  const title = { brands: 'Quản lý thương hiệu', admins: 'Quản lý quản trị viên', maintenance: 'Chế độ bảo trì', embedding: 'Cấu hình embedding' }[section];
+  const title = { brands: 'Quản lý thương hiệu', admins: 'Quản lý phân quyền & nhân sự', maintenance: 'Chế độ bảo trì', embedding: 'Cấu hình embedding' }[section];
   return <><PageHeading title={title} />
     {isDemo ? <p className="notice">Chức năng này cần kết nối backend.</p> : <>
       {query.error && <ErrorState error={query.error} />}{mutation.error && <ErrorState error={mutation.error} />}
@@ -34,14 +35,37 @@ export default function AdminOperationsPage({ section }: { section: 'brands' | '
         {(query.data as Brand[] | undefined)?.map(brand => <div key={brand.id} className="flex gap-4 items-center mt-4"><span>{brand.name}</span>
           <Button variant="secondary" onClick={() => { const value = window.prompt('Tên thương hiệu', brand.name); if (value?.trim()) act(`/admin/brands/${brand.id}`, 'PUT', { name: value.trim() }); }}>Sửa</Button>
           <Button variant="danger" onClick={() => { if (window.confirm(`Xóa thương hiệu ${brand.name}?`)) act(`/admin/brands/${brand.id}`, 'DELETE'); }}>Xóa</Button></div>)}</div>}
-      {section === 'admins' && <div className="card panel"><form onSubmit={e => { e.preventDefault(); act('/admin/admin-invitations', 'POST', { email: email.trim(), fullName: name.trim() }); }}>
+      {section === 'admins' && <div className="card panel"><form onSubmit={e => { e.preventDefault(); act('/admin/admin-invitations', 'POST', { email: email.trim(), fullName: name.trim(), role: inviteRole }); }}>
         <label className="form-field">Họ tên<input required value={name} onChange={e => setName(e.target.value)} /></label>
-        <label className="form-field">Email<input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label><Button type="submit" busy={mutation.isPending}>Gửi lời mời</Button></form>
+        <label className="form-field">Email<input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label>
+        <label className="form-field">Vai trò<select value={inviteRole} onChange={e => setInviteRole(e.target.value as 'STAFF' | 'MANAGER' | 'ADMIN')}>
+          <option value="STAFF">Nhân viên (STAFF)</option>
+          <option value="MANAGER">Quản lý (MANAGER)</option>
+          <option value="ADMIN">Quản trị viên (ADMIN)</option>
+        </select></label>
+        <Button type="submit" busy={mutation.isPending}>Gửi lời mời</Button></form>
         {invitationId && <Button variant="secondary" className="mt-4" onClick={() => act(`/admin/admin-invitations/${invitationId}/resend`, 'POST')}>Gửi lại lời mời vừa tạo</Button>}
-        {(query.data as AdminEntry[] | undefined)?.map(item => <div key={item.user.id} className="flex gap-4 items-center mt-4"><span>{item.user.fullName} · {item.user.email || 'Admin gốc'} · {item.root ? 'Admin gốc' : item.active ? 'Đang hoạt động' : 'Đã mời'}</span>
+        {(query.data as AdminEntry[] | undefined)?.map(item => <div key={item.user.id} className="flex gap-4 items-center mt-4 flex-wrap">
+          <span>{item.user.fullName} · {item.user.email || 'Admin gốc'} · <strong className="px-2 py-0.5 rounded bg-surface-container-high text-xs">{item.user.role}</strong> · {item.root ? 'Admin gốc' : item.active ? 'Đang hoạt động' : 'Đã mời'}</span>
           {!item.active && item.invitationId && <Button variant="secondary" onClick={() => act(`/admin/admin-invitations/${item.invitationId}/resend`, 'POST')}>Gửi lại lời mời</Button>}
-          {!item.root && <><Button variant="secondary" onClick={() => { if (window.confirm('Chuyển tài khoản này thành khách hàng?')) act(`/admin/admins/${item.user.id}/role`, 'PATCH', { role: 'CUSTOMER' }); }}>Hạ quyền</Button>
-          <Button variant="danger" onClick={() => { if (window.confirm('Xóa tài khoản quản trị này?')) act(`/admin/admins/${item.user.id}`, 'DELETE'); }}>Xóa</Button></>}</div>)}</div>}
+          {!item.root && <>
+            <select
+              value={item.user.role}
+              onChange={e => {
+                const newRole = e.target.value;
+                if (window.confirm(`Đổi vai trò tài khoản ${item.user.fullName} sang ${newRole}?`)) {
+                  act(`/admin/admins/${item.user.id}/role`, 'PATCH', { role: newRole });
+                }
+              }}
+              className="p-1 border rounded text-xs bg-surface text-on-surface"
+            >
+              <option value="STAFF">STAFF</option>
+              <option value="MANAGER">MANAGER</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="CUSTOMER">CUSTOMER</option>
+            </select>
+            <Button variant="danger" onClick={() => { if (window.confirm(`Xóa tài khoản ${item.user.fullName}?`)) act(`/admin/admins/${item.user.id}`, 'DELETE'); }}>Xóa</Button>
+          </>}</div>)}</div>}
       {section === 'maintenance' && <div className="card panel"><p>Trạng thái: {(query.data as {enabled?: boolean} | undefined)?.enabled ? 'Đang bảo trì' : 'Đang hoạt động'}</p>
         <Button className="mt-4" disabled={query.isPending} onClick={() => { const enabled = !(query.data as {enabled: boolean}).enabled; if (window.confirm(enabled ? 'Bật bảo trì cửa hàng?' : 'Tắt bảo trì cửa hàng?')) act('/admin/maintenance', 'PUT', { enabled }); }}>{(query.data as {enabled?: boolean} | undefined)?.enabled ? 'Tắt bảo trì' : 'Bật bảo trì'}</Button></div>}
       {section === 'embedding' && <form className="card panel" onSubmit={e => { e.preventDefault(); act('/admin/embedding-settings', 'PUT', { provider, model: model.trim(), dimensions, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }); }}>

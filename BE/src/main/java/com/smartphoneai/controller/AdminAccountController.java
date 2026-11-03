@@ -2,7 +2,6 @@ package com.smartphoneai.controller;
 
 import com.smartphoneai.dto.request.AdminInvitationRequest;
 import com.smartphoneai.dto.request.ChangeAdminRoleRequest;
-import com.smartphoneai.exception.ProtectedAccountException;
 import com.smartphoneai.service.AdminManagementService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +26,7 @@ public class AdminAccountController {
         admins.deleteAdmin(UUID.fromString(auth.getName()), id); return ResponseEntity.noContent().build();
     }
     @PatchMapping("/admins/{id}/role")
-    public Object demote(@PathVariable UUID id, Authentication auth, @Valid @RequestBody ChangeAdminRoleRequest input) {
-        if (!"CUSTOMER".equals(input.role())) throw new ProtectedAccountException();
-        return admins.demoteAdmin(UUID.fromString(auth.getName()), id);
+    public Object changeRole(@PathVariable UUID id, Authentication auth, @Valid @RequestBody ChangeAdminRoleRequest input) {
+        return admins.changeRole(UUID.fromString(auth.getName()), id, input.role());
     }
 }

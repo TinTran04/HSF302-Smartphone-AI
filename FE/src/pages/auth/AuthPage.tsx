@@ -77,7 +77,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
       if (!isDemo) clearGuestToken();
       auth.setUser(user);
       const from = location.state?.from;
-      navigate(from ? safeReturnPath(from) : user.role === 'ADMIN' ? '/admin' : '/', {
+      navigate(from ? safeReturnPath(from) : user.role !== 'CUSTOMER' ? '/admin' : '/', {
         replace: true,
       });
     },
@@ -94,6 +94,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
     e.preventDefault();
     if (submit.isPending) return;
     const next: Record<string, string> = {};
+    if (register && password.length < 8) next.password = 'Mật khẩu phải có ít nhất 8 ký tự.';
     if (register && password !== confirm) next.confirm = 'Mật khẩu xác nhận chưa khớp.';
     if (register && !fullName.trim()) next.fullName = 'Vui lòng nhập họ tên.';
     if (register && !/^[+\d][\d\s-]{8,14}$/.test(phone.trim()))
@@ -205,11 +206,16 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             </label>
             <PasswordField
               id="auth-password"
-              label="Mật khẩu"
+              label={register ? 'Mật khẩu (tối thiểu 8 ký tự)' : 'Mật khẩu'}
               value={password}
               onChange={setPassword}
               autoComplete={register ? 'new-password' : 'current-password'}
             />
+            {errors.password && (
+              <p className="field-error" role="alert">
+                {errors.password}
+              </p>
+            )}
             {register && (
               <>
                 <PasswordField

@@ -17,10 +17,10 @@ export const formatSize = (bytes: number) =>
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Có lỗi xảy ra. Vui lòng thử lại.';
 export const orderLabels = {
-  PENDING: 'Chờ xác nhận',
+  PENDING: 'Chờ duyệt',
   CONFIRMED: 'Đã xác nhận',
   SHIPPING: 'Đang giao',
-  COMPLETED: 'Hoàn thành',
+  COMPLETED: 'Đã giao',
   CANCELLED: 'Đã hủy',
 };
 export const knowledgeLabels = {

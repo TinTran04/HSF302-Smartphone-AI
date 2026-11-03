@@ -7,7 +7,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class UserAccount {
-    public enum Role { CUSTOMER, ADMIN }
+    public enum Role { CUSTOMER, STAFF, MANAGER, ADMIN }
     @Id private UUID id;
     @Column(unique = true) private String email;
     @Column(unique = true) private String username;
@@ -51,13 +51,19 @@ public class UserAccount {
     }
 
     public static UserAccount invitedAdmin(String email, String name) {
+        return invitedUser(email, name, Role.ADMIN);
+    }
+
+    public static UserAccount invitedUser(String email, String name, Role role) {
         var user = pendingCustomer(email, name, "", "!");
-        user.role = Role.ADMIN;
+        user.role = role == null ? Role.ADMIN : role;
         return user;
     }
 
     public void activate() { active = true; }
     public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void changeRole(Role newRole) { if (!isRoot() && newRole != null) this.role = newRole; }
+    public void demoteToCustomer() { changeRole(Role.CUSTOMER); }
     public void updateProfile(String name, String phone, String address) {
         this.fullName = name.trim(); this.phone = phone.trim(); this.address = address.trim();
     }
@@ -71,7 +77,7 @@ public class UserAccount {
     public Role getRole() { return role; }
     public boolean isActive() { return active; }
     public boolean isRoot() { return rootKey != null; }
+    public String getRootKey() { return rootKey; }
     public boolean isDeleted() { return deleted; }
     public void disableAndDelete() { deleted = true; active = false; }
-    public void demoteToCustomer() { role = Role.CUSTOMER; }
 }
