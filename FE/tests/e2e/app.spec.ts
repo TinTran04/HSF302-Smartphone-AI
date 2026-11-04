@@ -197,3 +197,22 @@ test('admin saves and removes a masked backup AI key', async ({ page }) => {
   await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true })).toBeHidden();
 });
+
+test('registration shows password strength and enforces eight characters', async ({ page }) => {
+  await page.goto('/register');
+  const password = page.getByLabel('Mật khẩu (tối thiểu 8 ký tự)', { exact: true });
+  const meter = page.getByRole('meter', { name: 'Độ mạnh mật khẩu' });
+  await password.fill('Ab1!xyz');
+  await expect(meter).toHaveAttribute('aria-valuetext', 'Yếu');
+  expect(await password.evaluate((input: HTMLInputElement) => input.validity.tooShort)).toBeTruthy();
+  await password.fill('Abcd1234');
+  await expect(meter).toHaveAttribute('aria-valuetext', 'Trung bình');
+  expect(await password.evaluate((input: HTMLInputElement) => input.validity.tooShort)).toBeFalsy();
+  await password.fill('LongTest123!');
+  await expect(meter).toHaveAttribute('aria-valuetext', 'Mạnh');
+  await password.fill('');
+  await expect(meter).toHaveCount(0);
+  await page.goto('/login');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('LongTest123!');
+  await expect(page.getByRole('meter')).toHaveCount(0);
+});

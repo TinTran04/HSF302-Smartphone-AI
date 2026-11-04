@@ -10,18 +10,30 @@ import { Icon } from '../../shared/components/Icon';
 import { safeReturnPath } from '../../shared/utils/format';
 import images from '../../design/product-images.json';
 import { clearGuestToken, realAuth } from '../../shared/api/realApi';
+import { getPasswordStrength } from '../../shared/utils/password';
+
+const strengthLevels = {
+  weak: { label: 'Yếu', score: 1, color: 'bg-red-500' },
+  medium: { label: 'Trung bình', score: 2, color: 'bg-amber-500' },
+  strong: { label: 'Mạnh', score: 3, color: 'bg-emerald-600' },
+};
+
 function PasswordField({
   id,
   label,
   value,
   onChange,
   autoComplete,
+  minLength,
+  describedBy,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   autoComplete: string;
+  minLength?: number;
+  describedBy?: string;
 }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -32,6 +44,8 @@ function PasswordField({
           id={id}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
+          minLength={minLength}
+          aria-describedby={describedBy}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required
@@ -57,6 +71,8 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [challenge, setChallenge] = useState<{challengeId: string; resendAfter?: string} | null>(null);
   const [code, setCode] = useState('');
+  const strength = getPasswordStrength(password);
+  const strengthLevel = strength ? strengthLevels[strength] : null;
   const auth = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -214,7 +230,32 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
               value={password}
               onChange={setPassword}
               autoComplete={register ? 'new-password' : 'current-password'}
+              minLength={register ? 8 : undefined}
+              describedBy={register ? 'password-strength' : undefined}
             />
+            {register && (
+              <div id="password-strength" className="mt-2 mb-4 text-sm" role="status" aria-live="polite">
+                {strengthLevel ? <>
+                  <p>Độ mạnh mật khẩu — <strong>{strengthLevel.label}</strong></p>
+                  <div
+                    role="meter"
+                    aria-label="Độ mạnh mật khẩu"
+                    aria-valuemin={0}
+                    aria-valuemax={3}
+                    aria-valuenow={strengthLevel.score}
+                    aria-valuetext={strengthLevel.label}
+                    className="h-1.5 mt-2 rounded-full bg-slate-200 overflow-hidden"
+                  >
+                    <div className={`h-full rounded-full ${strengthLevel.color}`} style={{ width: `${strengthLevel.score / 3 * 100}%` }} />
+                  </div>
+                </> : null}
+                <p className="help-text mt-2">
+                  {password.length < 8
+                    ? 'Mật khẩu phải có ít nhất 8 ký tự.'
+                    : 'Đánh giá ước tính theo độ dài và kiểu ký tự. Kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt để tăng độ mạnh.'}
+                </p>
+              </div>
+            )}
             {errors.password && (
               <p className="field-error" role="alert">
                 {errors.password}
@@ -228,6 +269,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
                   value={confirm}
                   onChange={setConfirm}
                   autoComplete="new-password"
+                  minLength={8}
                 />
                 {errors.confirm && (
                   <p className="field-error" role="alert">
