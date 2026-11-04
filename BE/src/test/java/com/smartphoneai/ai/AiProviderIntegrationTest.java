@@ -50,9 +50,12 @@ class AiProviderIntegrationTest {
         mvc.perform(put("/api/admin/ai-settings").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"GEMINI\",\"model\":\"bad-model\",\"apiKey\":\"bad-key\"}"))
                 .andExpect(status().isOk());
-        when(provider.chat(eq("GEMINI"), eq("bad-model"), eq("bad-key"), anyString())).thenThrow(new AiProviderException());
+        when(provider.chat(eq("GEMINI"), eq("bad-model"), eq("bad-key"), anyString())).thenThrow(new AiProviderException(503));
         mvc.perform(post("/api/admin/ai-settings/test").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"GEMINI\",\"model\":\"bad-model\"}")).andExpect(status().isServiceUnavailable());
+                .content("{\"provider\":\"GEMINI\",\"model\":\"bad-model\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_PROVIDER_BUSY"))
+                .andExpect(jsonPath("$.message").value(containsString("quá tải")));
         mvc.perform(post("/api/admin/ai-settings/activate").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"GEMINI\"}")).andExpect(status().isConflict());
         org.junit.jupiter.api.Assertions.assertEquals("OPENAI", configs.findAllByActiveTrue().getFirst().getProvider());

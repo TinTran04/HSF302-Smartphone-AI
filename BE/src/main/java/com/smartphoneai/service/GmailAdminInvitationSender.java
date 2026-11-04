@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
+import org.springframework.mail.MailException;
+import com.smartphoneai.exception.EmailDeliveryException;
 
 @Component
 public class GmailAdminInvitationSender implements AdminInvitationSender {
@@ -16,10 +18,14 @@ public class GmailAdminInvitationSender implements AdminInvitationSender {
     }
     @Override public void send(String email, String token) {
         String link = inviteUrl + "?token=" + token;
-        if (sender.isBlank()) throw new IllegalStateException("SMTP username is not configured");
+        if (sender.isBlank()) throw new EmailDeliveryException("Hệ thống chưa cấu hình email gửi lời mời. Vui lòng liên hệ quản trị viên.");
         var message = new SimpleMailMessage();
         message.setFrom(sender); message.setTo(email); message.setSubject("Lời mời quản trị SmartPhone AI");
         message.setText("Đặt mật khẩu trong 24 giờ: " + link);
-        mail.send(message);
+        try {
+            mail.send(message);
+        } catch (MailException exception) {
+            throw new EmailDeliveryException(exception);
+        }
     }
 }

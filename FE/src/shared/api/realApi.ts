@@ -117,8 +117,8 @@ export const realApi: Api = {
     return chatRequest(`/ai/conversations/${encodeURIComponent(result.conversationId)}`);
   },
   conversation: (id) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}`),
-  sendMessage: (id, content) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }) }),
-  confirmSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST' }),
+  sendMessage: (id, content) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }), signal: AbortSignal.timeout(120000) }),
+  confirmSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST', signal: AbortSignal.timeout(120000) }),
   cancelSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   dashboard: () => http('/admin/dashboard'),
   saveProduct: (product, creating) =>
@@ -156,13 +156,13 @@ export const realApi: Api = {
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
     return (['OPENAI', 'GEMINI'] as const).map(provider => {
-      const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', active: false };
+      const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
       const active = configs.find(c => c.provider === provider && c.active);
       return { ...latest, ...(active ? { activeModel: active.model } : {}) };
     });
   },
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
-  testAiConnection: (data) => post('/admin/ai-settings/test', data),
+  testAiConnection: (data) => http('/admin/ai-settings/test', { method: 'POST', body: jsonBody(data), signal: AbortSignal.timeout(65000) }),
   activateProvider: async (provider) => {
     await post('/admin/ai-settings/activate', { provider });
     return realApi.aiSettings();

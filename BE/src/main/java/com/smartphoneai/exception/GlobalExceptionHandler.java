@@ -12,6 +12,11 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(EmailDeliveryException.class)
+    public ResponseEntity<ApiError> emailDeliveryUnavailable(EmailDeliveryException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError("EMAIL_DELIVERY_UNAVAILABLE", exception.getMessage(), Instant.now()));
+    }
     @ExceptionHandler(KnowledgeNotFoundException.class)
     public ResponseEntity<ApiError> knowledgeNotFound(KnowledgeNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("KNOWLEDGE_NOT_FOUND", "Không tìm thấy tài liệu", Instant.now()));
@@ -42,7 +47,7 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(AiProviderException.class)
     public ResponseEntity<ApiError> aiProviderError(AiProviderException exception) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError("AI_PROVIDER_ERROR", "Không thể kết nối nhà cung cấp AI", Instant.now()));
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError(exception.getCode(), exception.getMessage(), Instant.now()));
     }
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class, MissingRequestHeaderException.class})

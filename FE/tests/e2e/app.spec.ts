@@ -180,3 +180,20 @@ test('comparison picker pages through products and resets paging on search', asy
   await dialog.getByLabel('Tìm máy so sánh').fill('iPhone');
   await expect(dialog.getByText('iPhone 16 Pro Max')).toBeVisible();
 });
+
+test('admin saves and removes a masked backup AI key', async ({ page }) => {
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  await page.getByLabel('API Key dự phòng mới', { exact: true }).fill('backup-test-secret');
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
+  await expect(page.getByLabel('API Key dự phòng mới', { exact: true })).toHaveValue('');
+  await page.reload();
+  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
+  const stored = await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }));
+  expect(stored).not.toContain('backup-test-secret');
+  await page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true }).check();
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true })).toBeHidden();
+});

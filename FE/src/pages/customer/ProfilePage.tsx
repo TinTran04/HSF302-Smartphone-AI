@@ -50,8 +50,8 @@ export default function ProfilePage() {
           </label>
           <label className="form-field">
             Email
-            <input type="email" value={user.email} readOnly />
-            <span className="help-text">Email được quản lý bởi hệ thống tài khoản.</span>
+            <input type="email" value={user.email ?? ''} readOnly />
+            <span className="help-text">{user.email ? 'Email được quản lý bởi hệ thống tài khoản.' : 'Admin gốc đăng nhập bằng tên đăng nhập và không có email.'}</span>
           </label>
           <label className="form-field">
             Số điện thoại

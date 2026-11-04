@@ -60,11 +60,15 @@ export interface Api {
     provider: AiProvider;
     model: string;
     apiKey?: string;
+    backupApiKey?: string;
+    removeBackupKey?: boolean;
   }): Promise<AiSettings>;
   testAiConnection(data: {
     provider: AiProvider;
     model: string;
     apiKey?: string;
+    backupApiKey?: string;
+    removeBackupKey?: boolean;
   }): Promise<{ message: string }>;
   activateProvider(provider: AiProvider): Promise<AiSettings[]>;
 }

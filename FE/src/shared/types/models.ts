@@ -2,7 +2,7 @@ export type Role = 'CUSTOMER' | 'ADMIN';
 export interface User {
   id: string;
   fullName: string;
-  email: string;
+  email: string | null;
   phone: string;
   address: string;
   role: Role;
@@ -139,6 +139,8 @@ export interface AiSettings {
   provider: AiProvider;
   model: string;
   maskedKey: string;
+  maskedBackupKey: string;
+  tested: boolean;
   active: boolean;
   activeModel?: string;
 }
