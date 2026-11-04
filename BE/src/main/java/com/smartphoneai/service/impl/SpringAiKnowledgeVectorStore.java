@@ -1,4 +1,9 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.impl;
+
+import com.smartphoneai.service.support.EmbeddingModelFactory;
+
+import com.smartphoneai.service.EmbeddingSettingsService;
+import com.smartphoneai.service.KnowledgeVectorStore;
 
 import com.smartphoneai.exception.AiProviderException;
 import org.springframework.ai.document.Document;

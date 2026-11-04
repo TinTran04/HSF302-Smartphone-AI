@@ -2,7 +2,7 @@ package com.smartphoneai.order;
 
 import org.junit.jupiter.api.Test;
 import com.smartphoneai.entity.OrderStatus;
-import com.smartphoneai.service.OrderStatusPolicy;
+import com.smartphoneai.service.support.OrderStatusPolicy;
 import static org.junit.jupiter.api.Assertions.*;
 
 class OrderStatusPolicyTest {

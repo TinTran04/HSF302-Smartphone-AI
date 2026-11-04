@@ -1,4 +1,4 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.support;
 
 import com.smartphoneai.exception.AiProviderException;
 import org.springframework.beans.factory.annotation.Value;

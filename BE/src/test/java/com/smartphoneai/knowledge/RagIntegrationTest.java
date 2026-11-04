@@ -50,7 +50,7 @@ class RagIntegrationTest {
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
                 assertEquals("READY", documents.findById(java.util.UUID.fromString(docId)).orElseThrow().getStatus()));
         when(vectors.search(anyString(),anySet(),eq("embedding-v1"))).thenReturn(List.of(new KnowledgeVectorStore.Hit(chunkId.get(),0.9)));
-        when(ai.chat(anyString())).thenReturn("{\"answer\":\"Bảo hành 12 tháng.\",\"citedChunkIds\":[\""+chunkId.get()+"\"]}");
+        when(ai.chat(anyString())).thenReturn("```json\n{\"answer\":\"Bảo hành 12 tháng.\",\"citedChunkIds\":[\""+chunkId.get()+"\"]}\n```");
         when(router.route(anyString(),anyString(),anyList())).thenReturn(new TopicRouter.Decision("SAME_TOPIC",null));
         var guest=mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
         String token=mapper.readTree(guest.getResponse().getContentAsString()).path("guestSessionToken").asText();

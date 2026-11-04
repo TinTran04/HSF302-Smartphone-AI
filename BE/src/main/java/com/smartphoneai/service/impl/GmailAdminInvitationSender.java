@@ -1,4 +1,6 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.impl;
+
+import com.smartphoneai.service.AdminInvitationSender;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;

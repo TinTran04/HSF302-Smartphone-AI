@@ -1,9 +1,9 @@
 package com.smartphoneai.ai;
 
 import com.smartphoneai.service.GuestSessionCleanup;
+import com.smartphoneai.service.impl.GuestSessionCleanupImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Bean;
@@ -17,7 +17,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @DataJpaTest
-@Import({GuestSessionCleanup.class, GuestSessionCleanupIntegrationTest.ClockConfig.class})
+@Import({GuestSessionCleanupImpl.class, GuestSessionCleanupIntegrationTest.ClockConfig.class})
 class GuestSessionCleanupIntegrationTest {
     @TestConfiguration static class ClockConfig { @Bean Clock clock() { return Clock.fixed(Instant.parse("2026-01-03T00:00:00Z"), ZoneOffset.UTC); } }
     @Autowired GuestSessionCleanup cleanup;

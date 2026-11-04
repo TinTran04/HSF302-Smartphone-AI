@@ -31,6 +31,8 @@ smartphone-ai/
 └── README.md
 ```
 
+Backend tổ chức theo luồng Controller → Service interface → ServiceImpl → Repository. Interface nằm trong `BE/src/main/java/com/smartphoneai/service`, các lớp triển khai nằm trong `service/impl`, helper nằm trong `service/support` và bộ ánh xạ DTO nằm trong `mapper`.
+
 ## Yêu cầu trước khi chạy
 
 - JDK 21 và Maven 3.9 trở lên.

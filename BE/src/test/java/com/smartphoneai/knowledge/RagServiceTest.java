@@ -1,5 +1,8 @@
 package com.smartphoneai.knowledge;
 
+import com.smartphoneai.service.impl.ChatResponderImpl;
+import com.smartphoneai.service.impl.RagServiceImpl;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.entity.KnowledgeChunk;
 import com.smartphoneai.entity.KnowledgeDocument;
@@ -24,8 +27,8 @@ class RagServiceTest {
         when(vectors.search(anyString(),anySet(),eq("v1"))).thenReturn(List.of(new KnowledgeVectorStore.Hit(chunk.getId(),0.9)));
         when(chunks.findById(chunk.getId())).thenReturn(Optional.of(chunk));
         when(ai.chat(anyString())).thenReturn("{\"answer\":\"12 tháng\",\"citedChunkIds\":[\""+chunk.getId()+"\"]}");
-        var rag=new RagService(docs,chunks,vectors,ai,new ObjectMapper());
-        var responder=new ChatResponder(ai,new ObjectMapper(),mock(PhoneAssistanceService.class),rag);
+        var rag=new RagServiceImpl(docs,chunks,vectors,ai,new ObjectMapper());
+        var responder=new ChatResponderImpl(ai,new ObjectMapper(),mock(PhoneAssistanceService.class),rag);
         var history=List.of(new com.smartphoneai.dto.response.ChatMessageResponse("1","user","Chính sách bảo hành?",List.of(),List.of(),List.of()));
         responder.answer("SHOP_SUPPORT","Áp dụng bao lâu?",history,List.of());
         verify(vectors).search(argThat(q -> q.contains("Chính sách bảo hành") && q.contains("Áp dụng bao lâu")),anySet(),eq("v1"));
@@ -47,7 +50,7 @@ class RagServiceTest {
         when(chunks.findById(newChunk.getId())).thenReturn(Optional.of(newChunk));
         when(ai.chat(anyString())).thenReturn("{\"answer\":\"Theo chính sách mới.\",\"citedChunkIds\":[\""+newChunk.getId()+"\"]}")
                 .thenReturn("{\"answer\":\"Bịa nguồn\",\"citedChunkIds\":[\"unknown\"]}");
-        var service=new RagService(docs,chunks,vectors,ai,new ObjectMapper());
+        var service=new RagServiceImpl(docs,chunks,vectors,ai,new ObjectMapper());
         var result=service.answer("Chính sách?");
         assertEquals(newDoc.getId().toString(),result.sources().getFirst().documentId());
         var prompt=ArgumentCaptor.forClass(String.class); verify(ai).chat(prompt.capture());

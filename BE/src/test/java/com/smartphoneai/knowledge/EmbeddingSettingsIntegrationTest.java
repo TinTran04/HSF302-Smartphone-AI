@@ -1,7 +1,7 @@
 package com.smartphoneai.knowledge;
 
 import com.smartphoneai.repository.EmbeddingConfigRepository;
-import com.smartphoneai.service.EmbeddingModelFactory;
+import com.smartphoneai.service.support.EmbeddingModelFactory;
 import com.smartphoneai.service.OtpSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;

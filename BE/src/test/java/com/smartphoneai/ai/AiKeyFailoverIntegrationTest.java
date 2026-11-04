@@ -5,7 +5,7 @@ import com.smartphoneai.exception.AiProviderException;
 import com.smartphoneai.repository.AiProviderConfigRepository;
 import com.smartphoneai.service.AiProviderService;
 import com.smartphoneai.service.ChatProviderClient;
-import com.smartphoneai.service.ConfigSecretCipher;
+import com.smartphoneai.service.support.ConfigSecretCipher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -101,7 +101,7 @@ class AiKeyFailoverIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {401, 403, 404, 503})
+    @ValueSource(ints = {401, 403, 404, 502, 504})
     void otherProviderErrorsAreReturnedImmediately(int status) throws Exception {
         saveWithBackup();
         testConnection().andExpect(status().isOk());
@@ -113,6 +113,82 @@ class AiKeyFailoverIntegrationTest {
         assertSame(failure, assertThrows(AiProviderException.class, () -> ai.chat("question")));
         verify(provider).chat("GEMINI", "demo-model", "primary-secret", "question");
         verifyNoMoreInteractions(provider);
+    }
+
+    @Test void temporaryOverloadRetriesOnceWithoutUsingBackup() throws Exception {
+        saveWithBackup();
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        clearInvocations(provider);
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "question"))
+                .thenThrow(new AiProviderException(503)).thenReturn("Recovered answer");
+        assertEquals("Recovered answer", ai.chat("question"));
+        verify(provider, times(2)).chat("GEMINI", "demo-model", "primary-secret", "question");
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test void persistentOverloadStopsAfterSecondAttempt() throws Exception {
+        saveWithBackup();
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        clearInvocations(provider);
+        var failure = new AiProviderException(503);
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "question")).thenThrow(failure);
+        assertSame(failure, assertThrows(AiProviderException.class, () -> ai.chat("question")));
+        verify(provider, times(2)).chat("GEMINI", "demo-model", "primary-secret", "question");
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test void backupOverloadCanRecoverAfterPrimaryQuotaFailure() throws Exception {
+        saveWithBackup();
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        clearInvocations(provider);
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "question"))
+                .thenThrow(new AiProviderException(429));
+        when(provider.chat("GEMINI", "demo-model", "backup-secret", "question"))
+                .thenThrow(new AiProviderException(503)).thenReturn("Backup recovered");
+        assertEquals("Backup recovered", ai.chat("question"));
+        verify(provider).chat("GEMINI", "demo-model", "primary-secret", "question");
+        verify(provider, times(2)).chat("GEMINI", "demo-model", "backup-secret", "question");
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test void connectionTestRecoversBeforeAllowingActivation() throws Exception {
+        saveWithBackup();
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "Reply with OK."))
+                .thenThrow(new AiProviderException(503)).thenReturn("OK");
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        assertTrue(configs.findAllByActiveTrue().getFirst().isTested());
+        verify(provider, times(2)).chat("GEMINI", "demo-model", "primary-secret", "Reply with OK.");
+    }
+
+    @Test void primaryOverloadThenQuotaStillAllowsBackupRetry() throws Exception {
+        saveWithBackup();
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        clearInvocations(provider);
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "question"))
+                .thenThrow(new AiProviderException(503)).thenThrow(new AiProviderException(429));
+        when(provider.chat("GEMINI", "demo-model", "backup-secret", "question"))
+                .thenThrow(new AiProviderException(503)).thenReturn("Recovered with backup");
+        assertEquals("Recovered with backup", ai.chat("question"));
+        var calls = inOrder(provider);
+        calls.verify(provider, times(2)).chat("GEMINI", "demo-model", "primary-secret", "question");
+        calls.verify(provider, times(2)).chat("GEMINI", "demo-model", "backup-secret", "question");
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test void failedConnectionRetryDoesNotAllowActivation() throws Exception {
+        saveWithBackup();
+        when(provider.chat("GEMINI", "demo-model", "primary-secret", "Reply with OK."))
+                .thenThrow(new AiProviderException(503));
+        testConnection().andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_PROVIDER_BUSY"));
+        activate().andExpect(status().isConflict());
+        verify(provider, times(2)).chat("GEMINI", "demo-model", "primary-secret", "Reply with OK.");
+        verify(provider, never()).chat(eq("GEMINI"), anyString(), eq("backup-secret"), anyString());
     }
 
     @Test void secondQuotaFailureEndsWithoutRetryingEitherKey() throws Exception {

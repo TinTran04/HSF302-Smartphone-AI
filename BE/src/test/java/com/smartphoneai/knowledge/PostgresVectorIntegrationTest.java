@@ -1,9 +1,9 @@
 package com.smartphoneai.knowledge;
 
-import com.smartphoneai.service.EmbeddingModelFactory;
+import com.smartphoneai.service.support.EmbeddingModelFactory;
 import com.smartphoneai.service.EmbeddingSettingsService;
 import com.smartphoneai.service.KnowledgeVectorStore;
-import com.smartphoneai.service.SpringAiKnowledgeVectorStore;
+import com.smartphoneai.service.impl.SpringAiKnowledgeVectorStore;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
