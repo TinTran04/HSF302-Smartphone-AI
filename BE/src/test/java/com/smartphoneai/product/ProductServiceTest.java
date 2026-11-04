@@ -1,10 +1,11 @@
 package com.smartphoneai.product;
 
+import com.smartphoneai.service.impl.ProductServiceImpl;
+
 import com.smartphoneai.entity.Product;
 import com.smartphoneai.entity.Brand;
 import com.smartphoneai.entity.ProductVariant;
 import com.smartphoneai.repository.ProductRepository;
-import com.smartphoneai.service.ProductService;
 import org.junit.jupiter.api.Test;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,7 +19,7 @@ class ProductServiceTest {
         product.setName("Demo");
         product.setActive(false);
         when(repository.findByIdAndActiveTrue(1L)).thenReturn(Optional.empty());
-        var service = new ProductService(repository);
+        var service = new ProductServiceImpl(repository);
         assertTrue(service.findActive(1L).isEmpty());
         verify(repository).findByIdAndActiveTrue(1L);
     }
@@ -30,7 +31,7 @@ class ProductServiceTest {
         product.setName("Demo");
         product.setActive(true);
         when(repository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
-        var result = new ProductService(repository).findActive(1L).orElseThrow();
+        var result = new ProductServiceImpl(repository).findActive(1L).orElseThrow();
         assertEquals("1", result.id());
         assertEquals("Demo", result.name());
     }
@@ -53,7 +54,7 @@ class ProductServiceTest {
         variant.setActive(true);
         product.addVariant(variant);
         when(repository.findByIdAndActiveTrue(7L)).thenReturn(Optional.of(product));
-        var result = new ProductService(repository).findActive(7L).orElseThrow();
+        var result = new ProductServiceImpl(repository).findActive(7L).orElseThrow();
         assertEquals("Demo Brand", result.brandName());
         assertEquals("2", result.brandId());
         assertEquals("9", result.variants().getFirst().id());

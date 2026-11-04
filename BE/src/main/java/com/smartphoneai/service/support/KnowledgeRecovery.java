@@ -1,4 +1,6 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.support;
+
+import com.smartphoneai.service.DocumentProcessingService;
 
 import com.smartphoneai.repository.KnowledgeDocumentRepository;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

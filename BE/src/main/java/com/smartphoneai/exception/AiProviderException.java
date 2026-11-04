@@ -30,4 +30,8 @@ public class AiProviderException extends RuntimeException {
     public boolean isQuotaExceeded() {
         return providerStatus == 429;
     }
+
+    public boolean isServiceUnavailable() {
+        return providerStatus == 503;
+    }
 }

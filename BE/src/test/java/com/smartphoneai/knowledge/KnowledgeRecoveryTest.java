@@ -3,7 +3,7 @@ package com.smartphoneai.knowledge;
 import com.smartphoneai.entity.KnowledgeDocument;
 import com.smartphoneai.repository.KnowledgeDocumentRepository;
 import com.smartphoneai.service.DocumentProcessingService;
-import com.smartphoneai.service.KnowledgeRecovery;
+import com.smartphoneai.service.support.KnowledgeRecovery;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

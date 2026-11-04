@@ -1,4 +1,6 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.impl;
+
+import com.smartphoneai.service.ChatProviderClient;
 
 import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;

@@ -2,6 +2,29 @@
 
 Backend Spring Boot cho catalog điện thoại, tài khoản và OTP, giỏ hàng, đơn COD, quản trị và trợ lý AI. Hợp đồng và nghiệp vụ được mô tả tại [API specification](../docs/API_SPECIFICATION.md) và [Business specification](../docs/BUSINESS_SPECIFICATION.md).
 
+## Cấu trúc backend
+
+```text
+com.smartphoneai/
+├── controller/                  # REST API, nhận request và trả response
+├── service/                     # Interface và hợp đồng nghiệp vụ
+│   ├── ProductService.java
+│   ├── OrderService.java
+│   ├── impl/                    # Các lớp triển khai, transaction và async
+│   │   ├── ProductServiceImpl.java
+│   │   ├── OrderServiceImpl.java
+│   │   └── SpringAiProviderClient.java
+│   └── support/                 # Mã hóa, trích xuất tài liệu và policy
+├── mapper/                      # Ánh xạ entity sang DTO
+├── repository/                  # Truy cập dữ liệu bằng Spring Data JPA
+├── entity/                      # Entity database
+├── dto/                         # Request và response
+├── config/                      # Cấu hình Spring, security và khởi tạo
+└── exception/                   # Ngoại lệ và xử lý lỗi API
+```
+
+Controller và các service khác inject interface. Spring tạo bean từ các lớp `*Impl` trong `service/impl`. Các implementation gửi Gmail và kết nối AI cũng nằm trong thư mục này. Các kiểu record công khai thuộc interface tương ứng. Annotation `@Transactional`, `@Async` và `@Scheduled` được đặt trên phương thức implementation.
+
 ## Chuẩn bị local
 
 - JDK 21 và Maven 3.9 trở lên.
@@ -44,6 +67,8 @@ Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đ
 Bộ kiểm thử tự động sử dụng H2 và mock cho các dịch vụ ngoài. Các test PostgreSQL có điều kiện dùng `TEST_POSTGRES_URL`, `TEST_POSTGRES_USERNAME` và `TEST_POSTGRES_PASSWORD`; test migration yêu cầu database **trống và tách biệt**, test vector yêu cầu database thử nghiệm đã chạy migration. Không trỏ test vào database thật. Hướng dẫn test tích hợp FE–BE với H2 và SMTP giả có trong [README frontend](../FE/README.md).
 
 ## AI và tài liệu RAG
+
+Mỗi lần gọi Chat được thử tối đa hai lần khi nhà cung cấp trả HTTP 503, cách nhau 750 ms. Sau lần thử cuối, lỗi vẫn được trả về nếu provider tiếp tục quá tải. HTTP 429 sử dụng quy tắc key dự phòng đã cấu hình. Bộ đọc JSON AI chấp nhận JSON thuần và JSON trong khối Markdown cho phân loại chủ đề, chọn sản phẩm và câu trả lời RAG.
 
 Trong trang quản trị, lưu cấu hình chat model, kiểm tra và kích hoạt OpenAI hoặc Gemini. Cấu hình embedding được quản lý riêng; nhập model, số chiều và API key phù hợp. Tải PDF/TXT từ **Kho kiến thức AI**; PDF ảnh không được OCR.
 

@@ -1,8 +1,9 @@
 package com.smartphoneai.auth;
 
+import com.smartphoneai.service.impl.OtpChallengeServiceImpl;
+
 import com.smartphoneai.entity.OtpChallenge;
 import com.smartphoneai.repository.OtpChallengeRepository;
-import com.smartphoneai.service.OtpChallengeService;
 import com.smartphoneai.service.OtpSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -23,7 +24,7 @@ class OtpChallengeServiceTest {
         when(repository.findFirstByEmailAndPurposeOrderByIssuedAtDesc("a@example.com", "LOGIN"))
                 .thenReturn(Optional.of(previous));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        var service = new OtpChallengeService(repository, (email, code) -> {}, new BCryptPasswordEncoder(4),
+        var service = new OtpChallengeServiceImpl(repository, (email, code) -> {}, new BCryptPasswordEncoder(4),
                 Clock.fixed(now, ZoneOffset.UTC));
         service.issue("a@example.com", "LOGIN");
         assertEquals(OtpChallenge.Result.UNAVAILABLE, previous.verify(true, now));
@@ -33,7 +34,7 @@ class OtpChallengeServiceTest {
         var sentCode = new AtomicReference<String>();
         OtpSender sender = (email, code) -> sentCode.set(code);
         var now = Instant.parse("2026-10-30T03:00:00Z");
-        var service = new OtpChallengeService(repository, sender, new BCryptPasswordEncoder(4),
+        var service = new OtpChallengeServiceImpl(repository, sender, new BCryptPasswordEncoder(4),
                 Clock.fixed(now, ZoneOffset.UTC));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         var challenge = service.issue("a@example.com", "LOGIN");

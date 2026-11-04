@@ -1,4 +1,4 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.support;
 
 import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;

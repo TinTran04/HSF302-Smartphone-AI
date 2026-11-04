@@ -1,6 +1,6 @@
 package com.smartphoneai.entity;
 
-import com.smartphoneai.service.OtpPolicy;
+import com.smartphoneai.service.support.OtpPolicy;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;

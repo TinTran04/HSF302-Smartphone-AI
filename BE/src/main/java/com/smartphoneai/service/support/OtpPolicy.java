@@ -1,4 +1,4 @@
-package com.smartphoneai.service;
+package com.smartphoneai.service.support;
 
 import java.time.Instant;
 

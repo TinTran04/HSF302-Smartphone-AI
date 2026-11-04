@@ -1,7 +1,7 @@
 package com.smartphoneai.auth;
 
-import com.smartphoneai.service.GmailAdminInvitationSender;
-import com.smartphoneai.service.GmailOtpSender;
+import com.smartphoneai.service.impl.GmailAdminInvitationSender;
+import com.smartphoneai.service.impl.GmailOtpSender;
 import com.smartphoneai.exception.EmailDeliveryException;
 import org.junit.jupiter.api.Test;
 import org.springframework.mail.javamail.JavaMailSender;

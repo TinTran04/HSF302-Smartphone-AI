@@ -28,7 +28,7 @@ class RegistrationIntegrationTest {
     @MockitoBean OtpSender sender;
 
     @Test void missingSmtpReturnsServiceUnavailableWithoutCreatingPendingAccount() throws Exception {
-        var unconfiguredSender = new com.smartphoneai.service.GmailOtpSender(
+        var unconfiguredSender = new com.smartphoneai.service.impl.GmailOtpSender(
                 mock(org.springframework.mail.javamail.JavaMailSender.class), "");
         doAnswer(invocation -> {
             unconfiguredSender.send(invocation.getArgument(0), invocation.getArgument(1));

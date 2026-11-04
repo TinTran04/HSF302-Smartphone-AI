@@ -1,5 +1,7 @@
 package com.smartphoneai.ai;
 
+import com.smartphoneai.service.impl.AiChatServiceImpl;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.config.AccountPrincipal;
 import com.smartphoneai.entity.AiConversation;
@@ -26,7 +28,7 @@ class TopicSwitchLockOrderTest {
         when(switches.findConversationId(request.getId())).thenReturn(Optional.of(conversation.getId()));
         when(switches.findLocked(request.getId())).thenReturn(Optional.of(request));
         when(conversations.findLocked(conversation.getId())).thenReturn(Optional.of(conversation));
-        var service = new AiChatService(guests, conversations, messages, switches, mock(TopicRouter.class),
+        var service = new AiChatServiceImpl(guests, conversations, messages, switches, mock(TopicRouter.class),
                 mock(ChatResponder.class), new ObjectMapper(), Clock.systemUTC());
         service.cancel(new UsernamePasswordAuthenticationToken(new AccountPrincipal(user), null), null, request.getId());
         var order = inOrder(conversations, switches);
