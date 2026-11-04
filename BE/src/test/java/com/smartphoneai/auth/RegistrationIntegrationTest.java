@@ -27,6 +27,21 @@ class RegistrationIntegrationTest {
     @Autowired ObjectMapper mapper;
     @MockitoBean OtpSender sender;
 
+    @Test void missingSmtpReturnsServiceUnavailableWithoutCreatingPendingAccount() throws Exception {
+        var unconfiguredSender = new com.smartphoneai.service.GmailOtpSender(
+                mock(org.springframework.mail.javamail.JavaMailSender.class), "");
+        doAnswer(invocation -> {
+            unconfiguredSender.send(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(sender).send(anyString(), anyString());
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"smtp-missing@example.com\",\"password\":\"TestPassword123!\",\"fullName\":\"Test\",\"phone\":\"0900000000\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("EMAIL_DELIVERY_UNAVAILABLE"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM users WHERE email = ?", Integer.class, "smtp-missing@example.com"));
+    }
+
     @Test void csrfTokenCanBeObtainedBeforeRegistering() throws Exception {
         var result = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty()).andReturn();

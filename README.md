@@ -103,6 +103,8 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
 
+Mỗi cấu hình Chat hỗ trợ một API key chính và một API key dự phòng tùy chọn, dùng cùng provider và model. Admin nhập key dự phòng, lưu cấu hình, kiểm tra cả hai key rồi kích hoạt. Mỗi yêu cầu ưu tiên key chính. Khi provider trả HTTP 429 do quota hoặc giới hạn sử dụng, BE thử key dự phòng một lần. Để trống trường key giữ giá trị đã lưu, chọn **Xóa API Key dự phòng khi lưu** để gỡ key khỏi bản cấu hình mới. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+
 Tư vấn và so sánh điện thoại dùng dữ liệu sản phẩm; trò chuyện chung dùng chat model. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 
 ### Chế độ demo giao diện

@@ -23,8 +23,6 @@ public class AccountSessionFilter extends OncePerRequestFilter {
                 SecurityContextHolder.clearContext();
                 var session = request.getSession(false);
                 if (session != null) session.invalidate();
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
             }
         }
         chain.doFilter(request, response);

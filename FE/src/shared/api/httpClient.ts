@@ -39,7 +39,9 @@ export async function http<T>(path: string, options: RequestInit = {}): Promise<
       headers,
       signal: options.signal ?? AbortSignal.timeout(30000),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError')
+      throw new ApiError(0, 'Máy chủ xử lý quá thời gian chờ. Vui lòng thử lại sau.', 'REQUEST_TIMEOUT');
     throw new ApiError(0, 'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối và thử lại.');
   }
   const data = response.status === 204 ? undefined : await response.json().catch(() => undefined);

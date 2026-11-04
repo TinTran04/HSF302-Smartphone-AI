@@ -29,12 +29,27 @@ public class AiProviderService {
     public List<AiSettingsResponse> list() { return configs.findAllByOrderByIdDesc().stream().map(AiSettingsResponse::from).toList(); }
     @Transactional
     public AiSettingsResponse save(AiSettingsRequest input) {
+        var old = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElse(null);
         String key = input.apiKey();
         if (key == null || key.isBlank()) {
-            var old = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElseThrow(InvalidAiConfigurationException::new);
+            if (old == null) throw new InvalidAiConfigurationException();
             key = cipher.decrypt(old.getProvider(), old.getKeyCipher());
+        } else {
+            key = key.trim();
         }
-        var config = configs.save(new AiProviderConfig(input.provider(), input.model().trim(), cipher.encrypt(input.provider(), key), clock.instant()));
+        String backupKey = input.backupApiKey();
+        if (input.removeBackupKey()) {
+            if (backupKey != null && !backupKey.isBlank()) throw new InvalidAiConfigurationException();
+            backupKey = null;
+        } else if (backupKey == null || backupKey.isBlank()) {
+            backupKey = old == null ? null : decryptBackupKey(old);
+        } else {
+            backupKey = backupKey.trim();
+        }
+        if (backupKey != null && sameKey(key, backupKey)) throw new InvalidAiConfigurationException();
+        var config = configs.save(new AiProviderConfig(input.provider(), input.model().trim(),
+                cipher.encrypt(input.provider(), key),
+                backupKey == null ? null : cipher.encrypt(input.provider(), backupKey), clock.instant()));
         return AiSettingsResponse.from(config);
     }
     @Transactional
@@ -43,10 +58,19 @@ public class AiProviderService {
         if (!config.getModel().equals(input.model().trim())) throw new InvalidAiConfigurationException();
         String key = cipher.decrypt(config.getProvider(), config.getKeyCipher());
         if (input.apiKey() != null && !input.apiKey().isBlank() &&
-                !MessageDigest.isEqual(key.getBytes(StandardCharsets.UTF_8), input.apiKey().getBytes(StandardCharsets.UTF_8)))
+                !sameKey(key, input.apiKey().trim()))
             throw new InvalidAiConfigurationException();
-        String answer = client.chat(config.getProvider(), config.getModel(), key, "Reply with OK.");
-        if (answer == null || answer.isBlank()) throw new AiProviderException();
+        String backupKey = decryptBackupKey(config);
+        if (input.backupApiKey() != null && !input.backupApiKey().isBlank() &&
+                (backupKey == null || !sameKey(backupKey, input.backupApiKey().trim())))
+            throw new InvalidAiConfigurationException();
+        if (input.removeBackupKey() && backupKey != null) throw new InvalidAiConfigurationException();
+        try {
+            call(config, key, "Reply with OK.");
+        } catch (AiProviderException exception) {
+            if (!exception.isQuotaExceeded() || backupKey == null) throw exception;
+        }
+        if (backupKey != null) call(config, backupKey, "Reply with OK.");
         config.markTested();
     }
     @Transactional
@@ -64,9 +88,26 @@ public class AiProviderService {
         var active = configs.findAllByActiveTrue();
         if (active.size() != 1) throw new AiProviderException();
         var config = active.getFirst();
-        String result = client.chat(config.getProvider(), config.getModel(),
-                cipher.decrypt(config.getProvider(), config.getKeyCipher()), prompt);
+        try {
+            return call(config, cipher.decrypt(config.getProvider(), config.getKeyCipher()), prompt);
+        } catch (AiProviderException exception) {
+            if (!exception.isQuotaExceeded() || config.getBackupKeyCipher() == null) throw exception;
+            return call(config, decryptBackupKey(config), prompt);
+        }
+    }
+
+    private String call(AiProviderConfig config, String key, String prompt) {
+        String result = client.chat(config.getProvider(), config.getModel(), key, prompt);
         if (result == null || result.isBlank()) throw new AiProviderException();
         return result;
+    }
+
+    private String decryptBackupKey(AiProviderConfig config) {
+        return config.getBackupKeyCipher() == null ? null
+                : cipher.decrypt(config.getProvider(), config.getBackupKeyCipher());
+    }
+
+    private boolean sameKey(String first, String second) {
+        return MessageDigest.isEqual(first.getBytes(StandardCharsets.UTF_8), second.getBytes(StandardCharsets.UTF_8));
     }
 }

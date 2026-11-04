@@ -74,6 +74,8 @@ Khởi động lại Vite. Request `/api` được proxy đến Spring Boot. Aut
 
 ## AI và RAG
 
+Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho từng nhà cung cấp. Thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Để trống trường key giữ key đã lưu. Chọn **Xóa API Key dự phòng khi lưu** để gỡ key trong bản cấu hình mới. Khi Chat nhận HTTP 429, BE thử key dự phòng một lần với cùng model. Giao diện tăng thời gian chờ cho kiểm tra hai key và gửi tin nhắn AI để chờ kết quả chuyển key. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+
 Màn hình AI có bốn chủ đề: tư vấn mua điện thoại, so sánh điện thoại, hỗ trợ cửa hàng và trò chuyện cùng AI. **Hỗ trợ cửa hàng** sử dụng tài liệu do Admin tải lên; hai chủ đề về điện thoại sử dụng dữ liệu sản phẩm. Trước khi kiểm thử AI thật, Admin cần cấu hình chat model, embedding model và tải tài liệu PDF/TXT đến trạng thái `READY`. FE không gọi trực tiếp OpenAI/Gemini.
 
 ## Kiểm tra

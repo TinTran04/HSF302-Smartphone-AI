@@ -60,8 +60,8 @@ let documents = read<KnowledgeDocument[]>('documents', [
   },
 ]);
 let settings = read<AiSettings[]>('settings', [
-  { provider: 'OPENAI', model: 'demo-chat-model', maskedKey: '••••••••', active: true },
-  { provider: 'GEMINI', model: 'demo-chat-model', maskedKey: '', active: false },
+  { provider: 'OPENAI', model: 'demo-chat-model', maskedKey: '••••••••', maskedBackupKey: '', tested: true, active: true },
+  { provider: 'GEMINI', model: 'demo-chat-model', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
 ]);
 const previews = new Map<string, OrderPreview & { items: CartItem[] }>();
 const idempotency = new Map<string, Order>();
@@ -536,20 +536,30 @@ export const mockApi: Api = {
   saveAiSettings: (data) => {
     admin();
     const current = settings.find((s) => s.provider === data.provider)!;
+    if (current.active) current.activeModel = current.model;
+    current.active = false;
+    current.tested = false;
     current.model = data.model;
     if (data.apiKey) current.maskedKey = '••••••••';
+    if (data.removeBackupKey) current.maskedBackupKey = '';
+    else if (data.backupApiKey) current.maskedBackupKey = '••••••••';
     save();
     return delay(current);
   },
-  testAiConnection: () => {
+  testAiConnection: (data) => {
     admin();
+    settings.find((s) => s.provider === data.provider)!.tested = true;
+    save();
     return delay({ message: 'Chế độ demo: chỉ kiểm tra giao diện, chưa gọi nhà cung cấp AI.' });
   },
   activateProvider: (provider) => {
     admin();
     if (!settings.find((s) => s.provider === provider)?.maskedKey)
       throw new ApiError(400, 'Vui lòng lưu cấu hình trước khi kích hoạt.');
-    settings = settings.map((s) => ({ ...s, active: s.provider === provider }));
+    if (!settings.find((s) => s.provider === provider)?.tested)
+      throw new ApiError(409, 'Vui lòng kiểm tra kết nối trước khi kích hoạt.');
+    settings = settings.map((s) => ({ ...s, active: s.provider === provider,
+      activeModel: s.provider === provider ? s.model : undefined }));
     save();
     return delay(settings);
   },
