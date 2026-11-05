@@ -11,13 +11,11 @@ import {
   PageHeading,
   ProductImage,
   Skeleton,
-  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
-import { errorMessage, formatVnd } from '../../shared/utils/format';
+import { formatVnd } from '../../shared/utils/format';
 export default function CartPage() {
   const cart = useCart();
-  const { notify } = useToast();
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<unknown>();
   const [excluded, setExcluded] = useState<string[]>([]);
@@ -26,8 +24,8 @@ export default function CartPage() {
   async function change(id: string, quantity: number) {
     try {
       await cart.update(id, quantity);
-    } catch (e) {
-      notify(errorMessage(e), 'error');
+    } catch {
+      /* The mutation notification reports the failure. Keep the existing quantity. */
     }
   }
   async function remove() {
@@ -35,7 +33,6 @@ export default function CartPage() {
       await cart.remove(removing!);
       setRemoving(null);
       setError(undefined);
-      notify('Đã xóa sản phẩm khỏi giỏ hàng.');
     } catch (e) {
       setError(e);
     }

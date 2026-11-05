@@ -28,7 +28,7 @@ class RagServiceTest {
         when(chunks.findById(chunk.getId())).thenReturn(Optional.of(chunk));
         when(ai.chat(anyString())).thenReturn("{\"answer\":\"12 tháng\",\"citedChunkIds\":[\""+chunk.getId()+"\"]}");
         var rag=new RagServiceImpl(docs,chunks,vectors,ai,new ObjectMapper());
-        var responder=new ChatResponderImpl(ai,new ObjectMapper(),mock(PhoneAssistanceService.class),rag);
+        var responder=new ChatResponderImpl(mock(PhoneAssistanceService.class),rag);
         var history=List.of(new com.smartphoneai.dto.response.ChatMessageResponse("1","user","Chính sách bảo hành?",List.of(),List.of(),List.of()));
         responder.answer("SHOP_SUPPORT","Áp dụng bao lâu?",history,List.of());
         verify(vectors).search(argThat(q -> q.contains("Chính sách bảo hành") && q.contains("Áp dụng bao lâu")),anySet(),eq("v1"));

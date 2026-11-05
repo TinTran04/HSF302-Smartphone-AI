@@ -25,9 +25,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     @Query("select u from UserAccount u where u.email = :email")
     Optional<UserAccount> findLockedByEmail(@Param("email") String email);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select u from UserAccount u where u.username = :username")
-    Optional<UserAccount> findLockedByUsername(@Param("username") String username);
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserAccount u where u.id = :id")
     Optional<UserAccount> findLockedById(@Param("id") UUID id);
 }

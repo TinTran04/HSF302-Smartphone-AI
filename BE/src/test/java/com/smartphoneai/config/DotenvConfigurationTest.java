@@ -29,7 +29,7 @@ class DotenvConfigurationTest {
                 SMTP_USERNAME=sender@example.com
                 SMTP_PASSWORD=mail!#=password
                 SMTP_LOCALHOST=localhost
-                ROOT_ADMIN_USERNAME=dotenv_admin
+                ROOT_ADMIN_EMAIL=dotenv-admin@example.com
                 ROOT_ADMIN_PASSWORD=AdminPassword123!
                 AI_CONFIG_ENCRYPTION_KEY=test-only-key
                 """);
@@ -40,7 +40,7 @@ class DotenvConfigurationTest {
             assertEquals("db!#=password", environment.getProperty("spring.datasource.password"));
             assertEquals("sender@example.com", environment.getProperty("spring.mail.username"));
             assertEquals("mail!#=password", environment.getProperty("spring.mail.password"));
-            assertEquals("dotenv_admin", environment.getProperty("app.root-admin.username"));
+            assertEquals("dotenv-admin@example.com", environment.getProperty("app.root-admin.email"));
             assertEquals("AdminPassword123!", environment.getProperty("app.root-admin.password"));
             assertEquals("test-only-key", environment.getProperty("app.ai.encryption-key"));
         }

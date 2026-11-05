@@ -32,7 +32,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         return otp.issue(email, "PASSWORD_RESET", eligible(user));
     }
     private static boolean eligible(com.smartphoneai.entity.UserAccount user) {
-        return user != null && !user.isDeleted() && (user.isActive() || user.getRole() == com.smartphoneai.entity.UserAccount.Role.CUSTOMER);
+        return user != null && !user.isDeleted() && !user.isDisabled() && !user.isPendingInvitation()
+                && (user.isActive() || user.getRole() == com.smartphoneai.entity.UserAccount.Role.CUSTOMER);
     }
     @Override
     @Transactional

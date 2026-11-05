@@ -14,8 +14,15 @@ import com.smartphoneai.exception.InvalidCredentialsException;
 import com.smartphoneai.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class CartServiceImpl implements CartService {
@@ -23,8 +30,10 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository items;
     private final ProductVariantRepository variants;
     private final UserAccountRepository users;
-    public CartServiceImpl(CartRepository carts, CartItemRepository items, ProductVariantRepository variants, UserAccountRepository users) {
-        this.carts = carts; this.items = items; this.variants = variants; this.users = users;
+    private final GuestCartMergeReceiptRepository mergeReceipts;
+    public CartServiceImpl(CartRepository carts, CartItemRepository items, ProductVariantRepository variants,
+                           UserAccountRepository users, GuestCartMergeReceiptRepository mergeReceipts) {
+        this.carts = carts; this.items = items; this.variants = variants; this.users = users; this.mergeReceipts = mergeReceipts;
     }
     @Override
     @Transactional(readOnly = true)
@@ -82,8 +91,28 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public void merge(UUID userId, List<CartItemRequest> guestItems) {
-        if (guestItems == null || guestItems.isEmpty()) return;
+        merge(userId, guestItems, null);
+    }
+    @Override
+    @Transactional
+    public void merge(UUID userId, List<CartItemRequest> guestItems, UUID mergeId) {
+        boolean emptyCart = guestItems == null || guestItems.isEmpty();
+        if (emptyCart && mergeId == null) return;
         lockUser(userId);
+        if (mergeId != null) {
+            String hash = payloadHash(guestItems);
+            var receipt = mergeReceipts.findById(mergeId).orElse(null);
+            if (receipt != null) {
+                if (!receipt.matches(userId, hash)) throw new CartActionException();
+                return;
+            }
+            try {
+                mergeReceipts.insert(mergeId, userId, hash);
+            } catch (DataIntegrityViolationException ex) {
+                throw new CartActionException();
+            }
+        }
+        if (emptyCart) return;
         if (!carts.existsById(userId)) carts.saveAndFlush(new Cart(userId));
         for (var entry : guestItems) {
             var variant = variants.findById(entry.variantId()).orElse(null);
@@ -98,8 +127,21 @@ public class CartServiceImpl implements CartService {
         items.flush();
         response(userId);
     }
+    private static String payloadHash(List<CartItemRequest> guestItems) {
+        List<CartItemRequest> entries = guestItems == null ? List.of() : guestItems;
+        String canonicalPayload = entries.stream()
+                .sorted(Comparator.comparing(CartItemRequest::variantId).thenComparing(CartItemRequest::quantity))
+                .map(entry -> entry.variantId() + "=" + entry.quantity())
+                .collect(Collectors.joining(","));
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonicalPayload.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
     private void lockUser(UUID userId) {
-        if (users.findLockedById(userId).filter(u -> u.isActive()).isEmpty()) throw new InvalidCredentialsException();
+        if (users.findLockedById(userId).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted()).isEmpty())
+            throw new InvalidCredentialsException();
     }
     private CartResponse response(UUID userId) {
         var values = items.findAllByUserId(userId).stream().map(CartServiceImpl::itemResponse).toList();

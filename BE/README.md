@@ -29,7 +29,7 @@ Controller và các service khác inject interface. Spring tạo bean từ các 
 
 - JDK 21 và Maven 3.9 trở lên.
 - PostgreSQL có extension `vector` (pgvector), tạo database `smartphone_ai`. Tài khoản database cần quyền tạo extension khi Flyway chạy lần đầu.
-- SMTP Gmail cho email OTP và lời mời Admin. Cấu hình AI và embedding riêng trong API quản trị trước khi dùng các chức năng liên quan.
+- SMTP Gmail cho email OTP và lời mời kích hoạt tài khoản. Cấu hình AI và embedding riêng trong API quản trị trước khi dùng các chức năng liên quan.
 
 Nhận file `.env` đã điền sẵn từ người phụ trách dự án và đặt tại `BE/.env`, hoặc sao chép `.env.example` thành `.env` để cấu hình lần đầu. BE tự đọc file khi working directory là thư mục `BE` hoặc thư mục gốc dự án.
 
@@ -43,12 +43,14 @@ Các giá trị trong file gồm những nhóm sau.
 | `DB_USERNAME`, `DB_PASSWORD` | Tài khoản PostgreSQL |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | Tài khoản và mật khẩu ứng dụng Gmail |
 | `SMTP_LOCALHOST` | Tên máy dùng khi gửi lệnh SMTP; mặc định `localhost` |
-| `ROOT_ADMIN_USERNAME`, `ROOT_ADMIN_PASSWORD` | Tạo Admin gốc lần đầu nếu chưa tồn tại |
+| `ROOT_ADMIN_EMAIL`, `ROOT_ADMIN_PASSWORD` | Email và mật khẩu khởi tạo Admin gốc |
 | `AI_CONFIG_ENCRYPTION_KEY` | Khóa AES 32 byte mã hóa Base64 để bảo vệ API key AI |
 
 File `.env` được Git bỏ qua và chia sẻ riêng. File `.env.example` đi cùng repository. Các kiểm thử tự động được tách khỏi `.env` để sử dụng database và dịch vụ thử nghiệm. Có thể chỉ định vị trí cấu hình riêng qua `APP_ENV_FILE` với cú pháp Spring config import khi chạy ứng dụng từ thư mục khác.
 
-Giữ nguyên khóa mã hóa giữa các lần chạy để đọc lại cấu hình AI đã lưu. Admin gốc chỉ được tạo khi chưa tồn tại và đã cấu hình username/mật khẩu; username không chứa `@`, mật khẩu tối thiểu 8 ký tự. Admin gốc đăng nhập bằng username, không cần email. Thay biến Admin gốc sau khi đã khởi tạo không thay đổi mật khẩu trong database. Flyway áp dụng migration khi ứng dụng khởi động và Hibernate kiểm tra schema.
+Giữ nguyên khóa mã hóa giữa các lần chạy để đọc lại cấu hình AI đã lưu. Admin gốc được tạo từ email hợp lệ và mật khẩu tối thiểu 8 ký tự khi chưa có tài khoản gốc. Admin đăng nhập bằng email và mật khẩu.
+
+Với database cũ có Admin gốc chưa có email, cấu hình `ROOT_ADMIN_EMAIL` rồi khởi động BE. Ứng dụng gán email cho tài khoản gốc hiện tại trong một transaction. ID tài khoản, mật khẩu đã lưu và dữ liệu liên quan được giữ lại. Email đã thuộc tài khoản khác sẽ được báo lỗi cấu hình để người quản trị chọn email phù hợp. Khi Admin gốc đã có email, cấu hình khởi tạo chỉ phục vụ lần tạo đầu tiên. Mật khẩu được quản lý qua chức năng đổi hoặc đặt lại mật khẩu. Flyway áp dụng migration khi ứng dụng khởi động và Hibernate kiểm tra schema.
 
 Migration `V20` xóa các tài khoản có vai trò `STAFF` hoặc `MANAGER` cũ cùng đơn hàng, giỏ, hội thoại, lời mời và OTP liên quan đến các tài khoản đó. Hãy sao lưu database trước khi khởi động phiên bản này với dữ liệu hiện có. Migration đã được kiểm thử bằng H2 và PostgreSQL 16 có pgvector trên database thử nghiệm; hãy kiểm tra thêm trên bản sao dữ liệu của bạn trước khi áp dụng vào database thực.
 
@@ -64,7 +66,23 @@ mvn spring-boot:run
 
 API mặc định ở `http://localhost:8080/api`. Client cần lấy CSRF token tại `/api/auth/csrf`, lưu cookie phiên và gửi token khi thực hiện thao tác thay đổi.
 
-Link lời mời Admin mặc định trỏ tới `http://localhost:5173/admin/invite`; có thể thay Spring property `app.admin-invitation-url` khi FE dùng địa chỉ khác. Chạy BE cùng FE theo [README dự án](../README.md).
+Link kích hoạt tài khoản mặc định trỏ tới `http://localhost:5173/account/invite`. Có thể thay Spring property `app.account-invitation-url` khi FE dùng địa chỉ khác. Cấu hình `app.admin-invitation-url` và link Admin cũ vẫn được hỗ trợ. Chạy BE cùng FE theo [README dự án](../README.md).
+
+## Quản lý tài khoản
+
+Admin xem toàn bộ tài khoản CUSTOMER và ADMIN qua `GET /api/admin/accounts`. Tạo tài khoản bằng `POST /api/admin/account-invitations` với `email`, `fullName` và `role` bằng CUSTOMER hoặc ADMIN. Người nhận mở email và tự đặt mật khẩu qua `POST /api/auth/account-invitations/accept` với `token` và `password`. Sau khi kích hoạt, CUSTOMER và ADMIN đăng nhập bằng email và mật khẩu. OTP dành cho đăng ký và quên mật khẩu.
+
+Link dùng một lần và hết hạn sau 24 giờ. `POST /api/admin/account-invitations/{id}/resend` gửi link mới, vô hiệu link cũ. Database lưu bản băm token và mật khẩu BCrypt. Lỗi gửi email hủy việc tạo tài khoản trong transaction để Admin có thể thử lại.
+
+`PATCH /api/admin/accounts/{id}/role` nhận `role` là CUSTOMER hoặc ADMIN cho tài khoản đã kích hoạt. Admin gốc và tài khoản đang thao tác được bảo vệ khi đổi quyền. Phiên dùng vai trò cũ bị vô hiệu ở yêu cầu tiếp theo. Các API `/admin/admins` và `/admin/admin-invitations` vẫn hoạt động cho client cũ.
+
+`PATCH /api/admin/accounts/{id}/status` nhận `{"enabled": false}` để vô hiệu hóa và `{"enabled": true}` để cho hoạt động lại. Áp dụng cho CUSTOMER và ADMIN thường, bảo vệ Admin gốc và chính người đang thao tác. Cả hai lần chuyển trạng thái đều thu hồi phiên cũ, yêu cầu lặp lại cùng trạng thái giữ nguyên phiên bản. Đăng nhập bằng mật khẩu đúng khi bị khóa trả `403 ACCOUNT_DISABLED`. OTP, lời mời và đặt lại mật khẩu tuân theo trạng thái khóa.
+
+Migration V24 thêm `disabled` mặc định false. Trường này độc lập với `active` dùng cho xác minh đăng ký. Dữ liệu tài khoản được giữ lại, cho hoạt động lại vẫn yêu cầu xác minh nếu trước đó chưa hoàn tất. `GET /api/admin/accounts` bổ sung `disabled` trong từng phần tử. Khởi động lại BE để áp dụng migration trước khi dùng nút trạng thái trên FE.
+
+Admin dùng portal và hồ sơ cá nhân `/admin/profile`. API catalog công khai, giỏ và AI của shop từ chối người đang đăng nhập bằng vai trò ADMIN. Product Form của Admin đọc thương hiệu qua API quản trị. Xóa Admin thường đánh dấu deleted/inactive.
+
+Migration V22 thêm `credential_version` mặc định 0 cho tài khoản cũ. Phiên lưu phiên bản lúc xác thực và kiểm tra với DB ở mỗi request. Đổi mật khẩu làm mất hiệu lực các phiên khác, phiên đang đổi mật khẩu được cập nhật phiên bản sau transaction thành công. Quên mật khẩu thu hồi toàn bộ phiên cũ.
 
 Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đăng nhập lại bằng email và mật khẩu đã nhập để nhận OTP đăng ký mới (áp dụng thời gian chờ gửi lại 60 giây). Phiên chat Guest hết hạn sau 24 giờ; tác vụ chạy mỗi giờ xóa tối đa 100 phiên hết hạn cùng hội thoại Guest còn gắn với chúng. Hội thoại đã chuyển vào tài khoản được giữ lại.
 
@@ -73,6 +91,8 @@ Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đ
 Bộ kiểm thử tự động sử dụng H2 và mock cho các dịch vụ ngoài. Các test PostgreSQL có điều kiện dùng `TEST_POSTGRES_URL`, `TEST_POSTGRES_USERNAME` và `TEST_POSTGRES_PASSWORD`; test migration yêu cầu database **trống và tách biệt**, test vector yêu cầu database thử nghiệm đã chạy migration. Không trỏ test vào database thật. Hướng dẫn test tích hợp FE–BE với H2 và SMTP giả có trong [README frontend](../FE/README.md).
 
 ## AI và tài liệu RAG
+
+Hai chủ đề hiển thị là PHONE_CONSULTATION và SHOP_SUPPORT. PHONE_CONSULTATION gộp tư vấn, so sánh và kiến thức AI, đồng thời truy xuất tài liệu khi có nguồn phù hợp. SHOP_SUPPORT tiếp tục trả lời chính sách theo bằng chứng RAG. Topic cũ PHONE_COMPARISON và GENERAL_CHAT được ánh xạ về tư vấn để mở lịch sử và link cũ. Giá/phiên bản tại cửa hàng lấy từ catalog, trích dẫn phải thuộc tài liệu thực sự được truy xuất. Kiến thức AI phục vụ giải thích tham khảo.
 
 Mỗi lần gọi Chat được thử tối đa hai lần khi nhà cung cấp trả HTTP 503, cách nhau 750 ms. Sau lần thử cuối, lỗi vẫn được trả về nếu provider tiếp tục quá tải. HTTP 429 sử dụng quy tắc key dự phòng đã cấu hình. Bộ đọc JSON AI chấp nhận JSON thuần và JSON trong khối Markdown cho phân loại chủ đề, chọn sản phẩm và câu trả lời RAG.
 

@@ -35,7 +35,7 @@ describe('Fake backend business contracts', () => {
     if (response.type !== 'SWITCH_REQUIRED') throw new Error('Expected switch');
     await backend.cancelSwitch(response.switchRequestId);
     const current = await backend.conversation(chat.id);
-    expect(current.topic).toBe('GENERAL_CHAT');
+    expect(current.topic).toBe('PHONE_CONSULTATION');
     expect(current.pendingSwitch).toBeUndefined();
     expect(current.messages).toHaveLength(1);
     expect(await backend.conversations()).toHaveLength(1);

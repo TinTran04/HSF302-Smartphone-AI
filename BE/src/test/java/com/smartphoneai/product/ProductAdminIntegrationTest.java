@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:productadmin;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=productadmin", "app.root-admin.password=TestRootPassword123!"})
+        "app.root-admin.email=productadmin@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
 class ProductAdminIntegrationTest {
     @Autowired MockMvc mvc;
@@ -27,7 +27,7 @@ class ProductAdminIntegrationTest {
     @Test void adminCanCreateAndDeactivateProductWithVariant() throws Exception {
         var session = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"productadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"productadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var brand = mvc.perform(post("/api/admin/brands").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Example\"}")).andExpect(status().isCreated()).andReturn();
         String brandId = mapper.readTree(brand.getResponse().getContentAsString()).path("id").asText();

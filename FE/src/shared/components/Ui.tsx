@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -152,6 +153,7 @@ export function Modal({
 }: PropsWithChildren<{ title: string; onClose: () => void; busy?: boolean }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useId();
+  const { registerHost } = useContext(ToastContext);
   useEffect(() => {
     const dialog = ref.current!;
     const previous = document.activeElement as HTMLElement | null;
@@ -192,6 +194,7 @@ export function Modal({
         </div>
         {children}
       </div>
+      <div ref={registerHost} />
     </dialog>,
     document.body,
   );
@@ -228,34 +231,47 @@ export function ConfirmDialog({
     </Modal>
   );
 }
-type ToastValue = { notify: (message: string, tone?: 'success' | 'error') => void };
-const ToastContext = createContext<ToastValue>({ notify: () => {} });
+type ToastValue = {
+  notify: (message: string, tone?: 'success' | 'error') => void;
+  registerHost: (element: HTMLDivElement | null) => void | (() => void);
+};
+const ToastContext = createContext<ToastValue>({ notify: () => {}, registerHost: () => {} });
 export const useToast = () => useContext(ToastContext);
 export function ToastProvider({ children }: PropsWithChildren) {
   const [toasts, setToasts] = useState<{ id: string; message: string; tone: string }[]>([]);
-  function notify(message: string, tone = 'success') {
+  const [hosts, setHosts] = useState<HTMLDivElement[]>([]);
+  const registerHost = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return;
+    setHosts((current) => [...current, element]);
+    return () => setHosts((current) => current.filter((host) => host !== element));
+  }, []);
+  const notify = useCallback((message: string, tone: 'success' | 'error' = 'success') => {
     const id = crypto.randomUUID();
     setToasts((current) => [...current, { id, message, tone }]);
     window.setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), 4500);
-  }
+  }, []);
+  const region = (
+    <div className="toast-region" role="status" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast toast-${t.tone}`}>
+          <Icon name={t.tone === 'error' ? 'error' : 'check_circle'} />
+          <span>{t.message}</span>
+          <button
+            className="icon-button"
+            aria-label="Đóng thông báo"
+            onClick={() => setToasts((v) => v.filter((x) => x.id !== t.id))}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+  const host = hosts.at(-1);
   return (
-    <ToastContext value={{ notify }}>
+    <ToastContext value={{ notify, registerHost }}>
       {children}
-      <div className="toast-region" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.tone}`}>
-            <Icon name={t.tone === 'error' ? 'error' : 'check_circle'} />
-            <span>{t.message}</span>
-            <button
-              className="icon-button"
-              aria-label="Đóng thông báo"
-              onClick={() => setToasts((v) => v.filter((x) => x.id !== t.id))}
-            >
-              <Icon name="close" />
-            </button>
-          </div>
-        ))}
-      </div>
+      {host ? createPortal(region, host) : region}
     </ToastContext>
   );
 }

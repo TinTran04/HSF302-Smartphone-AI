@@ -19,7 +19,7 @@ import java.util.UUID;
 
 @Service
 public class OtpChallengeServiceImpl implements OtpChallengeService {
-    private static final Set<String> PURPOSES = Set.of("REGISTER", "LOGIN", "PASSWORD_RESET");
+    private static final Set<String> PURPOSES = Set.of("REGISTER", "PASSWORD_RESET");
     private final SecureRandom random = new SecureRandom();
     private final OtpChallengeRepository repository;
     private final OtpSender sender;
@@ -55,6 +55,7 @@ public class OtpChallengeServiceImpl implements OtpChallengeService {
     @Override
     @Transactional
     public OtpChallenge.Result verify(UUID id, String purpose, String code) {
+        if (purpose == null || !PURPOSES.contains(purpose)) return OtpChallenge.Result.UNAVAILABLE;
         var challenge = repository.findLockedById(id).orElse(null);
         if (challenge == null || !challenge.getPurpose().equals(purpose)) return OtpChallenge.Result.UNAVAILABLE;
         boolean matches = code != null && encoder.matches(code, challenge.getCodeHash());
@@ -65,7 +66,7 @@ public class OtpChallengeServiceImpl implements OtpChallengeService {
     @Transactional
     public boolean resend(UUID id) {
         var challenge = repository.findLockedById(id).orElse(null);
-        if (challenge == null) return false;
+        if (challenge == null || !PURPOSES.contains(challenge.getPurpose())) return false;
         String code = newCode();
         if (!challenge.replaceCode(encoder.encode(code), clock.instant())) return false;
         if (challenge.isDeliverable()) sender.send(challenge.getEmail(), code);

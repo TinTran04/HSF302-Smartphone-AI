@@ -1,6 +1,7 @@
 import type { Api } from './contracts';
 import { ApiError, http, jsonBody } from './httpClient';
 import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview } from '../types/models';
+import { guestCartMergeId } from '../utils/guestCartMerge';
 
 type ServerCart = { items: (CartEntry & { product: Product | null; variant: CartItem['variant'] | null; unavailable: boolean; priceAtAdd: number })[]; total: number };
 function mapCart(cart: ServerCart): Cart {
@@ -51,11 +52,11 @@ async function chatRequest<T>(path: string, options: RequestInit = {}): Promise<
   }
 }
 export const realAuth = {
-  verify: (challengeId: string, code: string, guestCart: CartEntry[]) => authRequest<{user: import('../types/models').User}>('/auth/otp/verify', { challengeId, code, guestCart }),
+  verify: async (challengeId: string, code: string, guestCart: CartEntry[]) => authRequest<{user: import('../types/models').User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) }),
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
   reset: (email: string) => post<{challengeId:string}>('/auth/password-reset', { email }),
   resetConfirm: (challengeId: string, code: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, code, newPassword }),
-  acceptInvitation: (token: string, password: string) => post('/auth/admin-invitations/accept', { token, password }),
+  acceptInvitation: (token: string, password: string) => post('/auth/account-invitations/accept', { token, password }),
 };
 export const realApi: Api = {
   me: async () => {
@@ -67,7 +68,7 @@ export const realApi: Api = {
     }
   },
   login: async (data) => {
-    const result = await authRequest<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password });
+    const result = await authRequest<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password, guestCart: data.guestCart, guestCartMergeId: await guestCartMergeId(data.guestCart) });
     return result.user ?? { challengeId: result.challengeId!, expiresAt: result.expiresAt, resendAfter: result.resendAfter };
   },
   register: (data) => post('/auth/register', { email: data.email, password: data.password, fullName: data.fullName, phone: data.phone }),
@@ -82,7 +83,7 @@ export const realApi: Api = {
   },
   product: (id, admin = false) =>
     http(`/${admin ? 'admin/' : ''}products/${encodeURIComponent(id)}`),
-  brands: () => http('/brands'),
+  brands: (admin = false) => http(`/${admin ? 'admin/' : ''}brands`),
   cart: async () => mapCart(await http<ServerCart>('/cart')),
   resolveCart: async (entries) => {
     const batches = [];

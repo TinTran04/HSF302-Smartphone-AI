@@ -1,4 +1,17 @@
 import { test, expect, type Page } from '@playwright/test';
+
+test('login and registration both use email', async ({ page }) => {
+  await page.goto('/login');
+  const identifier = page.getByRole('textbox', { name: 'Email', exact: true });
+  await expect(identifier).toBeVisible();
+  await expect(identifier).toHaveAttribute('type', 'email');
+  await expect(identifier).toHaveAttribute('autocomplete', 'email');
+  await page.goto('/register');
+  const email = page.getByRole('textbox', { name: 'Email', exact: true });
+  await expect(email).toHaveAttribute('type', 'email');
+  await expect(email).toHaveAttribute('autocomplete', 'email');
+});
+
 async function login(page: Page, admin = false) {
   await page.goto('/login');
   await page
@@ -55,6 +68,8 @@ test('catalog filters, variant selection, guest cart persistence, login merge an
 });
 test('unified AI confirms topic switch without resending the question', async ({ page }) => {
   await page.goto('/ai');
+  await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
+  await expect(page.locator('footer').getByRole('link', { name: 'Tư vấn mua điện thoại', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
   await expect(page).toHaveURL(/\/ai\/conversations\//);
   const oldUrl = page.url();
@@ -80,6 +95,31 @@ test('customer cannot open admin routes', async ({ page }) => {
   await login(page);
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Bạn không có quyền truy cập' })).toBeVisible();
+});
+
+test('admin stays in the portal and has personal settings there', async ({ page }) => {
+  await login(page, true);
+  for (const path of ['/products', '/cart', '/ai', '/profile', '/login']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/admin$/);
+  }
+  await page.goto('/admin/profile');
+  await expect(page.getByRole('heading', { name: 'Thông tin tài khoản' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Cửa hàng', exact: true })).toHaveCount(0);
+});
+
+test('comparison opens unified phone advice with selected products', async ({ page }) => {
+  await page.goto('/products');
+  await page.getByRole('button', { name: /Thêm .* vào so sánh/ }).first().click();
+  await page.getByRole('button', { name: /Thêm .* vào so sánh/ }).first().click();
+  await page.getByRole('link', { name: 'So sánh', exact: true }).click();
+  await page.getByRole('link', { name: 'So sánh cùng AI' }).click();
+  await expect(page).toHaveURL(/topic=PHONE_CONSULTATION/);
+  await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
+  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
+  await page.getByLabel('Nhập câu hỏi cho trợ lý AI').fill('So sánh hai máy đã chọn.');
+  await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
+  await expect(page.locator('.message.assistant table')).toBeVisible();
 });
 test('admin product editing, provider form, document upload and status', async ({ page }) => {
   await login(page, true);

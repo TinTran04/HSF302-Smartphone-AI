@@ -14,6 +14,7 @@ import {
   PageHeading,
   ProductImage,
   Skeleton,
+  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import type { OrderPreview, ShippingInfo } from '../../shared/types/models';
@@ -36,6 +37,7 @@ export default function CheckoutPage() {
     try { const saved = JSON.parse(sessionStorage.getItem('smartphone-ai-checkout-items') || 'null'); return Array.isArray(saved) ? saved : []; } catch { return []; }
   });
   const client = useQueryClient();
+  const { notify } = useToast();
   const [savedAttempt] = useState(() => readAttempt(user?.id));
   const attempt = useRef<OrderAttempt | null>(savedAttempt);
   const [uncertain, setUncertain] = useState(!!savedAttempt);
@@ -49,6 +51,7 @@ export default function CheckoutPage() {
   const [priceChanged, setPriceChanged] = useState(false);
   const key = useRef(savedAttempt?.key ?? crypto.randomUUID());
   const submit = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: async () => {
       if (attempt.current) {
         const { key: savedKey, userId: _userId, ...data } = attempt.current;
@@ -63,6 +66,12 @@ export default function CheckoutPage() {
       setPreview(latest);
       if (!preview || changed) {
         setPriceChanged(!!changed);
+        notify(
+          changed
+            ? 'Giá sản phẩm đã thay đổi. Vui lòng kiểm tra lại trước khi đặt hàng.'
+            : 'Đã kiểm tra đơn hàng. Vui lòng xác nhận để đặt hàng.',
+          changed ? 'error' : 'success',
+        );
         return null;
       }
       const data = { previewId: latest.previewId, shipping, paymentMethod: 'COD' as const };
@@ -78,6 +87,7 @@ export default function CheckoutPage() {
         void client.invalidateQueries({ queryKey: ['cart'] });
         void client.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/orders/${order.id}`, { state: { placed: true }, replace: true });
+        notify('Đã đặt hàng thành công.');
       }
     },
     onError: (error) => {

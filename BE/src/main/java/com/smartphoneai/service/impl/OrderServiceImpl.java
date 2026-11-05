@@ -103,6 +103,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse cancel(UUID userId, UUID id) {
+        lockUser(userId);
         var order = orders.findLocked(id).filter(o -> o.getUserId().equals(userId)).orElseThrow(OrderNotFoundException::new);
         if (!OrderStatusPolicy.customerMayCancel(order.getStatus())) throw new OrderConflictException("INVALID_ORDER_STATUS");
         order.transition(OrderStatus.CANCELLED, clock.instant()); return OrderResponse.from(order);
@@ -121,7 +122,8 @@ public class OrderServiceImpl implements OrderService {
         order.transition(status, clock.instant()); return OrderResponse.from(order);
     }
     private void lockUser(UUID id) {
-        if (users.findLockedById(id).filter(u -> u.isActive() && u.getRole() == UserAccount.Role.CUSTOMER).isEmpty())
+        if (users.findLockedById(id).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted()
+                && u.getRole() == UserAccount.Role.CUSTOMER).isEmpty())
             throw new InvalidCredentialsException();
     }
     private static long total(List<OrderPreviewItem> items) {

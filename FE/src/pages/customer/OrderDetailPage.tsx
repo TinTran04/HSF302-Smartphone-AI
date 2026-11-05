@@ -31,6 +31,7 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
     },
   });
   const update = useMutation({
+    meta: { toast: { success: admin ? 'Đã cập nhật trạng thái đơn hàng.' : 'Đã hủy đơn hàng.' } },
     mutationFn: () => (admin ? api.updateOrderStatus(id!, action!) : api.cancelOrder(id!)),
     onSuccess: (data) => {
       client.setQueryData(key, data);

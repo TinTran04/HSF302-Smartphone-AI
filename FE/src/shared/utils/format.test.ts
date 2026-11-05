@@ -24,4 +24,18 @@ describe('Display and return navigation', () => {
   );
   it('preserves a valid checkout return path', () =>
     expect(safeReturnPath('/checkout')).toBe('/checkout'));
+  it('returns customers to the store after their Admin role is removed', () => {
+    expect(safeReturnPath('/admin/accounts?tab=all', 'CUSTOMER')).toBe('/');
+    expect(safeReturnPath('/admin', 'CUSTOMER')).toBe('/');
+    expect(safeReturnPath('/ADMIN/accounts', 'CUSTOMER')).toBe('/');
+    expect(safeReturnPath('/checkout', 'CUSTOMER')).toBe('/checkout');
+    expect(safeReturnPath('/admin/accounts', 'ADMIN')).toBe('/admin/accounts');
+  });
+  it('keeps Admin return navigation inside the portal', () => {
+    expect(safeReturnPath('/admin/products/1/edit', 'ADMIN')).toBe('/admin/products/1/edit');
+    expect(safeReturnPath('/checkout', 'ADMIN')).toBe('/admin');
+    expect(safeReturnPath('/administrator', 'ADMIN')).toBe('/admin');
+    expect(safeReturnPath('//evil.example', 'ADMIN')).toBe('/admin');
+    expect(safeReturnPath(undefined, 'ADMIN')).toBe('/admin');
+  });
 });

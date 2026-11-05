@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { createBrowserRouter, Outlet, useLocation, useRouteError, Link } from 'react-router-dom';
+import { createBrowserRouter, Outlet, useLocation, useRouteError, Link, Navigate } from 'react-router-dom';
 import { StoreLayout } from '../layouts/StoreLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AccountLayout } from '../layouts/AccountLayout';
@@ -27,6 +27,7 @@ const AdminOrders = lazy(() => import('../pages/admin/OrderManagementPage'));
 const Knowledge = lazy(() => import('../pages/admin/KnowledgeBasePage'));
 const AiSettings = lazy(() => import('../pages/admin/AiSettingsPage'));
 const AdminOperations = lazy(() => import('../pages/admin/AdminOperationsPage'));
+const Accounts = lazy(() => import('../pages/admin/AccountManagementPage'));
 const NotFound = lazy(() => import('../pages/NotFoundPage'));
 const Gallery = import.meta.env.DEV ? lazy(() => import('../pages/DesignGalleryPage')) : null;
 function Root() {
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
           { path: 'forgot-password', element: <AccountAccess /> },
           { path: 'accept-invitation', element: <AccountAccess invitation /> },
           { path: 'admin/invite', element: <AccountAccess invitation /> },
+          { path: 'account/invite', element: <AccountAccess invitation /> },
           {
             element: <RequireAuth />,
             children: [
@@ -110,6 +112,7 @@ export const router = createBrowserRouter([
                 element: <AdminLayout />,
                 children: [
                   { index: true, element: <Dashboard /> },
+                  { path: 'profile', element: <Profile /> },
                   { path: 'products', element: <AdminProducts /> },
                   { path: 'products/new', element: <ProductForm /> },
                   { path: 'products/:id/edit', element: <ProductForm /> },
@@ -118,7 +121,8 @@ export const router = createBrowserRouter([
                   { path: 'knowledge', element: <Knowledge /> },
                   { path: 'ai-settings', element: <AiSettings /> },
                   { path: 'brands', element: <AdminOperations section="brands" /> },
-                  { path: 'admins', element: <AdminOperations section="admins" /> },
+                  { path: 'accounts', element: <Accounts /> },
+                  { path: 'admins', element: <Navigate to="/admin/accounts" replace /> },
                   { path: 'maintenance', element: <AdminOperations section="maintenance" /> },
                   { path: 'embedding', element: <AdminOperations section="embedding" /> },
                 ],

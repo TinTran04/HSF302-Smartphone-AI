@@ -29,6 +29,20 @@ class ChatFlowIntegrationTest {
     @MockitoBean TopicRouter router;
     @MockitoBean ChatResponder responder;
 
+    @Test void oldTopicLinksCreateUnifiedConsultations() throws Exception {
+        var guest = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
+        String token = mapper.readTree(guest.getResponse().getContentAsString()).path("guestSessionToken").asText();
+        for (String topic : java.util.List.of("PHONE_COMPARISON", "GENERAL_CHAT", "PHONE_CONSULTATION")) {
+            var created = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("topic", topic))))
+                    .andExpect(status().isCreated()).andReturn();
+            String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+            mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.topic").value("PHONE_CONSULTATION"))
+                    .andExpect(jsonPath("$.title").value("Tư vấn mua điện thoại"));
+        }
+    }
+
     @Test void rejectedSwitchDoesNotProcessQuestionAndOtherGuestCannotReadConversation() throws Exception {
         when(router.route(anyString(), anyString(), anyList()))
                 .thenReturn(new TopicRouter.Decision("DIFFERENT_TOPIC", "SHOP_SUPPORT"))

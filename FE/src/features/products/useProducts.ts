@@ -13,6 +13,6 @@ export function useProduct(id?: string, admin = false) {
     enabled: !!id,
   });
 }
-export function useBrands() {
-  return useQuery({ queryKey: ['brands'], queryFn: api.brands });
+export function useBrands(admin = false) {
+  return useQuery({ queryKey: ['brands', admin], queryFn: () => api.brands(admin) });
 }

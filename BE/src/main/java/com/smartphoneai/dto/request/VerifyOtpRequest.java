@@ -10,4 +10,9 @@ import java.util.UUID;
 
 public record VerifyOtpRequest(@NotNull UUID challengeId,
                                @NotBlank @Pattern(regexp = "[0-9]{6}") String code,
-                               @Size(max = 100) List<@Valid CartItemRequest> guestCart) {}
+                               @Size(max = 100) List<@Valid CartItemRequest> guestCart,
+                               UUID guestCartMergeId) {
+    public VerifyOtpRequest(UUID challengeId, String code, List<CartItemRequest> guestCart) {
+        this(challengeId, code, guestCart, null);
+    }
+}

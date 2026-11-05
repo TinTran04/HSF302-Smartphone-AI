@@ -1,3 +1,5 @@
+import type { Role } from '../types/models';
+
 export const formatVnd = (value: number) =>
   new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -33,11 +35,13 @@ export const productPrice = (p: { variants: { price: number; status: string }[] 
   const prices = p.variants.filter((v) => v.status === 'ACTIVE').map((v) => v.price);
   return prices.length ? Math.min(...prices) : null;
 };
-export const safeReturnPath = (value: unknown) =>
+export const safeReturnPath = (value: unknown, role?: Role) =>
   typeof value === 'string' &&
   value.startsWith('/') &&
   !value.startsWith('//') &&
   !value.includes('\\') &&
+  !(role === 'CUSTOMER' && /^\/admin(\/|\?|#|$)/i.test(value)) &&
+  !(role === 'ADMIN' && !/^\/admin(\/|\?|#|$)/i.test(value)) &&
   !/^\/(login|register)(\/|\?|$)/.test(value)
     ? value
-    : '/';
+    : role === 'ADMIN' ? '/admin' : '/';

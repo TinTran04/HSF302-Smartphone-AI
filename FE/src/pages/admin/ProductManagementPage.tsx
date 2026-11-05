@@ -24,6 +24,7 @@ export default function ProductManagementPage() {
   const { notify } = useToast();
   const products = useProducts(params, true);
   const status = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () =>
       api.productStatus(changing!.id, changing!.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'),
     onSuccess: () => {

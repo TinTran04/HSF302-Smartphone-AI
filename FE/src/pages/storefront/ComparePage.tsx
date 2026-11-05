@@ -46,7 +46,7 @@ export default function ComparePage() {
         {products.length >= 2 ? (
           <Link
             className="button button-ai"
-            to={`/ai?topic=PHONE_COMPARISON&productIds=${products.map((p) => p.id).join(',')}`}
+            to={`/ai?topic=PHONE_CONSULTATION&productIds=${products.map((p) => p.id).join(',')}`}
           >
             <Icon name="auto_awesome" />
             So sánh cùng AI

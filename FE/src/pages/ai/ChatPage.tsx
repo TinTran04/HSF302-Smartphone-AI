@@ -4,7 +4,7 @@ import { useChat } from '../../features/ai-chat/hooks/useChat';
 import { ChatMessage } from '../../features/ai-chat/components/ChatMessage';
 import { TopicSwitchDialog } from '../../features/ai-chat/components/TopicSwitchDialog';
 import { topicInfo } from '../../features/ai-chat/constants/chatTopics';
-import { Button, EmptyState, ErrorState, Skeleton, useToast } from '../../shared/components/Ui';
+import { Button, EmptyState, ErrorState, Skeleton } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import { isDemo } from '../../shared/api';
 export default function ChatPage() {
@@ -15,7 +15,6 @@ function ChatWorkspace({ id }: { id: string }) {
   const chat = useChat(id);
   const [draft, setDraft] = useState('');
   const stream = useRef<HTMLDivElement>(null);
-  const { notify } = useToast();
   const data = chat.conversation.data;
   useEffect(() => {
     stream.current?.scrollTo({ top: stream.current.scrollHeight, behavior: 'smooth' });
@@ -144,9 +143,7 @@ function ChatWorkspace({ id }: { id: string }) {
         <TopicSwitchDialog
           request={chat.pending}
           onConfirm={() => chat.confirm.mutate()}
-          onCancel={() =>
-            chat.cancel.mutate(undefined, { onSuccess: () => notify('Đã giữ chủ đề hiện tại.') })
-          }
+          onCancel={() => chat.cancel.mutate()}
           busy={chat.confirm.isPending || chat.cancel.isPending}
           error={chat.confirm.error || chat.cancel.error}
         />
