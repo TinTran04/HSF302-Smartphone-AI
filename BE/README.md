@@ -31,7 +31,11 @@ Controller và các service khác inject interface. Spring tạo bean từ các 
 - PostgreSQL có extension `vector` (pgvector), tạo database `smartphone_ai`. Tài khoản database cần quyền tạo extension khi Flyway chạy lần đầu.
 - SMTP Gmail cho email OTP và lời mời Admin. Cấu hình AI và embedding riêng trong API quản trị trước khi dùng các chức năng liên quan.
 
-Đặt các biến môi trường sau cho máy local, không ghi mật khẩu hoặc API key vào mã nguồn:
+Nhận file `.env` đã điền sẵn từ người phụ trách dự án và đặt tại `BE/.env`, hoặc sao chép `.env.example` thành `.env` để cấu hình lần đầu. BE tự đọc file khi working directory là thư mục `BE` hoặc thư mục gốc dự án.
+
+File dùng định dạng `KEY=value` của Java properties. Giá trị viết trực tiếp, dấu gạch chéo ngược viết thành `\\`. Các biến môi trường của IntelliJ hoặc terminal có ưu tiên cao hơn file. Khởi động lại BE sau khi cập nhật `.env`.
+
+Các giá trị trong file gồm những nhóm sau.
 
 | Biến | Mục đích |
 | --- | --- |
@@ -41,6 +45,8 @@ Controller và các service khác inject interface. Spring tạo bean từ các 
 | `SMTP_LOCALHOST` | Tên máy dùng khi gửi lệnh SMTP; mặc định `localhost` |
 | `ROOT_ADMIN_USERNAME`, `ROOT_ADMIN_PASSWORD` | Tạo Admin gốc lần đầu nếu chưa tồn tại |
 | `AI_CONFIG_ENCRYPTION_KEY` | Khóa AES 32 byte mã hóa Base64 để bảo vệ API key AI |
+
+File `.env` được Git bỏ qua và chia sẻ riêng. File `.env.example` đi cùng repository. Các kiểm thử tự động được tách khỏi `.env` để sử dụng database và dịch vụ thử nghiệm. Có thể chỉ định vị trí cấu hình riêng qua `APP_ENV_FILE` với cú pháp Spring config import khi chạy ứng dụng từ thư mục khác.
 
 Giữ nguyên khóa mã hóa giữa các lần chạy để đọc lại cấu hình AI đã lưu. Admin gốc chỉ được tạo khi chưa tồn tại và đã cấu hình username/mật khẩu; username không chứa `@`, mật khẩu tối thiểu 8 ký tự. Admin gốc đăng nhập bằng username, không cần email. Thay biến Admin gốc sau khi đã khởi tạo không thay đổi mật khẩu trong database. Flyway áp dụng migration khi ứng dụng khởi động và Hibernate kiểm tra schema.
 

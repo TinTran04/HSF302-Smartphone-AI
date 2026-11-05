@@ -49,23 +49,24 @@ Các lệnh sau dùng PowerShell và giả sử bạn đang ở thư mục gốc
 
 ### 1. Cấu hình và chạy backend
 
-Trong terminal dành cho backend, đặt các biến môi trường phù hợp với máy của bạn:
+Nhận file `BE/.env` đã được cấu hình từ người phụ trách dự án và đặt vào thư mục `BE`. Nếu tự cấu hình lần đầu, sao chép file mẫu rồi điền giá trị trong `BE/.env`.
 
 ```powershell
-$env:DB_URL = "jdbc:postgresql://localhost:5432/smartphone_ai"
-$env:DB_USERNAME = "<ten-nguoi-dung-postgresql>"
-$env:DB_PASSWORD = "<mat-khau-postgresql>"
-$env:SMTP_USERNAME = "<email-gmail>"
-$env:SMTP_PASSWORD = "<mat-khau-ung-dung-gmail>"
-$env:ROOT_ADMIN_USERNAME = "<ten-dang-nhap-admin-goc>"
-$env:ROOT_ADMIN_PASSWORD = "<mat-khau-admin-goc>"
-$env:AI_CONFIG_ENCRYPTION_KEY = "<khoa-base64-cua-32-byte-ngau-nhien>"
+Copy-Item BE/.env.example BE/.env
+```
 
+Khi đã có file `.env` phù hợp với database local, chạy backend.
+
+```powershell
 cd BE
 mvn spring-boot:run
 ```
 
-Thay các giá trị trong dấu `<...>` bằng cấu hình của bạn; không lưu thông tin thật vào mã nguồn. Có thể tạo khóa mã hóa một lần bằng PowerShell:
+BE tự đọc `BE/.env` khi chạy từ thư mục `BE` hoặc thư mục gốc dự án, kể cả khi chạy bằng IntelliJ với working directory tương ứng. Các nhóm cấu hình gồm database, Gmail gửi OTP, Admin gốc và khóa mã hóa AI. File dùng cú pháp `KEY=value`, giá trị viết trực tiếp, dấu gạch chéo ngược được viết thành `\\`. Khởi động lại BE sau khi sửa file. Biến môi trường trong IntelliJ hoặc terminal có ưu tiên cao hơn giá trị trong `.env`.
+
+File `.env` chứa giá trị thật được Git bỏ qua và chia sẻ riêng cho nhóm. File `.env.example` đi cùng mã nguồn trên GitHub. Nếu dùng database khác trên máy mới, điều chỉnh các giá trị `DB_*` cho database đó. API key chat và embedding được quản lý trong giao diện Admin, còn `AI_CONFIG_ENCRYPTION_KEY` trong `.env` bảo vệ các key đã lưu trong database.
+
+Người cấu hình lần đầu có thể tạo khóa mã hóa bằng PowerShell.
 
 ```powershell
 $aiKeyBytes = New-Object byte[] 32
@@ -74,7 +75,7 @@ $rng.GetBytes($aiKeyBytes)
 [Convert]::ToBase64String($aiKeyBytes)
 ```
 
-Lưu khóa ở nơi an toàn và sử dụng **cùng một khóa** cho các lần chạy sau để đọc được cấu hình AI đã mã hóa. Admin gốc được tạo nếu chưa tồn tại và đã cấu hình username/mật khẩu; thay đổi biến môi trường sau khi tài khoản đã được tạo không tự đổi mật khẩu đã lưu. Flyway sẽ áp dụng migration khi backend khởi động. Các biến `$env:` chỉ tồn tại trong terminal PowerShell hiện tại.
+Điền kết quả vào `AI_CONFIG_ENCRYPTION_KEY` trong `BE/.env` và sử dụng **cùng một khóa** cho database đó ở các lần chạy sau. Admin gốc được tạo nếu chưa tồn tại và đã cấu hình username/mật khẩu. Mật khẩu tài khoản đã tạo được quản lý qua chức năng đổi mật khẩu. Flyway áp dụng migration khi backend khởi động.
 
 Backend mặc định phục vụ API tại `http://localhost:8080/api`. Tham khảo [hướng dẫn backend](BE/README.md) để biết chi tiết cấu hình và kiểm thử.
 
@@ -88,7 +89,7 @@ npm install
 npm run dev
 ```
 
-Mở `http://localhost:5173`. FE mặc định gọi API thật qua `/api`; Vite chuyển tiếp các request đến `http://localhost:8080`. Nếu BE chạy ở địa chỉ khác, tạo `FE/.env.local`:
+Mở `http://localhost:5173`. FE mặc định gọi API thật qua `/api`; Vite chuyển tiếp các request đến `http://localhost:8080`. Có thể sao chép `FE/.env.example` thành `FE/.env`. Khi BE chạy ở địa chỉ khác, chỉnh cấu hình FE tương ứng.
 
 ```dotenv
 VITE_API_BASE_URL=/api
@@ -134,6 +135,8 @@ npm run test:e2e
 Kiểm thử giao diện dùng Chrome cài trên máy và chạy ở chế độ demo. Dự án cũng có `npm run test:integration` để kiểm thử FE với Spring Boot, H2 và SMTP giả cục bộ; xem cách khởi động các dịch vụ thử nghiệm trong [FE README](FE/README.md). Các kiểm thử dùng H2 hoặc dịch vụ giả không thay thế việc kiểm thử PostgreSQL/pgvector, Gmail và nhà cung cấp AI thực tế.
 
 ## Tài liệu
+
+Bộ dataset điện thoại gốc, dữ liệu đã chuẩn hóa và SQL nhập catalog nằm trong [datasets/phones](datasets/phones/README.md). Giá quy đổi trong bộ này phục vụ kiểm thử giao diện VNĐ, nguồn và giá gốc được lưu cùng từng sản phẩm.
 
 - [Đặc tả nghiệp vụ](docs/BUSINESS_SPECIFICATION.md)
 - [Đặc tả REST API](docs/API_SPECIFICATION.md)

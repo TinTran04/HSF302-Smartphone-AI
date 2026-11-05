@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: "${APP_ENV_FILE:optional:file:./.env[.properties],optional:file:./BE/.env[.properties]}"
   flyway:
     locations: classpath:db/migration,classpath:db/vendor/{vendor}
     validate-on-migrate: false
