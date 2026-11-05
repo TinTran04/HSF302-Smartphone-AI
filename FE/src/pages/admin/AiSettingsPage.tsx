@@ -85,6 +85,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     ...(removeBackupKey ? { removeBackupKey: true } : {}),
   });
   const save = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () => api.saveAiSettings(body()),
     onSuccess: (saved) => {
       setApiKey('');
@@ -99,6 +100,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     },
   });
   const test = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () => api.testAiConnection(body()),
     onSuccess: (data) => {
       void client.invalidateQueries({ queryKey: ['ai-settings'] });
@@ -106,6 +108,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     },
   });
   const activation = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () => api.activateProvider(setting.provider),
     onSuccess: (data) => {
       client.setQueryData(['ai-settings'], data);

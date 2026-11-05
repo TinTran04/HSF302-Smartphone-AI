@@ -15,8 +15,9 @@ export default function ProfilePage() {
   const [address, setAddress] = useState(user.address);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const passwordChange = useMutation({ mutationFn: () => http('/users/me/password', { method: 'POST', body: jsonBody({ currentPassword, newPassword }) }), onSuccess: () => { setCurrentPassword(''); setNewPassword(''); notify('Đã đổi mật khẩu.'); } });
+  const passwordChange = useMutation({ meta: { toast: { success: false } }, mutationFn: () => http('/users/me/password', { method: 'POST', body: jsonBody({ currentPassword, newPassword }) }), onSuccess: () => { setCurrentPassword(''); setNewPassword(''); notify('Đã đổi mật khẩu.'); } });
   const save = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () => api.updateProfile({ fullName: fullName.trim(), phone, address }),
     onSuccess: (updated) => {
       auth.setUser(updated);
@@ -51,7 +52,7 @@ export default function ProfilePage() {
           <label className="form-field">
             Email
             <input type="email" value={user.email ?? ''} readOnly />
-            <span className="help-text">{user.email ? 'Email được quản lý bởi hệ thống tài khoản.' : 'Admin gốc đăng nhập bằng tên đăng nhập và không có email.'}</span>
+            <span className="help-text">Email được quản lý bởi hệ thống tài khoản.</span>
           </label>
           <label className="form-field">
             Số điện thoại

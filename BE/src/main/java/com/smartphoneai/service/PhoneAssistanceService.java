@@ -5,6 +5,8 @@ import com.smartphoneai.dto.response.ProductResponse;
 import java.util.*;
 
 public interface PhoneAssistanceService {
+    ChatResponder.Answer advise(String question, List<ChatMessageResponse> history, List<String> productIds);
+
     public record Recommendation(String text, List<ProductResponse> recommendedProducts) {}
 
     public record Comparison(String text, List<ProductResponse> comparedProducts) {}

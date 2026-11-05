@@ -18,7 +18,9 @@ public class UserAccount {
     @Enumerated(EnumType.STRING) @Column(nullable = false) private Role role;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private boolean deleted;
+    @Column(nullable = false) private boolean disabled;
     @Column(name = "root_key", unique = true) private String rootKey;
+    @Column(name = "credential_version", nullable = false) private long credentialVersion;
     @Version private long version;
 
     protected UserAccount() {}
@@ -36,10 +38,10 @@ public class UserAccount {
         return user;
     }
 
-    public static UserAccount rootAdmin(String username, String passwordHash) {
+    public static UserAccount rootAdmin(String email, String passwordHash) {
         var user = new UserAccount();
         user.id = UUID.randomUUID();
-        user.username = username.trim().toLowerCase(Locale.ROOT);
+        user.email = email.trim().toLowerCase(Locale.ROOT);
         user.fullName = "Admin gốc";
         user.phone = "";
         user.address = "";
@@ -51,15 +53,39 @@ public class UserAccount {
     }
 
     public static UserAccount invitedAdmin(String email, String name) {
+        return invitedAccount(email, name, Role.ADMIN);
+    }
+
+    public static UserAccount invitedAccount(String email, String name, Role role) {
         var user = pendingCustomer(email, name, "", "!");
-        user.role = Role.ADMIN;
+        user.role = role;
         return user;
     }
 
     public void activate() { active = true; }
-    public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public void changeRole(Role newRole) { if (!isRoot() && newRole != null) this.role = newRole; }
+    public void assignRootEmail(String email) {
+        if (!isRoot()) throw new IllegalStateException("Only the root Admin can use this migration");
+        this.email = email.trim().toLowerCase(Locale.ROOT);
+        this.username = null;
+    }
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+        credentialVersion++;
+    }
+    public void changeRole(Role newRole) {
+        if (!isRoot() && newRole != null && newRole != role) {
+            role = newRole;
+            credentialVersion++;
+        }
+    }
     public void demoteToCustomer() { changeRole(Role.CUSTOMER); }
+    public void changeEnabled(boolean enabled) {
+        boolean newDisabled = !enabled;
+        if (disabled != newDisabled) {
+            disabled = newDisabled;
+            credentialVersion++;
+        }
+    }
     public void updateProfile(String name, String phone, String address) {
         this.fullName = name.trim(); this.phone = phone.trim(); this.address = address.trim();
     }
@@ -70,10 +96,13 @@ public class UserAccount {
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
     public String getPasswordHash() { return passwordHash; }
+    public long getCredentialVersion() { return credentialVersion; }
     public Role getRole() { return role; }
     public boolean isActive() { return active; }
+    public boolean isPendingInvitation() { return !active && "!".equals(passwordHash); }
     public boolean isRoot() { return rootKey != null; }
     public String getRootKey() { return rootKey; }
     public boolean isDeleted() { return deleted; }
+    public boolean isDisabled() { return disabled; }
     public void disableAndDelete() { deleted = true; active = false; }
 }

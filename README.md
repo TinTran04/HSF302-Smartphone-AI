@@ -2,14 +2,18 @@
 
 Website bán điện thoại có trợ lý AI, gồm giao diện React và backend Spring Boot. Dự án được thiết kế để chạy local, hỗ trợ thanh toán khi nhận hàng (COD) và miễn phí giao hàng.
 
-Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin gốc đăng nhập bằng username và mật khẩu; Gmail được cấu hình riêng để gửi OTP và lời mời Admin.
+Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đăng nhập bằng email và mật khẩu. Gmail gửi OTP và lời mời kích hoạt tài khoản được cấu hình riêng.
 
 ## Chức năng chính
 
 - **Cửa hàng:** xem, tìm kiếm và lọc điện thoại; xem phiên bản; so sánh sản phẩm; dùng giỏ hàng và đặt hàng COD.
-- **Tài khoản:** đăng ký, đăng nhập và đặt lại mật khẩu với OTP qua email; quản lý thông tin cá nhân và theo dõi đơn hàng.
-- **Trợ lý AI:** tư vấn điện thoại, so sánh sản phẩm, hỗ trợ thông tin cửa hàng từ tài liệu và trò chuyện chung. Khách chưa đăng nhập được gửi tối đa hai tin nhắn trong mỗi phiên Guest.
-- **Quản trị:** quản lý sản phẩm, thương hiệu, đơn hàng, tài khoản Admin, chế độ bảo trì, tài liệu AI và cấu hình nhà cung cấp AI/embedding.
+- **Tài khoản** đăng nhập bằng email và mật khẩu. OTP qua email dùng cho đăng ký và quên mật khẩu. Chủ tài khoản quản lý thông tin cá nhân và theo dõi đơn hàng. Đổi mật khẩu thu hồi phiên trên thiết bị khác, đặt lại mật khẩu thu hồi các phiên cũ.
+- **Trợ lý AI** có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ bằng catalog, tài liệu và kiến thức AI. Hỗ trợ cửa hàng trả lời chính sách theo RAG có nguồn. Khách chưa đăng nhập được gửi tối đa hai tin trong mỗi phiên Guest.
+- **Quản trị** quản lý sản phẩm, thương hiệu, đơn hàng, tài khoản CUSTOMER/ADMIN, chế độ bảo trì, tài liệu AI và cấu hình nhà cung cấp AI/embedding. Admin tạo tài khoản qua email để người nhận tự đặt mật khẩu và đổi vai trò của tài khoản đã kích hoạt.
+
+Admin sử dụng khu vực `/admin`, gồm hồ sơ cá nhân tại `/admin/profile`. CUSTOMER sử dụng các luồng mua hàng và AI. Xóa Admin thường là xóa mềm.
+
+Trang **Quản lý tài khoản** hỗ trợ vô hiệu hóa và cho CUSTOMER hoặc ADMIN thường hoạt động lại. Mỗi lần chuyển trạng thái thu hồi phiên cũ và giữ dữ liệu. Admin gốc và tài khoản đang thao tác được bảo vệ. Các thao tác nghiệp vụ trên FE có toast kết quả và hộp thoại xác nhận cho thao tác cần xác nhận.
 
 Dự án không xử lý tồn kho thực tế, thanh toán trực tuyến hoặc kết nối đơn vị vận chuyển.
 
@@ -38,7 +42,7 @@ Backend tổ chức theo luồng Controller → Service interface → ServiceImp
 - JDK 21 và Maven 3.9 trở lên.
 - Node.js 22.12 trở lên và npm.
 - PostgreSQL đã cài extension **pgvector**. Tạo database `smartphone_ai`; tài khoản database cần quyền tạo extension khi Flyway chạy lần đầu.
-- Tài khoản Gmail và mật khẩu ứng dụng để gửi OTP và lời mời Admin. Các tính năng này cần SMTP hoạt động.
+- Tài khoản Gmail và mật khẩu ứng dụng để gửi OTP và lời mời kích hoạt tài khoản. Các tính năng này cần SMTP hoạt động.
 - API key của OpenAI hoặc Gemini nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
 
 **Nếu database đã có dữ liệu:** sao lưu và thử trên bản sao trước khi khởi động BE. Migration V20 xóa các tài khoản STAFF/MANAGER cũ cùng dữ liệu liên quan của chính các tài khoản đó. Chi tiết tại [README backend](BE/README.md).
@@ -75,7 +79,7 @@ $rng.GetBytes($aiKeyBytes)
 [Convert]::ToBase64String($aiKeyBytes)
 ```
 
-Điền kết quả vào `AI_CONFIG_ENCRYPTION_KEY` trong `BE/.env` và sử dụng **cùng một khóa** cho database đó ở các lần chạy sau. Admin gốc được tạo nếu chưa tồn tại và đã cấu hình username/mật khẩu. Mật khẩu tài khoản đã tạo được quản lý qua chức năng đổi mật khẩu. Flyway áp dụng migration khi backend khởi động.
+Điền kết quả vào `AI_CONFIG_ENCRYPTION_KEY` trong `BE/.env` và sử dụng **cùng một khóa** cho database đó ở các lần chạy sau. Admin gốc được tạo từ `ROOT_ADMIN_EMAIL` và `ROOT_ADMIN_PASSWORD` nếu chưa tồn tại. Với Admin gốc cũ chưa có email, lần khởi động tiếp theo sẽ gán `ROOT_ADMIN_EMAIL` cho tài khoản đó và chuyển sang đăng nhập bằng email. Mật khẩu tài khoản đã tạo được quản lý qua chức năng đổi mật khẩu. Flyway áp dụng migration khi backend khởi động.
 
 Backend mặc định phục vụ API tại `http://localhost:8080/api`. Tham khảo [hướng dẫn backend](BE/README.md) để biết chi tiết cấu hình và kiểm thử.
 

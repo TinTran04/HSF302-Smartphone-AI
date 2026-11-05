@@ -28,7 +28,7 @@ export interface Api {
   updateProfile(data: Pick<User, 'fullName' | 'phone' | 'address'>): Promise<User>;
   products(params?: URLSearchParams, admin?: boolean): Promise<PageResult<Product>>;
   product(id: string, admin?: boolean): Promise<Product>;
-  brands(): Promise<Brand[]>;
+  brands(admin?: boolean): Promise<Brand[]>;
   cart(): Promise<Cart>;
   resolveCart(entries: CartEntry[]): Promise<Cart>;
   addCart(entry: CartEntry): Promise<Cart>;

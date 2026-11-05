@@ -3,6 +3,7 @@ package com.smartphoneai.service.impl;
 import com.smartphoneai.service.AiChatService;
 import com.smartphoneai.service.ChatResponder;
 import com.smartphoneai.service.TopicRouter;
+import com.smartphoneai.service.support.ChatTopics;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +26,7 @@ import java.util.*;
 
 @Service
 public class AiChatServiceImpl implements AiChatService {
-    private static final Set<String> TOPICS=Set.of("PHONE_CONSULTATION","PHONE_COMPARISON","SHOP_SUPPORT","GENERAL_CHAT");
+    private static final Set<String> TOPICS=Set.of("PHONE_CONSULTATION","SHOP_SUPPORT");
     private final AiGuestSessionRepository guests;
     private final AiConversationRepository conversations;
     private final AiMessageRepository messages;
@@ -54,7 +55,7 @@ public class AiChatServiceImpl implements AiChatService {
     public UUID create(Authentication auth, String token, CreateConversationRequest request) {
         var actor=actor(auth,token);
         var conversation=new AiConversation(actor.userId(), actor.guest()==null ? null : actor.guest().getId(),
-                request.topic(), json(request.productIds()==null ? List.of() : request.productIds()), clock.instant());
+                ChatTopics.normalize(request.topic()), json(request.productIds()==null ? List.of() : request.productIds()), clock.instant());
         return conversations.save(conversation).getId();
     }
     @Override
@@ -82,23 +83,25 @@ public class AiChatServiceImpl implements AiChatService {
         }
         String content=rawContent.trim();
         List<ChatMessageResponse> history=messageViews(id);
-        var decision=router.route(conversation.getTopic(),content,history);
+        String currentTopic = ChatTopics.normalize(conversation.getTopic());
+        var decision=router.route(currentTopic,content,history);
         if (decision==null) throw new AiProviderException();
+        String suggestedTopic = decision.suggestedTopic() == null ? null : ChatTopics.normalize(decision.suggestedTopic());
         if ("DIFFERENT_TOPIC".equals(decision.result()) && decision.suggestedTopic()!=null
-                && TOPICS.contains(decision.suggestedTopic()) && !conversation.getTopic().equals(decision.suggestedTopic())) {
+                && TOPICS.contains(suggestedTopic) && !currentTopic.equals(suggestedTopic)) {
             addMessage(id,"user",content,List.of());
-            var request=switches.save(new AiTopicSwitch(id,decision.suggestedTopic(),content,clock.instant()));
+            var request=switches.save(new AiTopicSwitch(id,suggestedTopic,content,clock.instant()));
             if (actor.guest()!=null) actor.guest().countMessage();
-            return switchView(request,conversation.getTopic());
+            return switchView(request,currentTopic);
         }
-        if (!"SAME_TOPIC".equals(decision.result())) {
+        if (!"SAME_TOPIC".equals(decision.result()) && !("DIFFERENT_TOPIC".equals(decision.result()) && currentTopic.equals(suggestedTopic))) {
             addMessage(id,"user",content,List.of());
             String clarification="Bạn muốn hỏi về chủ đề nào? Vui lòng nói rõ thêm.";
             addMessage(id,"assistant",clarification,List.of());
             if (actor.guest()!=null) actor.guest().countMessage();
             return Map.of("type","CLARIFICATION_REQUIRED","message",clarification);
         }
-        var answer=responder.answer(conversation.getTopic(),content,history,productIds(conversation.getProductIds()));
+        var answer=responder.answer(currentTopic,content,history,productIds(conversation.getProductIds()));
         validateAnswer(answer);
         addMessage(id,"user",content,List.of()); addAnswer(id,answer);
         if (actor.guest()!=null) actor.guest().countMessage();
@@ -120,7 +123,7 @@ public class AiChatServiceImpl implements AiChatService {
         var answer=responder.answer(request.getSuggestedTopic(),request.getQuestion(),List.of(),List.of());
         validateAnswer(answer);
         var next=conversations.saveAndFlush(new AiConversation(actor.userId(),actor.guest()==null ? null : actor.guest().getId(),
-                request.getSuggestedTopic(),"[]",clock.instant()));
+                ChatTopics.normalize(request.getSuggestedTopic()),"[]",clock.instant()));
         addMessage(next.getId(),"user",request.getQuestion(),List.of());
         addAnswer(next.getId(),answer);
         request.confirm(next.getId());
@@ -169,7 +172,10 @@ public class AiChatServiceImpl implements AiChatService {
     }
     private Map<String,Object> conversationView(AiConversation conversation) {
         var view=new LinkedHashMap<String,Object>();
-        view.put("id",conversation.getId().toString()); view.put("topic",conversation.getTopic()); view.put("title",conversation.getTitle());
+        String title = conversation.getTitle();
+        if (Set.of("PHONE_CONSULTATION", "PHONE_COMPARISON", "GENERAL_CHAT", "SHOP_SUPPORT").contains(title))
+            title = ChatTopics.title(conversation.getTopic());
+        view.put("id",conversation.getId().toString()); view.put("topic",ChatTopics.normalize(conversation.getTopic())); view.put("title",title);
         view.put("messages",messageViews(conversation.getId()));
         switches.findFirstByConversationIdAndStatus(conversation.getId(),"PENDING")
                 .filter(s -> s.canConfirm(clock.instant()))
@@ -189,8 +195,8 @@ public class AiChatServiceImpl implements AiChatService {
                 json(answer.recommendedProducts()),json(answer.comparedProducts()),clock.instant()));
     }
     private Map<String,Object> switchView(AiTopicSwitch request, String currentTopic) {
-        return Map.of("type","SWITCH_REQUIRED","switchRequestId",request.getId().toString(),"currentTopic",currentTopic,
-                "suggestedTopic",request.getSuggestedTopic(),"message","Bạn có muốn chuyển chủ đề để xử lý câu hỏi này không?");
+        return Map.of("type","SWITCH_REQUIRED","switchRequestId",request.getId().toString(),"currentTopic",ChatTopics.normalize(currentTopic),
+                "suggestedTopic",ChatTopics.normalize(request.getSuggestedTopic()),"message","Bạn có muốn chuyển chủ đề để xử lý câu hỏi này không?");
     }
     private Map<String,Object> answerView(UUID id, UUID newId, ChatResponder.Answer answer) {
         var result=new LinkedHashMap<String,Object>(); result.put("type","ANSWER"); result.put("conversationId",id.toString());

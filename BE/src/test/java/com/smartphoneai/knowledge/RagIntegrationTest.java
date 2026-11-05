@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:ragtest;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=ragadmin", "app.root-admin.password=TestRootPassword123!"})
+        "app.root-admin.email=ragadmin@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
 class RagIntegrationTest {
     @Autowired MockMvc mvc;
@@ -42,7 +42,7 @@ class RagIntegrationTest {
                 .when(vectors).replace(any(),anyString(),anyList(),anyString());
         var admin=new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(admin).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"ragadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"ragadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var file=new MockMultipartFile("file","policy.txt","text/plain","Chính sách demo: bảo hành 12 tháng.".getBytes(StandardCharsets.UTF_8));
         var uploaded=mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(admin).with(csrf()))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PROCESSING")).andReturn();

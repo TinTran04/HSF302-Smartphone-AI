@@ -14,4 +14,6 @@ public interface RegistrationService {
     OtpChallenge register(RegisterRequest input);
 
     Optional<Verified> verify(UUID challengeId, String code, List<CartItemRequest> guestCart, String guestToken);
+
+    Optional<Verified> verify(UUID challengeId, String code, List<CartItemRequest> guestCart, String guestToken, UUID mergeId);
 }

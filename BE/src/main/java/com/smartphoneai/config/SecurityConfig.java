@@ -15,6 +15,8 @@ import java.time.Clock;
 import com.smartphoneai.repository.UserAccountRepository;
 import com.smartphoneai.service.MaintenanceService;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import static org.springframework.security.authorization.AuthorizationManagers.not;
+import static org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole;
 
 @Configuration
 public class SecurityConfig {
@@ -26,10 +28,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*", "/api/brands", "/api/auth/csrf", "/api/maintenance").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/cart/resolve").permitAll()
-                        .requestMatchers("/api/ai/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf", "/api/maintenance").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*", "/api/brands").access(not(hasRole("ADMIN")))
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/cart/resolve").access(not(hasRole("ADMIN")))
+                        .requestMatchers("/api/ai/**").access(not(hasRole("ADMIN")))
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/cart", "/api/cart/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("CUSTOMER")

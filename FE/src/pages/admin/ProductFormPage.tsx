@@ -44,11 +44,12 @@ function ProductForm({ initial, creating }: { initial: Product; creating: boolea
   const [product, setProduct] = useState<Product>(structuredClone(initial));
   const [imageText, setImageText] = useState(initial.images.join('\n'));
   const [validation, setValidation] = useState('');
-  const brands = useBrands();
+  const brands = useBrands(true);
   const client = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
   const save = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () =>
       api.saveProduct(
         {
@@ -77,6 +78,10 @@ function ProductForm({ initial, creating }: { initial: Product; creating: boolea
   });
   const set = <K extends keyof Product>(key: K, value: Product[K]) =>
     setProduct((p) => ({ ...p, [key]: value }));
+  function rejectValidation(message: string) {
+    setValidation(message);
+    notify(message, 'error');
+  }
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (save.isPending) return;
@@ -86,22 +91,22 @@ function ProductForm({ initial, creating }: { initial: Product; creating: boolea
         variants.map((v) => `${v.color.trim().toLowerCase()}-${v.storage.trim().toLowerCase()}`),
       ).size !== variants.length;
     if (!product.name.trim() || (isDemo && !product.id.trim()))
-      return setValidation('Tên và mã sản phẩm không được để trống.');
+      return rejectValidation('Tên và mã sản phẩm không được để trống.');
     if (!variants.length || duplicate)
-      return setValidation('Cần ít nhất một phiên bản và không được trùng màu / dung lượng.');
+      return rejectValidation('Cần ít nhất một phiên bản và không được trùng màu / dung lượng.');
     if (
       variants.some(
         (v) => !v.color.trim() || !v.storage.trim() || !Number.isFinite(v.price) || v.price < 0,
       )
     )
-      return setValidation('Vui lòng kiểm tra màu sắc, dung lượng và giá của từng phiên bản.');
+      return rejectValidation('Vui lòng kiểm tra màu sắc, dung lượng và giá của từng phiên bản.');
     if (
       imageText
         .split('\n')
         .filter((s) => s.trim())
         .some((s) => !/^(https?:\/\/|\/(?!\/))/.test(s.trim()))
     )
-      return setValidation('Ảnh phải là URL http(s) hoặc đường dẫn ảnh nội bộ bắt đầu bằng /.');
+      return rejectValidation('Ảnh phải là URL http(s) hoặc đường dẫn ảnh nội bộ bắt đầu bằng /.');
     setValidation('');
     save.mutate();
   }

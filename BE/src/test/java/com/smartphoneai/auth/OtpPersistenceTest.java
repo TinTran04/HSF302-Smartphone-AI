@@ -24,13 +24,13 @@ class OtpPersistenceTest {
         var code = new AtomicReference<String>();
         var service = new OtpChallengeServiceImpl(repository, (email, value) -> code.set(value),
                 new BCryptPasswordEncoder(4), Clock.fixed(Instant.parse("2026-10-30T03:00:00Z"), ZoneOffset.UTC));
-        var id = service.issue("A@example.com", "LOGIN").getId();
+        var id = service.issue("A@example.com", "REGISTER").getId();
         entityManager.flush(); entityManager.clear();
-        assertEquals(OtpChallenge.Result.INVALID, service.verify(id, "LOGIN", "not-the-code"));
+        assertEquals(OtpChallenge.Result.INVALID, service.verify(id, "REGISTER", "not-the-code"));
         entityManager.flush(); entityManager.clear();
         assertEquals(1, repository.findById(id).orElseThrow().getFailedAttempts());
-        assertEquals(OtpChallenge.Result.SUCCESS, service.verify(id, "LOGIN", code.get()));
+        assertEquals(OtpChallenge.Result.SUCCESS, service.verify(id, "REGISTER", code.get()));
         entityManager.flush(); entityManager.clear();
-        assertEquals(OtpChallenge.Result.UNAVAILABLE, service.verify(id, "LOGIN", code.get()));
+        assertEquals(OtpChallenge.Result.UNAVAILABLE, service.verify(id, "REGISTER", code.get()));
     }
 }

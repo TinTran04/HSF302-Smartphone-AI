@@ -21,7 +21,7 @@ import static org.hamcrest.Matchers.*;
 
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:aiprovider;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=aiadmin", "app.root-admin.password=TestRootPassword123!",
+        "app.root-admin.email=aiadmin@example.com", "app.root-admin.password=TestRootPassword123!",
         "app.ai.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @AutoConfigureMockMvc
 class AiProviderIntegrationTest {
@@ -32,7 +32,7 @@ class AiProviderIntegrationTest {
     @Test void onlySuccessfullyTestedConfigurationCanBeActivatedWithoutReturningSecret() throws Exception {
         var session = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"aiadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"aiadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         mvc.perform(put("/api/admin/ai-settings").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"OPENAI\",\"model\":\"demo-model\",\"apiKey\":\"secret-key-123\"}"))
                 .andExpect(status().isOk()).andExpect(content().string(not(containsString("secret-key-123"))));

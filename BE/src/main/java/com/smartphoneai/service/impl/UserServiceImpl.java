@@ -24,24 +24,26 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public Optional<UserResponse> findActiveUser(String id) {
         try {
-            return users.findById(UUID.fromString(id)).filter(u -> u.isActive()).map(UserResponse::from);
+            return users.findById(UUID.fromString(id)).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted())
+                    .map(UserResponse::from);
         } catch (IllegalArgumentException ex) {
             return Optional.empty();
         }
     }
     @Override
     @Transactional
-    public void changePassword(String id, String currentPassword, String newPassword) {
+    public long changePassword(String id, String currentPassword, String newPassword) {
         if (newPassword.getBytes(StandardCharsets.UTF_8).length > 72) throw new InvalidPasswordException();
-        var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive())
+        var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted())
                 .orElseThrow(InvalidCredentialsException::new);
         if (!passwords.matches(currentPassword, user.getPasswordHash())) throw new InvalidCredentialsException();
         user.changePasswordHash(passwords.encode(newPassword));
+        return user.getCredentialVersion();
     }
     @Override
     @Transactional
     public UserResponse updateProfile(String id, UpdateProfileRequest input) {
-        var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive())
+        var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted())
                 .orElseThrow(InvalidCredentialsException::new);
         user.updateProfile(input.fullName(), input.phone(), input.address());
         return UserResponse.from(user);

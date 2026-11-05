@@ -14,6 +14,15 @@ import static org.mockito.Mockito.*;
 
 class TopicRouterTest {
     @ParameterizedTest
+    @ValueSource(strings = {"PHONE_COMPARISON", "GENERAL_CHAT"})
+    void comparisonAndGeneralKnowledgeRemainInUnifiedConsultation(String legacyTopic) {
+        var provider = mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenReturn("{\"result\":\"DIFFERENT_TOPIC\",\"suggestedTopic\":\"" + legacyTopic + "\"}");
+        var decision = new TopicRouterImpl(provider, new ObjectMapper()).route("PHONE_CONSULTATION", "So sánh và giải thích chip.", List.of());
+        assertEquals(new TopicRouter.Decision("SAME_TOPIC", null), decision);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
             "{\"result\":\"SAME_TOPIC\",\"suggestedTopic\":null}",
             "```json\n{\"result\":\"SAME_TOPIC\",\"suggestedTopic\":null}\n```",

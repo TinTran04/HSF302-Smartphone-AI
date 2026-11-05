@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:knowledge;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=knowledgeadmin", "app.root-admin.password=TestRootPassword123!"})
+        "app.root-admin.email=knowledgeadmin@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
 class KnowledgeIntegrationTest {
     @Autowired MockMvc mvc;
@@ -54,7 +54,7 @@ class KnowledgeIntegrationTest {
         when(vectors.currentVersion()).thenThrow(new IllegalStateException("Embedding unavailable"));
         var session = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"knowledgeadmin\",\"password\":\"TestRootPassword123!\"}"))
+                .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isOk());
         var file = new MockMultipartFile("file", "failure.txt", "text/plain", "Demo document".getBytes(StandardCharsets.UTF_8));
         var uploaded = mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(session).with(csrf()))
@@ -73,7 +73,7 @@ class KnowledgeIntegrationTest {
         });
         var session=new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"knowledgeadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var file=new MockMultipartFile("file","async.txt","text/plain","Demo document".getBytes(StandardCharsets.UTF_8));
         String id;
         try {
@@ -95,7 +95,7 @@ class KnowledgeIntegrationTest {
         when(vectors.currentVersion()).thenReturn("embedding-v1");
         var session=new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"knowledgeadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var file=new MockMultipartFile("file","demo.txt","text/plain","Chính sách demo: bảo hành 12 tháng.".getBytes(StandardCharsets.UTF_8));
         var upload=mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(session).with(csrf()))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PROCESSING")).andReturn();

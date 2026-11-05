@@ -1,4 +1,5 @@
 import type { CartEntry } from '../../shared/types/models';
+import { resetGuestCartMerge } from '../../shared/utils/guestCartMerge';
 const key = 'smartphone-ai-guest-cart';
 export function readGuestCart(): CartEntry[] {
   try {
@@ -19,6 +20,7 @@ export function readGuestCart(): CartEntry[] {
   }
 }
 export function saveGuestCart(entries: CartEntry[]) {
+  if (!entries.length || JSON.stringify(readGuestCart()) !== JSON.stringify(entries)) resetGuestCartMerge();
   try {
     localStorage.setItem(
       key,

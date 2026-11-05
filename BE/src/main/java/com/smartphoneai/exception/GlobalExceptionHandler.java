@@ -86,6 +86,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> invalidCredentials(InvalidCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError("INVALID_CREDENTIALS", "Thông tin đăng nhập không hợp lệ", Instant.now()));
     }
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<ApiError> accountDisabled(AccountDisabledException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("ACCOUNT_DISABLED", "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên", Instant.now()));
+    }
     @ExceptionHandler(OtpRateLimitException.class)
     public ResponseEntity<ApiError> otpRateLimit(OtpRateLimitException exception) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError("OTP_RATE_LIMIT", "Chưa thể gửi lại mã", Instant.now()));

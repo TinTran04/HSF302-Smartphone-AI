@@ -49,15 +49,21 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Override
     @Transactional
     public Optional<Verified> verify(UUID challengeId, String code, List<CartItemRequest> guestCart, String guestToken) {
-        var challenge = challenges.findLockedById(challengeId).orElse(null);
-        if (challenge == null || !("REGISTER".equals(challenge.getPurpose()) || "LOGIN".equals(challenge.getPurpose()))) return Optional.empty();
-        var account = users.findByEmail(challenge.getEmail()).orElse(null);
-        if (account == null || ("REGISTER".equals(challenge.getPurpose()) && account.isActive())
-                || ("LOGIN".equals(challenge.getPurpose()) && !account.isActive())) return Optional.empty();
-        var result = otp.verify(challengeId, challenge.getPurpose(), code);
+        return verify(challengeId, code, guestCart, guestToken, null);
+    }
+
+    @Override
+    @Transactional
+    public Optional<Verified> verify(UUID challengeId, String code, List<CartItemRequest> guestCart, String guestToken, UUID mergeId) {
+        var challenge = challenges.findById(challengeId).orElse(null);
+        if (challenge == null || !"REGISTER".equals(challenge.getPurpose())) return Optional.empty();
+        var account = users.findLockedByEmail(challenge.getEmail()).orElse(null);
+        if (account == null || account.isDeleted() || account.isDisabled() || account.isActive() || account.isPendingInvitation()
+                || account.getRole() != UserAccount.Role.CUSTOMER) return Optional.empty();
+        var result = otp.verify(challengeId, "REGISTER", code);
         if (result != OtpChallenge.Result.SUCCESS) return Optional.empty();
-        if ("REGISTER".equals(challenge.getPurpose())) account.activate();
-        carts.merge(account.getId(), guestCart);
+        account.activate();
+        carts.merge(account.getId(), guestCart, mergeId);
         return Optional.of(new Verified(account, chats.claim(account.getId(), guestToken)));
     }
 }

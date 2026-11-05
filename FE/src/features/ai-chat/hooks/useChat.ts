@@ -17,6 +17,7 @@ export function useChat(id: string) {
   });
   const pending = pendingSwitch ?? conversation.data?.pendingSwitch;
   const send = useMutation({
+    meta: { toast: { success: 'Đã gửi tin nhắn.' } },
     mutationFn: (content: string) => api.sendMessage(id, content),
     onSuccess: async (result) => {
       if (result.type === 'SWITCH_REQUIRED') setPendingSwitch(result);
@@ -25,6 +26,7 @@ export function useChat(id: string) {
     },
   });
   const confirm = useMutation({
+    meta: { toast: { success: 'Đã chuyển chủ đề tư vấn.' } },
     mutationFn: () => api.confirmSwitch(pending!.switchRequestId),
     onSuccess: async (result) => {
       if (result.type !== 'ANSWER' || !result.newConversationId)
@@ -36,6 +38,7 @@ export function useChat(id: string) {
     },
   });
   const cancel = useMutation({
+    meta: { toast: { success: 'Đã giữ chủ đề hiện tại.' } },
     mutationFn: () => api.cancelSwitch(pending!.switchRequestId),
     onSuccess: async () => {
       setPendingSwitch(null);

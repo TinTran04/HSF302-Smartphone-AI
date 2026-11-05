@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:ordertest;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=orderadmin", "app.root-admin.password=TestRootPassword123!"})
+        "app.root-admin.email=orderadmin@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
 class OrderIntegrationTest {
     @Autowired MockMvc mvc;
@@ -84,7 +84,7 @@ class OrderIntegrationTest {
         String secondOrderId = mapper.readTree(secondOrder.getResponse().getContentAsString()).path("id").asText();
         var admin = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(admin).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"orderadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"orderadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         for (String status : List.of("CONFIRMED", "SHIPPING"))
             mvc.perform(patch("/api/admin/orders/" + secondOrderId + "/status").session(admin).with(csrf())
                     .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("status", status))))

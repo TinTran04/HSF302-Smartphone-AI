@@ -18,7 +18,7 @@ import type {
   User,
 } from '../shared/types/models';
 import { mockBrands, mockProducts } from './products';
-import { topicInfo } from '../features/ai-chat/constants/chatTopics';
+import { normalizeTopic, topicInfo } from '../features/ai-chat/constants/chatTopics';
 
 // Local fake backend. It never connects to an AI provider or stores credentials.
 // It is loaded only when the explicitly visible demo mode is enabled.
@@ -120,6 +120,7 @@ function myCart() {
 function myChat(id: string) {
   const chat = (chats[owner()] || []).find((c) => c.id === id);
   if (!chat) throw new ApiError(404, 'Cuộc hội thoại không tồn tại hoặc đã hết phiên.');
+  chat.topic = normalizeTopic(chat.topic);
   return chat;
 }
 function findOrder(id: string, isAdmin = false) {
@@ -142,14 +143,15 @@ function responseFor(chat: Conversation, question: string): AiAnswer {
   };
   const ids = (chats[owner()] || []).find((c) => c.id === chat.id)?.productIds;
   const compared = ids?.length ? products.filter((p) => ids.includes(p.id)) : products.slice(0, 2);
+  const comparing = chat.topic === 'PHONE_CONSULTATION' && (/so sánh|compare/i.test(question) || (ids?.length ?? 0) >= 2);
   const response: AiAnswer = {
     type: 'ANSWER',
     conversationId: chat.id,
     answer: answers[chat.topic],
-    ...(chat.topic === 'PHONE_CONSULTATION'
+    ...(chat.topic === 'PHONE_CONSULTATION' && !comparing
       ? { recommendedProducts: products.filter((p) => p.status === 'ACTIVE').slice(0, 2) }
       : {}),
-    ...(chat.topic === 'PHONE_COMPARISON' ? { comparedProducts: compared } : {}),
+    ...(comparing ? { comparedProducts: compared } : {}),
     ...(chat.topic === 'SHOP_SUPPORT'
       ? {
           sources: [
@@ -390,7 +392,7 @@ export const mockApi: Api = {
   createConversation: (topic, context) => {
     const conversation = {
       id: uid('conv'),
-      topic,
+      topic: normalizeTopic(topic),
       title: topicInfo(topic).title,
       messages: [],
       owner: owner(),

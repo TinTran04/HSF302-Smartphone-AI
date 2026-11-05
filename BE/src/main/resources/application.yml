@@ -32,5 +32,5 @@ app:
   ai:
     encryption-key: ${AI_CONFIG_ENCRYPTION_KEY:}
   root-admin:
-    username: ${ROOT_ADMIN_USERNAME:}
+    email: ${ROOT_ADMIN_EMAIL:}
     password: ${ROOT_ADMIN_PASSWORD:}

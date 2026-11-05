@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:adminmanage;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=owner", "app.root-admin.password=TestRootPassword123!"})
+        "app.root-admin.email=owner@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
 class AdminManagementIntegrationTest {
     @Autowired MockMvc mvc;
@@ -35,7 +35,7 @@ class AdminManagementIntegrationTest {
                 .when(invitationSender).send(anyString(), anyString());
         var rootSession = new MockHttpSession();
         var rootLogin = mvc.perform(post("/api/auth/login").session(rootSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"owner\",\"password\":\"TestRootPassword123!\"}"))
+                .content("{\"identifier\":\"owner@example.com\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isOk()).andReturn();
         String rootId = mapper.readTree(rootLogin.getResponse().getContentAsString()).path("user").path("id").asText();
         mvc.perform(post("/api/admin/admin-invitations").session(rootSession).with(csrf())

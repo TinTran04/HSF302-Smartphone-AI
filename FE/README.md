@@ -60,6 +60,16 @@ FE/
 
 Adapter trong `src/shared/api/realApi.ts` kết nối Spring Boot theo hợp đồng API. Các luồng quản trị, đăng ký OTP, giỏ Guest và đặt COD đã được kiểm thử cùng BE với cơ sở dữ liệu và SMTP giả cục bộ.
 
+Trang **Quản lý tài khoản** tại `/admin/accounts` hiển thị CUSTOMER và ADMIN, cho đổi vai trò của tài khoản đã kích hoạt và tạo tài khoản mới bằng email. Vai trò mặc định khi tạo là CUSTOMER. Người nhận mở link trong email, nhập mật khẩu mới và xác nhận để kích hoạt. Link có hiệu lực 24 giờ và dùng một lần. Admin có thể gửi lại lời mời cho tài khoản đang chờ đặt mật khẩu. Admin gốc và tài khoản đang đăng nhập được bảo vệ khi đổi quyền. Địa chỉ `/admin/admins` cũ chuyển tới trang mới.
+
+Mỗi tài khoản có nút **Vô hiệu hóa** hoặc **Cho hoạt động lại** với hộp thoại xác nhận. Vô hiệu hóa thu hồi phiên đăng nhập và giữ dữ liệu. Cho hoạt động lại khôi phục trạng thái xác minh trước đó, tài khoản đang chờ vẫn cần hoàn tất đăng ký hoặc đặt mật khẩu. Admin gốc và tài khoản đang đăng nhập được bảo vệ khỏi vô hiệu hóa.
+
+Các thao tác nghiệp vụ hiển thị toast thành công hoặc lỗi, gồm xác thực, tài khoản, giỏ hàng, đơn hàng, sản phẩm, thương hiệu, tài liệu và cấu hình AI. Hộp thoại của ứng dụng xác nhận thao tác đổi quyền, vô hiệu hóa, xóa và bật/tắt bảo trì. Toast lỗi hiển thị cùng lỗi tại biểu mẫu để có thể thử lại. Điều hướng, nhập liệu, bộ lọc và tải lại dữ liệu nền dùng trạng thái giao diện tương ứng.
+
+CUSTOMER và ADMIN đăng nhập bằng email/mật khẩu. OTP phục vụ đăng ký và quên mật khẩu. Form OTP xuất hiện khi cần hoàn tất đăng ký đang dang dở. Admin đi vào portal, hồ sơ và đổi mật khẩu tại `/admin/profile`. Đường dẫn shop của người đang đăng nhập ADMIN chuyển tới `/admin`.
+
+Màn hình AI có hai ô **Tư vấn mua điện thoại** và **Hỗ trợ cửa hàng**. Tư vấn hiển thị gợi ý, bảng so sánh và nguồn tài liệu cùng câu trả lời khi BE cung cấp. Các link và lịch sử mang topic so sánh hoặc trò chuyện cũ được ánh xạ về tư vấn.
+
 Sao chép `.env.example` thành `.env` hoặc dùng file `.env` đã được chia sẻ. Vite tự đọc các giá trị này khi khởi động.
 
 ```dotenv
@@ -78,7 +88,7 @@ Thời gian chờ gửi tin nhắn và xác nhận chuyển chủ đề là tố
 
 Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho từng nhà cung cấp. Thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Để trống trường key giữ key đã lưu. Chọn **Xóa API Key dự phòng khi lưu** để gỡ key trong bản cấu hình mới. Khi Chat nhận HTTP 429, BE thử key dự phòng một lần với cùng model. Giao diện tăng thời gian chờ cho kiểm tra hai key và gửi tin nhắn AI để chờ kết quả chuyển key. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
-Màn hình AI có bốn chủ đề: tư vấn mua điện thoại, so sánh điện thoại, hỗ trợ cửa hàng và trò chuyện cùng AI. **Hỗ trợ cửa hàng** sử dụng tài liệu do Admin tải lên; hai chủ đề về điện thoại sử dụng dữ liệu sản phẩm. Trước khi kiểm thử AI thật, Admin cần cấu hình chat model, embedding model và tải tài liệu PDF/TXT đến trạng thái `READY`. FE không gọi trực tiếp OpenAI/Gemini.
+Màn hình AI có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ từ catalog, tài liệu phù hợp và kiến thức AI tham khảo. Hỗ trợ cửa hàng dùng tài liệu chính sách. Admin cấu hình chat model, embedding model và tải PDF/TXT đến READY để kiểm thử phần truy xuất tài liệu. FE gọi BE để nhận câu trả lời.
 
 ## Kiểm tra
 
@@ -98,7 +108,7 @@ Kiểm thử E2E dùng Chrome được cài trên máy, khởi động Vite tự
 node tests/integration/local-mail.mjs
 
 # Terminal 2, trong BE: database H2 trong bộ nhớ, không dùng dữ liệu cửa hàng
-mvn "-Dspring-boot.run.useTestClasspath=true" "-Dspring-boot.run.arguments=--server.port=18080 --spring.datasource.url=jdbc:h2:mem:feintegration;DB_CLOSE_DELAY=-1 --spring.datasource.username=sa --spring.datasource.password= --app.root-admin.username=integration-admin --app.root-admin.password=IntegrationPass123! --spring.mail.host=127.0.0.1 --spring.mail.port=12525 --spring.mail.username=test@example.com --spring.mail.properties.mail.smtp.auth=false --spring.mail.properties.mail.smtp.starttls.enable=false" spring-boot:run
+mvn "-Dspring-boot.run.useTestClasspath=true" "-Dspring-boot.run.arguments=--server.port=18080 --spring.datasource.url=jdbc:h2:mem:feintegration;DB_CLOSE_DELAY=-1 --spring.datasource.username=sa --spring.datasource.password= --app.root-admin.email=integration-admin@example.com --app.root-admin.password=IntegrationPass123! --spring.mail.host=127.0.0.1 --spring.mail.port=12525 --spring.mail.username=test@example.com --spring.mail.properties.mail.smtp.auth=false --spring.mail.properties.mail.smtp.starttls.enable=false" spring-boot:run
 
 # Terminal 3, trong FE
 npm run test:integration

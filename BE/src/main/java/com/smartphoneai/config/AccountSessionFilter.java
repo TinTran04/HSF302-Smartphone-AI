@@ -17,7 +17,8 @@ public class AccountSessionFilter extends OncePerRequestFilter {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AccountPrincipal principal) {
             var account = users.findById(principal.id()).orElse(null);
-            boolean valid = account != null && account.isActive() && !account.isDeleted()
+            boolean valid = account != null && account.isActive() && !account.isDeleted() && !account.isDisabled()
+                    && principal.credentialVersion() == account.getCredentialVersion()
                     && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + account.getRole().name()));
             if (!valid) {
                 SecurityContextHolder.clearContext();

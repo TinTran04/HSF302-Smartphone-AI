@@ -4,9 +4,15 @@ import com.smartphoneai.dto.response.UserResponse;
 import com.smartphoneai.service.UserService;
 import com.smartphoneai.dto.request.ChangePasswordRequest;
 import com.smartphoneai.dto.request.UpdateProfileRequest;
+import com.smartphoneai.config.AccountPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,8 +29,15 @@ public class UserController {
         return users.updateProfile(auth.getName(), input);
     }
     @PostMapping("/me/password")
-    public ResponseEntity<Void> changePassword(Authentication auth, @Valid @RequestBody ChangePasswordRequest input) {
-        users.changePassword(auth.getName(), input.currentPassword(), input.newPassword());
+    public ResponseEntity<Void> changePassword(Authentication auth, @Valid @RequestBody ChangePasswordRequest input,
+                                             HttpServletRequest request, HttpServletResponse response) {
+        long credentialVersion = users.changePassword(auth.getName(), input.currentPassword(), input.newPassword());
+        var principal = (AccountPrincipal) auth.getPrincipal();
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                new AccountPrincipal(principal.id(), credentialVersion), null, auth.getAuthorities()));
+        SecurityContextHolder.setContext(context);
+        new HttpSessionSecurityContextRepository().saveContext(context, request, response);
         return ResponseEntity.noContent().build();
     }
 }

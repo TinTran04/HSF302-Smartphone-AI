@@ -10,12 +10,13 @@ const links = [
   { to: '/admin', name: 'Tổng quan', icon: 'dashboard' },
   { to: '/admin/products', name: 'Quản lý sản phẩm', icon: 'smartphone' },
   { to: '/admin/brands', name: 'Thương hiệu', icon: 'category' },
-  { to: '/admin/admins', name: 'Quản trị viên', icon: 'manage_accounts' },
+  { to: '/admin/accounts', name: 'Quản lý tài khoản', icon: 'manage_accounts' },
   { to: '/admin/maintenance', name: 'Bảo trì', icon: 'settings' },
   { to: '/admin/orders', name: 'Quản lý đơn hàng', icon: 'receipt_long' },
   { to: '/admin/knowledge', name: 'Kho kiến thức AI', icon: 'dataset' },
   { to: '/admin/ai-settings', name: 'Cấu hình AI', icon: 'tune' },
   { to: '/admin/embedding', name: 'Cấu hình embedding', icon: 'dataset' },
+  { to: '/admin/profile', name: 'Thông tin tài khoản', icon: 'person' },
 ];
 export function AdminLayout() {
   const { pathname } = useLocation();
@@ -28,6 +29,7 @@ export function AdminLayout() {
     try {
       await logout();
       navigate('/login');
+      notify('Đã đăng xuất.');
     } catch (e) {
       notify(errorMessage(e), 'error');
     } finally {
@@ -41,7 +43,7 @@ export function AdminLayout() {
       </a>
       <aside className="admin-sidebar">
         <div>
-          <Brand />
+          <Brand to="/admin" />
           <p className="eyebrow !mb-0 ml-12 mt-1">Admin Portal</p>
         </div>
         <nav className="admin-nav" aria-label="Quản trị">
@@ -53,10 +55,6 @@ export function AdminLayout() {
             ))}
         </nav>
         <div className="mt-auto sidebar-bottom">
-          <Link to="/" className="text-link text-xs flex items-center gap-2 mb-6">
-            <Icon name="arrow_back" />
-            Quay lại cửa hàng
-          </Link>
           <div className="bg-surface-container-low p-4 rounded-xl">
             <p className="text-sm font-semibold">{user?.fullName}</p>
             <p className="help-text mt-1">
@@ -80,13 +78,13 @@ export function AdminLayout() {
             {links.find((l) => l.to !== '/admin' && pathname.startsWith(l.to))?.name ||
               'Bảng điều khiển'}
           </span>
-          <Link to="/" className="text-link flex items-center gap-2">
-            <Icon name="storefront" />
-            Cửa hàng
+          <Link to="/admin/profile" className="text-link flex items-center gap-2">
+            <Icon name="person" />
+            Tài khoản của tôi
           </Link>
           <Button className="admin-mobile-logout" variant="ghost" busy={pending} onClick={signOut}>Đăng xuất quản trị</Button>
         </header>
-        <DemoBanner />
+        <DemoBanner admin />
         <main id="main" className="admin-content">
           <Outlet />
         </main>

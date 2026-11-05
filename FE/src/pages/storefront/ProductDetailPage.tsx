@@ -9,10 +9,9 @@ import {
   ErrorState,
   ProductImage,
   Skeleton,
-  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
-import { errorMessage, formatVnd, productPrice } from '../../shared/utils/format';
+import { formatVnd, productPrice } from '../../shared/utils/format';
 import type { Product } from '../../shared/types/models';
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -42,7 +41,6 @@ function ProductDetails({ product }: { product: Product }) {
   const [tab, setTab] = useState('specs');
   const cart = useCart();
   const comparison = useComparison();
-  const { notify } = useToast();
   const active = product.variants.filter((v) => v.status === 'ACTIVE');
   const variant = active.find((v) => v.storage === storage && v.color === color);
   const lowest = productPrice(product);
@@ -50,9 +48,8 @@ function ProductDetails({ product }: { product: Product }) {
     if (!variant || cart.pending) return;
     try {
       await cart.add({ variantId: variant.id, quantity });
-      notify(`Đã thêm ${product.name} (${variant.storage}, ${variant.color}) vào giỏ hàng.`);
-    } catch (e) {
-      notify(errorMessage(e), 'error');
+    } catch {
+      /* The mutation notification reports the failure. Preserve the selected variant. */
     }
   }
   return (

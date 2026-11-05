@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./httpClient', () => ({
   ApiError: class ApiError extends Error { constructor(public status: number, message = '', public code?: string) { super(message); } },
@@ -10,13 +10,34 @@ import { realApi } from './realApi';
 
 describe('real backend contract', () => {
   beforeEach(() => vi.resetAllMocks());
+  afterEach(() => vi.unstubAllGlobals());
 
   it('sends the backend identifier field for login', async () => {
     vi.mocked(http).mockResolvedValueOnce({ challengeId: 'challenge' });
     await realApi.login({ email: 'a@example.com', password: 'pw', guestCart: [] });
     expect(http).toHaveBeenCalledWith('/auth/login', expect.objectContaining({
-      body: JSON.stringify({ identifier: 'a@example.com', password: 'pw' }),
+      body: JSON.stringify({ identifier: 'a@example.com', password: 'pw', guestCart: [] }),
     }));
+  });
+
+  it('forwards guest cart with a stable merge ID on password-login retry', async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
+    vi.mocked(http).mockResolvedValue({ user: { id: 'customer', role: 'CUSTOMER' } });
+    const guestCart = [{ variantId: '7', quantity: 2 }];
+    const login = { email: 'a@example.com', password: 'Password123!', guestCart };
+    await realApi.login(login);
+    await realApi.login(login);
+    const requests = vi.mocked(http).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(requests[0].guestCart).toEqual(guestCart);
+    expect(requests[0].guestCartMergeId).toMatch(/^[a-f0-9-]{36}$/i);
+    expect(requests[1].guestCartMergeId).toBe(requests[0].guestCartMergeId);
+  });
+
+  it('uses the Admin catalog endpoint for product-form brands', async () => {
+    vi.mocked(http).mockResolvedValueOnce([{ id: '1', name: 'Brand' }]);
+    await realApi.brands(true);
+    expect(http).toHaveBeenCalledWith('/admin/brands');
   });
 
   it('resolves a guest cart on the server and preserves unavailable IDs', async () => {

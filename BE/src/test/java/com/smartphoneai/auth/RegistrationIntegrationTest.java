@@ -120,7 +120,7 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"reset@example.com\",\"password\":\"Newpassword123!\"}"))
-                .andExpect(status().isAccepted());
+                .andExpect(status().isOk());
     }
 
     @Test void unknownEmailGetsSameResetResponseWithoutSendingMail() throws Exception {
@@ -166,15 +166,10 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isConflict());
 
         mvc.perform(post("/api/auth/logout").session(session).with(csrf())).andExpect(status().isNoContent());
-        var login = mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"customer@example.com\",\"password\":\"Goodpass123!\"}"))
-                .andExpect(status().isAccepted()).andReturn();
         var loginSession = new MockHttpSession();
         mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isUnauthorized());
-        String loginId = mapper.readTree(login.getResponse().getContentAsString()).path("challengeId").asText();
-        String loginBody = mapper.writeValueAsString(java.util.Map.of("challengeId", loginId, "code", sent.get()));
-        mvc.perform(post("/api/auth/otp/verify").session(loginSession).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(loginBody))
+        mvc.perform(post("/api/auth/login").session(loginSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"customer@example.com\",\"password\":\"Goodpass123!\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("customer@example.com"));
         mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isOk());
     }

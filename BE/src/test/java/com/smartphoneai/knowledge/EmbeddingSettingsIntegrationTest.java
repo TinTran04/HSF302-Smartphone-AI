@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:embedding;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=embedadmin", "app.root-admin.password=TestRootPassword123!",
+        "app.root-admin.email=embedadmin@example.com", "app.root-admin.password=TestRootPassword123!",
         "app.ai.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @AutoConfigureMockMvc
 class EmbeddingSettingsIntegrationTest {
@@ -34,7 +34,7 @@ class EmbeddingSettingsIntegrationTest {
         when(model.embed(anyString())).thenReturn(new float[]{0.1f,0.2f,0.3f});
         var session=new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"embedadmin\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
+                .content("{\"identifier\":\"embedadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         mvc.perform(put("/api/admin/embedding-settings").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"OPENAI\",\"model\":\"embed-model\",\"apiKey\":\"embedding-secret\",\"dimensions\":3}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))

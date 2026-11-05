@@ -13,7 +13,6 @@ import com.smartphoneai.service.OtpChallengeService;
 import com.smartphoneai.service.LoginService;
 import com.smartphoneai.service.PasswordResetService;
 import com.smartphoneai.service.AdminManagementService;
-import com.smartphoneai.service.AiChatService;
 import com.smartphoneai.entity.UserAccount;
 import com.smartphoneai.config.AccountPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,13 +36,12 @@ public class AuthController {
     private final LoginService login;
     private final PasswordResetService passwordReset;
     private final AdminManagementService admins;
-    private final AiChatService chats;
     public AuthController(RegistrationService registration, OtpChallengeService otp, LoginService login,
-                          PasswordResetService passwordReset, AdminManagementService admins, AiChatService chats) {
-        this.registration = registration; this.otp = otp; this.login = login; this.passwordReset = passwordReset; this.admins = admins; this.chats = chats;
+                          PasswordResetService passwordReset, AdminManagementService admins) {
+        this.registration = registration; this.otp = otp; this.login = login; this.passwordReset = passwordReset; this.admins = admins;
     }
 
-    @PostMapping("/admin-invitations/accept")
+    @PostMapping({"/admin-invitations/accept", "/account-invitations/accept"})
     public ResponseEntity<Void> acceptInvitation(@Valid @RequestBody AcceptInvitationRequest input) {
         admins.accept(input.token(), input.password()); return ResponseEntity.noContent().build();
     }
@@ -65,11 +63,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response,
                                    @RequestHeader(value="X-Guest-Session",required=false) String guestToken) {
-        var result = login.beginLogin(input);
+        var result = login.beginLogin(input, guestToken);
         if (result.user() != null) {
-            var claimed = chats.claim(result.user().getId(), guestToken);
             establishSession(result.user(), request, response);
-            return ResponseEntity.ok(Map.of("user", UserResponse.from(result.user()), "mergedConversationIds", claimed));
+            return ResponseEntity.ok(Map.of("user", UserResponse.from(result.user()), "mergedConversationIds", result.mergedConversationIds()));
         }
         var challenge = result.challenge();
         return ResponseEntity.accepted().body(Map.of("challengeId", challenge.getId().toString(),
@@ -108,7 +105,7 @@ public class AuthController {
     @PostMapping("/otp/verify")
     public ResponseEntity<?> verify(@Valid @RequestBody VerifyOtpRequest input, HttpServletRequest request,
                                     HttpServletResponse response, @RequestHeader(value="X-Guest-Session",required=false) String guestToken) {
-        var verified = registration.verify(input.challengeId(), input.code(), input.guestCart(), guestToken).orElse(null);
+        var verified = registration.verify(input.challengeId(), input.code(), input.guestCart(), guestToken, input.guestCartMergeId()).orElse(null);
         if (verified == null) return ResponseEntity.status(409).body(Map.of("code", "INVALID_OTP", "message", "Mã không hợp lệ hoặc đã hết hạn"));
         var user = verified.user();
         establishSession(user, request, response);
@@ -118,7 +115,7 @@ public class AuthController {
     private void establishSession(UserAccount user, HttpServletRequest request, HttpServletResponse response) {
         if (request.getSession(false) != null) request.changeSessionId();
         var context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new UsernamePasswordAuthenticationToken(new AccountPrincipal(user.getId()), null,
+        context.setAuthentication(new UsernamePasswordAuthenticationToken(new AccountPrincipal(user.getId(), user.getCredentialVersion()), null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
         SecurityContextHolder.setContext(context);
         new HttpSessionSecurityContextRepository().saveContext(context, request, response);

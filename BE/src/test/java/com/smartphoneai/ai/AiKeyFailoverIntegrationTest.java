@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:aifailover;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "app.root-admin.username=failoveradmin", "app.root-admin.password=TestPassword123!",
+        "app.root-admin.email=failoveradmin@example.com", "app.root-admin.password=TestPassword123!",
         "app.ai.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @AutoConfigureMockMvc
 class AiKeyFailoverIntegrationTest {
@@ -49,7 +49,7 @@ class AiKeyFailoverIntegrationTest {
         when(provider.chat(anyString(), anyString(), anyString(), anyString())).thenReturn("OK");
         session = new MockHttpSession();
         mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"identifier\":\"failoveradmin\",\"password\":\"TestPassword123!\"}"))
+                .content("{\"identifier\":\"failoveradmin@example.com\",\"password\":\"TestPassword123!\"}"))
                 .andExpect(status().isOk());
     }
 

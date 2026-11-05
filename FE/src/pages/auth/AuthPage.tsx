@@ -5,7 +5,7 @@ import { api, isDemo } from '../../shared/api';
 import { useAuth } from '../../features/auth/AuthProvider';
 import { clearGuestCart, readGuestCart } from '../../features/cart/guestCart';
 import { Brand } from '../../shared/components/AppHeader';
-import { Button, ErrorState, ProductImage } from '../../shared/components/Ui';
+import { Button, ErrorState, ProductImage, useToast } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import { safeReturnPath } from '../../shared/utils/format';
 import images from '../../design/product-images.json';
@@ -76,7 +76,9 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
   const auth = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const submit = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () =>
       register
         ? api.register({
@@ -88,17 +90,24 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
           })
         : api.login({ email: email.trim(), password, guestCart: readGuestCart() }),
     onSuccess: (user) => {
-      if ('challengeId' in user) { setChallenge(user); return; }
-      if (user.role === 'CUSTOMER') clearGuestCart();
-      if (!isDemo) clearGuestToken();
+      if ('challengeId' in user) {
+        setChallenge(user);
+        notify('Đã gửi mã xác minh đăng ký đến email của bạn.');
+        return;
+      }
+      if (user.role === 'CUSTOMER') {
+        clearGuestCart();
+        if (!isDemo) clearGuestToken();
+      }
       auth.setUser(user);
-      const from = location.state?.from;
-      navigate(from ? safeReturnPath(from) : user.role === 'ADMIN' ? '/admin' : '/', {
+      navigate(safeReturnPath(location.state?.from, user.role), {
         replace: true,
       });
+      notify(register ? 'Đăng ký tài khoản thành công.' : 'Đăng nhập thành công.');
     },
   });
   const verify = useMutation({
+    meta: { toast: { success: 'Đã xác minh tài khoản và đăng nhập.' } },
     mutationFn: () => {
       const guestCart = readGuestCart();
       if (guestCart.length > 100) throw new Error('Giỏ hàng có quá 100 phiên bản. Hãy quay lại giỏ và xóa bớt trước khi đăng nhập.');
@@ -106,10 +115,13 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
     },
     onSuccess: ({ user }) => {
       clearGuestCart(); clearGuestToken(); auth.setUser(user);
-      navigate(location.state?.from ? safeReturnPath(location.state.from) : '/', { replace: true });
+      navigate(safeReturnPath(location.state?.from, user.role), { replace: true });
     },
   });
-  const resend = useMutation({ mutationFn: () => realAuth.resend(challenge!.challengeId) });
+  const resend = useMutation({
+    mutationFn: () => realAuth.resend(challenge!.challengeId),
+    meta: { toast: { success: 'Đã gửi lại mã xác minh.' } },
+  });
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submit.isPending) return;
@@ -120,7 +132,9 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
     if (register && !/^[+\d][\d\s-]{8,14}$/.test(phone.trim()))
       next.phone = 'Số điện thoại chưa hợp lệ.';
     setErrors(next);
-    if (!Object.keys(next).length) submit.mutate();
+    const firstError = Object.values(next)[0];
+    if (firstError) notify(firstError, 'error');
+    else submit.mutate();
   }
   return (
     <div className="container page">
@@ -162,10 +176,12 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             </Link>
           </div>
           <h1 className="!text-2xl mt-8">
-            {register ? 'Tạo tài khoản SmartPhone AI' : 'Chào mừng trở lại'}
+            {challenge ? 'Xác minh đăng ký tài khoản' : register ? 'Tạo tài khoản SmartPhone AI' : 'Chào mừng trở lại'}
           </h1>
           <p className="muted text-sm mt-3">
-            {register
+            {challenge
+              ? 'Hoàn tất xác minh email để kích hoạt tài khoản đã đăng ký.'
+              : register
               ? 'Bắt đầu hành trình công nghệ của riêng bạn.'
               : 'Đăng nhập để tiếp tục mua sắm thông minh.'}
           </p>
@@ -177,12 +193,11 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             </div>
           )}
           {challenge ? <form onSubmit={(event) => { event.preventDefault(); verify.mutate(); }}>
-            <p className="notice mt-6">Nhập mã OTP được gửi đến email của bạn. Mã có hiệu lực trong 5 phút.</p>
+            <p className="notice mt-6">Nhập mã OTP xác minh đăng ký được gửi đến email của bạn. Mã có hiệu lực trong 5 phút.</p>
             <label className="form-field">Mã OTP<input required inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} /></label>
             {verify.error && <><ErrorState error={verify.error} /><Link className="text-link" to="/cart">Quay lại giỏ hàng</Link></>}
             {resend.error && <ErrorState error={resend.error} />}
-            {resend.isSuccess && <p role="status">Đã gửi lại mã xác minh.</p>}
-            <Button type="submit" className="w-full mt-4" busy={verify.isPending}>Xác minh OTP</Button>
+            <Button type="submit" className="w-full mt-4" busy={verify.isPending}>Hoàn tất đăng ký</Button>
             <Button variant="ghost" className="mt-3" disabled={resend.isPending} onClick={() => resend.mutate()}>Gửi lại mã</Button>
           </form> : <form onSubmit={handleSubmit}>
             {register && (
@@ -216,7 +231,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             <label className="form-field">
               Email
               <input
-                type={register ? 'email' : 'text'}
+                type="email"
                 name="email"
                 autoComplete="email"
                 required
@@ -284,7 +299,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
               <Icon name="arrow_forward" />
             </Button>
           </form>}
-          {!register && !challenge && <p className="help-text mt-4">Nếu chưa hoàn tất đăng ký, hãy đăng nhập bằng email và mật khẩu đã đăng ký để nhận lại mã OTP.</p>}
+          {!register && !challenge && <p className="help-text mt-4">Tài khoản đã kích hoạt chỉ cần email và mật khẩu. Nếu chưa hoàn tất đăng ký, đăng nhập để nhận lại mã OTP xác minh đăng ký.</p>}
           {!register && !challenge && <p className="mt-4 text-right"><Link className="text-link text-sm" to="/forgot-password">Quên mật khẩu?</Link></p>}
           <p className="help-text mt-6 text-center">
             {register ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}
