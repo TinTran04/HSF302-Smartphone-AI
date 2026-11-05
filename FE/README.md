@@ -60,7 +60,7 @@ FE/
 
 Adapter trong `src/shared/api/realApi.ts` kết nối Spring Boot theo hợp đồng API. Các luồng quản trị, đăng ký OTP, giỏ Guest và đặt COD đã được kiểm thử cùng BE với cơ sở dữ liệu và SMTP giả cục bộ.
 
-Tạo `.env.local` với nội dung:
+Sao chép `.env.example` thành `.env` hoặc dùng file `.env` đã được chia sẻ. Vite tự đọc các giá trị này khi khởi động.
 
 ```dotenv
 VITE_ENABLE_MOCK_API=false
@@ -68,7 +68,7 @@ VITE_API_BASE_URL=/api
 VITE_API_TARGET=http://localhost:8080
 ```
 
-Khởi động lại Vite. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie phiên. Không đặt API key, mật khẩu hay thông tin database vào biến `VITE_*` vì chúng có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
+Khởi động lại Vite. `.env.local` có ưu tiên cao hơn `.env` nếu cùng tồn tại. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie phiên. Cấu hình Gmail, database và khóa mã hóa AI nằm trong `BE/.env`. Các giá trị `VITE_*` có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
 
 `npm run build` sử dụng cấu hình Vite hiện có; không bật demo khi muốn dùng API thật. `VITE_API_TARGET` chỉ cấu hình proxy khi chạy Vite; môi trường khác cần có proxy tương ứng. Xem `docs/API_INTEGRATION.md` nếu tài liệu có trên máy.
 
