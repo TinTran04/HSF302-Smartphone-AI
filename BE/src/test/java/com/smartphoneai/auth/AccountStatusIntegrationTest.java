@@ -37,7 +37,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -56,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa", "spring.datasource.password=",
         "app.root-admin.email=status-owner@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class AccountStatusIntegrationTest {
     private static final String PASSWORD = "AccountPassword123!";
     @Autowired MockMvc mvc;
@@ -91,8 +93,8 @@ class AccountStatusIntegrationTest {
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody(target.getEmail(), PASSWORD)))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
-        mvc.perform(get("/api/users/me").session(old)).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/admin/accounts").session(root)).andExpect(status().isOk())
+        mvc.perform(get("/api/users/me").with(old)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/accounts").with(root)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.user.email == '" + target.getEmail() + "')].disabled").value(true));
         changeStatus(root, target, true, 200).andExpect(jsonPath("$.disabled").value(false))
                 .andExpect(jsonPath("$.active").value(true));
@@ -100,9 +102,9 @@ class AccountStatusIntegrationTest {
         assertTrue(enabledVersion > disabledVersion);
         changeStatus(root, target, true, 200);
         assertEquals(enabledVersion, users.findById(target.getId()).orElseThrow().getCredentialVersion());
-        mvc.perform(get("/api/users/me").session(secondOld)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(secondOld)).andExpect(status().isUnauthorized());
         var fresh = login(target, PASSWORD, 200);
-        mvc.perform(get("/api/users/me").session(fresh)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(fresh)).andExpect(status().isOk());
         var restored = users.findById(target.getId()).orElseThrow();
         assertEquals(target.getFullName(), restored.getFullName());
         assertEquals(target.getPasswordHash(), restored.getPasswordHash());
@@ -114,7 +116,7 @@ class AccountStatusIntegrationTest {
         var target = account("CUSTOMER");
         var session = login(target, PASSWORD, 200);
         jdbc.update("update users set disabled = true where id = ?", target.getId());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
     }
 
     @Test void ordinaryAdminCanManageOtherAccountsWithRootSelfDeletedAndInputGuards() throws Exception {
@@ -133,11 +135,11 @@ class AccountStatusIntegrationTest {
         deleted.disableAndDelete();
         users.saveAndFlush(deleted);
         changeStatus(session, deleted, true, 403);
-        mvc.perform(patch("/api/admin/accounts/{id}/status", UUID.randomUUID()).session(session).with(csrf())
+        mvc.perform(patch("/api/admin/accounts/{id}/status", UUID.randomUUID()).with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
                 .andExpect(status().isForbidden());
         for (String body : List.of("{}", "{\"enabled\":null}", "{\"enabled\":\"invalid\"}")) {
-            mvc.perform(patch("/api/admin/accounts/{id}/status", customer.getId()).session(session).with(csrf())
+            mvc.perform(patch("/api/admin/accounts/{id}/status", customer.getId()).with(session).with(csrf())
                     .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
         }
         mvc.perform(patch("/api/admin/accounts/{id}/status", customer.getId()).with(csrf())
@@ -176,7 +178,7 @@ class AccountStatusIntegrationTest {
                 .when(invitationSender).send(anyString(), anyString());
         var root = rootSession();
         String email = UUID.randomUUID() + "@example.com";
-        var response = mvc.perform(post("/api/admin/account-invitations").session(root).with(csrf())
+        var response = mvc.perform(post("/api/admin/account-invitations").with(root).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(
                                 Map.of("email", email, "fullName", "Invited", "role", role))))
                 .andExpect(status().isAccepted()).andReturn();
@@ -185,7 +187,7 @@ class AccountStatusIntegrationTest {
         var target = users.findByEmail(email).orElseThrow();
         changeStatus(root, target, false, 200).andExpect(jsonPath("$.active").value(false))
                 .andExpect(jsonPath("$.invitationId").value(invitationId));
-        mvc.perform(post("/api/admin/account-invitations/{id}/resend", invitationId).session(root).with(csrf()))
+        mvc.perform(post("/api/admin/account-invitations/{id}/resend", invitationId).with(root).with(csrf()))
                 .andExpect(status().isConflict());
         acceptInvitation(originalToken, 409);
         assertFalse(users.findById(target.getId()).orElseThrow().isActive());
@@ -297,13 +299,13 @@ class AccountStatusIntegrationTest {
         return users.saveAndFlush(user);
     }
 
-    private MockHttpSession rootSession() throws Exception {
+    private JwtTestClient rootSession() throws Exception {
         return login(users.findByRootKey("ROOT").orElseThrow(), "TestRootPassword123!", 200);
     }
 
-    private MockHttpSession login(UserAccount user, String password, int expectedStatus) throws Exception {
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+    private JwtTestClient login(UserAccount user, String password, int expectedStatus) throws Exception {
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody(user.getEmail(), password))).andExpect(status().is(expectedStatus));
         return session;
     }
@@ -312,8 +314,8 @@ class AccountStatusIntegrationTest {
         return mapper.writeValueAsString(Map.of("identifier", email, "password", password));
     }
 
-    private ResultActions changeStatus(MockHttpSession actor, UserAccount target, boolean enabled, int expectedStatus) throws Exception {
-        return mvc.perform(patch("/api/admin/accounts/{id}/status", target.getId()).session(actor).with(csrf())
+    private ResultActions changeStatus(JwtTestClient actor, UserAccount target, boolean enabled, int expectedStatus) throws Exception {
+        return mvc.perform(patch("/api/admin/accounts/{id}/status", target.getId()).with(actor).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("enabled", enabled))))
                 .andExpect(status().is(expectedStatus));
     }

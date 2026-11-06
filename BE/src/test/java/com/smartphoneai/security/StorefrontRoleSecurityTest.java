@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StorefrontRoleSecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean UserAccountRepository users;
+    @MockitoBean com.smartphoneai.service.AuthTokenService tokens;
     @MockitoBean MaintenanceService maintenance;
 
     @ParameterizedTest

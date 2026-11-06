@@ -8,7 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:knowledge;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password=",
         "app.root-admin.email=knowledgeadmin@example.com", "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class KnowledgeIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -52,12 +54,12 @@ class KnowledgeIntegrationTest {
     }
     @Test void failedEmbeddingMarksDocumentFailed() throws Exception {
         when(vectors.currentVersion()).thenThrow(new IllegalStateException("Embedding unavailable"));
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isOk());
         var file = new MockMultipartFile("file", "failure.txt", "text/plain", "Demo document".getBytes(StandardCharsets.UTF_8));
-        var uploaded = mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(session).with(csrf()))
+        var uploaded = mvc.perform(multipart("/api/admin/knowledge/documents").file(file).with(session).with(csrf()))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PROCESSING")).andReturn();
         var id = java.util.UUID.fromString(mapper.readTree(uploaded.getResponse().getContentAsString()).path("id").asText());
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
@@ -71,14 +73,14 @@ class KnowledgeIntegrationTest {
             if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Embedding was not released");
             return "embedding-v1";
         });
-        var session=new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session=new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var file=new MockMultipartFile("file","async.txt","text/plain","Demo document".getBytes(StandardCharsets.UTF_8));
         String id;
         try {
             var future = CompletableFuture.supplyAsync(() -> {
-                try { return mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(session).with(csrf())).andReturn(); }
+                try { return mvc.perform(multipart("/api/admin/knowledge/documents").file(file).with(session).with(csrf())).andReturn(); }
                 catch (Exception ex) { throw new RuntimeException(ex); }
             });
             var response = future.get(3, TimeUnit.SECONDS).getResponse();
@@ -93,28 +95,28 @@ class KnowledgeIntegrationTest {
     }
     @Test void adminUploadsIndexesDisablesAndDeletesDocument() throws Exception {
         when(vectors.currentVersion()).thenReturn("embedding-v1");
-        var session=new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session=new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"knowledgeadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         var file=new MockMultipartFile("file","demo.txt","text/plain","Chính sách demo: bảo hành 12 tháng.".getBytes(StandardCharsets.UTF_8));
-        var upload=mvc.perform(multipart("/api/admin/knowledge/documents").file(file).session(session).with(csrf()))
+        var upload=mvc.perform(multipart("/api/admin/knowledge/documents").file(file).with(session).with(csrf()))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PROCESSING")).andReturn();
         String id=mapper.readTree(upload.getResponse().getContentAsString()).path("id").asText();
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
                 assertEquals("READY", documents.findById(java.util.UUID.fromString(id)).orElseThrow().getStatus()));
-        mvc.perform(patch("/api/admin/knowledge/documents/"+id+"/status").session(session).with(csrf())
+        mvc.perform(patch("/api/admin/knowledge/documents/"+id+"/status").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISABLED"));
-        mvc.perform(post("/api/admin/knowledge/documents/"+id+"/reindex").session(session).with(csrf()))
+        mvc.perform(post("/api/admin/knowledge/documents/"+id+"/reindex").with(session).with(csrf()))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PROCESSING"));
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
                 assertEquals("DISABLED", documents.findById(java.util.UUID.fromString(id)).orElseThrow().getStatus()));
-        mvc.perform(patch("/api/admin/knowledge/documents/"+id+"/status").session(session).with(csrf())
+        mvc.perform(patch("/api/admin/knowledge/documents/"+id+"/status").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("READY"));
-        mvc.perform(delete("/api/admin/knowledge/documents/"+id).session(session).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/admin/knowledge/documents/"+id).with(session).with(csrf())).andExpect(status().isNoContent());
         verify(vectors,atLeastOnce()).delete(java.util.UUID.fromString(id));
         var invalid=new MockMultipartFile("file","bad.exe","application/octet-stream",new byte[]{1,2});
-        mvc.perform(multipart("/api/admin/knowledge/documents").file(invalid).session(session).with(csrf())).andExpect(status().isBadRequest());
+        mvc.perform(multipart("/api/admin/knowledge/documents").file(invalid).with(session).with(csrf())).andExpect(status().isBadRequest());
     }
 }

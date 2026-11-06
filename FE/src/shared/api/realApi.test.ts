@@ -4,9 +4,10 @@ vi.mock('./httpClient', () => ({
   ApiError: class ApiError extends Error { constructor(public status: number, message = '', public code?: string) { super(message); } },
   http: vi.fn(),
   jsonBody: JSON.stringify,
+  setAuthAccount: vi.fn(),
 }));
-import { ApiError, http } from './httpClient';
-import { realApi } from './realApi';
+import { ApiError, http, setAuthAccount } from './httpClient';
+import { realApi, realAuth } from './realApi';
 
 describe('real backend contract', () => {
   beforeEach(() => vi.resetAllMocks());
@@ -18,6 +19,32 @@ describe('real backend contract', () => {
     expect(http).toHaveBeenCalledWith('/auth/login', expect.objectContaining({
       body: JSON.stringify({ identifier: 'a@example.com', password: 'pw', guestCart: [] }),
     }));
+  });
+
+  it('keeps the account identity attached to normal authentication entry points', async () => {
+    const user = { id: 'customer-id', role: 'CUSTOMER' };
+    vi.mocked(http).mockResolvedValueOnce(user);
+    await realApi.me();
+    expect(setAuthAccount).toHaveBeenLastCalledWith(user.id);
+    vi.mocked(http).mockResolvedValueOnce({ user });
+    await realApi.login({ email: 'customer@example.com', password: 'Password123!', guestCart: [] });
+    expect(setAuthAccount).toHaveBeenLastCalledWith(user.id);
+    vi.mocked(http).mockResolvedValueOnce({ user });
+    await realAuth.verify('challenge', '123456', []);
+    expect(setAuthAccount).toHaveBeenLastCalledWith(user.id);
+    vi.mocked(http).mockResolvedValueOnce(undefined);
+    await realApi.logout();
+    expect(setAuthAccount).toHaveBeenLastCalledWith(null);
+  });
+
+  it('clears an expired identity and preserves a newer identity when an old request is cancelled', async () => {
+    vi.mocked(http).mockRejectedValueOnce(new ApiError(401, ''));
+    await expect(realApi.me()).resolves.toBe(null);
+    expect(setAuthAccount).toHaveBeenLastCalledWith(null);
+    vi.mocked(setAuthAccount).mockClear();
+    vi.mocked(http).mockRejectedValueOnce(new ApiError(401, 'Account changed', 'AUTH_CONTEXT_CHANGED'));
+    await expect(realApi.me()).rejects.toMatchObject({ code: 'AUTH_CONTEXT_CHANGED' });
+    expect(setAuthAccount).not.toHaveBeenCalled();
   });
 
   it('forwards guest cart with a stable merge ID on password-login retry', async () => {

@@ -14,7 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -35,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.root-admin.email=failoveradmin@example.com", "app.root-admin.password=TestPassword123!",
         "app.ai.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class AiKeyFailoverIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -42,13 +44,13 @@ class AiKeyFailoverIntegrationTest {
     @Autowired AiProviderConfigRepository configs;
     @Autowired ConfigSecretCipher cipher;
     @MockitoBean ChatProviderClient provider;
-    private MockHttpSession session;
+    private JwtTestClient session;
 
     @BeforeEach void setup() throws Exception {
         configs.deleteAll();
         when(provider.chat(anyString(), anyString(), anyString(), anyString())).thenReturn("OK");
-        session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"failoveradmin@example.com\",\"password\":\"TestPassword123!\"}"))
                 .andExpect(status().isOk());
     }
@@ -64,7 +66,7 @@ class AiKeyFailoverIntegrationTest {
         calls.verify(provider).chat("GEMINI", "demo-model", "primary-secret", "Reply with OK.");
         calls.verify(provider).chat("GEMINI", "demo-model", "backup-secret", "Reply with OK.");
         activate().andExpect(status().isOk());
-        mvc.perform(get("/api/admin/ai-settings").session(session))
+        mvc.perform(get("/api/admin/ai-settings").with(session))
                 .andExpect(jsonPath("$[0].maskedBackupKey").value("••••••••"))
                 .andExpect(content().string(not(containsString("backup-secret"))))
                 .andExpect(content().string(not(containsString("primary-secret"))));
@@ -218,7 +220,7 @@ class AiKeyFailoverIntegrationTest {
     @Test void failedBackupTestKeepsExistingActiveConfiguration() throws Exception {
         save(Map.of("provider", "GEMINI", "model", "old-model", "apiKey", "old-secret"))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/admin/ai-settings/test").session(session).with(csrf())
+        mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"GEMINI\",\"model\":\"old-model\"}"))
                 .andExpect(status().isOk());
         activate().andExpect(status().isOk());
@@ -265,17 +267,17 @@ class AiKeyFailoverIntegrationTest {
     }
 
     private org.springframework.test.web.servlet.ResultActions save(Map<String, Object> input) throws Exception {
-        return mvc.perform(put("/api/admin/ai-settings").session(session).with(csrf())
+        return mvc.perform(put("/api/admin/ai-settings").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(input)));
     }
 
     private org.springframework.test.web.servlet.ResultActions testConnection() throws Exception {
-        return mvc.perform(post("/api/admin/ai-settings/test").session(session).with(csrf())
+        return mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"GEMINI\",\"model\":\"demo-model\"}"));
     }
 
     private org.springframework.test.web.servlet.ResultActions activate() throws Exception {
-        return mvc.perform(post("/api/admin/ai-settings/activate").session(session).with(csrf())
+        return mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"GEMINI\"}"));
     }
 }

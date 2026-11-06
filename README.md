@@ -4,6 +4,8 @@ Website bán điện thoại có trợ lý AI, gồm giao diện React và backe
 
 Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đăng nhập bằng email và mật khẩu. Gmail gửi OTP và lời mời kích hoạt tài khoản được cấu hình riêng.
 
+Xác thực dùng access JWT 15 phút và refresh token xoay vòng 7 ngày trong cookie HttpOnly, kèm CSRF. Mỗi thiết bị có thể bị thu hồi khi đăng xuất hoặc khi thông tin tài khoản thay đổi. BE áp dụng migration V25 khi khởi động.
+
 ## Chức năng chính
 
 - **Cửa hàng:** xem, tìm kiếm và lọc điện thoại; xem phiên bản; so sánh sản phẩm; dùng giỏ hàng và đặt hàng COD.
@@ -12,6 +14,8 @@ Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đ
 - **Quản trị** quản lý sản phẩm, thương hiệu, đơn hàng, tài khoản CUSTOMER/ADMIN, chế độ bảo trì, tài liệu AI và cấu hình nhà cung cấp AI/embedding. Admin tạo tài khoản qua email để người nhận tự đặt mật khẩu và đổi vai trò của tài khoản đã kích hoạt.
 
 Admin sử dụng khu vực `/admin`, gồm hồ sơ cá nhân tại `/admin/profile`. CUSTOMER sử dụng các luồng mua hàng và AI. Xóa Admin thường là xóa mềm.
+
+Bật bảo trì hiển thị màn hình riêng **Shop đang bảo trì** cho khách, Admin vẫn truy cập dashboard. AI tư vấn theo mức tiền khách đưa ra, các gợi ý vượt tối đa 10% phải nêu rõ số tiền và tỷ lệ vượt.
 
 Trang **Quản lý tài khoản** hỗ trợ vô hiệu hóa và cho CUSTOMER hoặc ADMIN thường hoạt động lại. Mỗi lần chuyển trạng thái thu hồi phiên cũ và giữ dữ liệu. Admin gốc và tài khoản đang thao tác được bảo vệ. Các thao tác nghiệp vụ trên FE có toast kết quả và hộp thoại xác nhận cho thao tác cần xác nhận.
 

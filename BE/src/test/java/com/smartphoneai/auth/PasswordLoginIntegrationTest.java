@@ -1,7 +1,6 @@
 package com.smartphoneai.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartphoneai.config.AccountPrincipal;
 import com.smartphoneai.dto.request.CartItemRequest;
 import com.smartphoneai.dto.request.LoginRequest;
 import com.smartphoneai.entity.OtpChallenge;
@@ -32,12 +31,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,10 +46,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:passwordlogin;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class PasswordLoginIntegrationTest {
     private static final String PASSWORD = "Password123!";
     private static final String NEW_PASSWORD = "ChangedPassword123!";
     @Autowired MockMvc mvc;
+    @Autowired com.smartphoneai.service.AuthTokenService tokens;
     @Autowired ObjectMapper mapper;
     @Autowired UserAccountRepository users;
     @Autowired OtpChallengeRepository challenges;
@@ -66,12 +64,12 @@ class PasswordLoginIntegrationTest {
 
     @Test void activeCustomerLogsInDirectlyWithoutIssuingOtp() throws Exception {
         var user = customer();
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("identifier", " " + user.getEmail().toUpperCase() + " ", "password", PASSWORD))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.id").value(user.getId().toString()))
                 .andExpect(jsonPath("$.mergedConversationIds").isEmpty()).andExpect(jsonPath("$.challengeId").doesNotExist());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isOk());
         assertEquals(0, jdbc.queryForObject("select count(*) from otp_challenges where email = ?", Integer.class, user.getEmail()));
         verifyNoInteractions(sender);
     }
@@ -81,11 +79,11 @@ class PasswordLoginIntegrationTest {
         var variant = variant();
         carts.add(user.getId(), variant.getId(), 3);
         var guest = guestConversation();
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).header("X-Guest-Session", guest.token()).with(csrf())
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).header("X-Guest-Session", guest.token()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(loginBody(user, variant.getId(), 2)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.mergedConversationIds[0]").value(guest.conversationId().toString()));
-        mvc.perform(get("/api/cart").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(5));
+        mvc.perform(get("/api/cart").with(session)).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(5));
         assertEquals(user.getId(), jdbc.queryForObject("select user_id from ai_conversations where id = ?", UUID.class, guest.conversationId()));
         assertTrue(jdbc.queryForObject("select revoked from ai_guest_sessions where id = ?", Boolean.class, guest.guestId()));
     }
@@ -249,14 +247,14 @@ class PasswordLoginIntegrationTest {
         var user = customer();
         var variant = variant();
         carts.add(user.getId(), variant.getId(), 3);
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).header("X-Guest-Session", "invalid").with(csrf())
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).header("X-Guest-Session", "invalid").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(loginBody(user, variant.getId(), 2)))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         assertEquals(3, carts.get(user.getId()).items().getFirst().quantity());
         var guest = guestConversation();
-        mvc.perform(post("/api/auth/login").session(session).header("X-Guest-Session", guest.token()).with(csrf())
+        mvc.perform(post("/api/auth/login").with(session).header("X-Guest-Session", guest.token()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(loginBody(user, variant.getId(), 2)))
                 .andExpect(status().isOk());
         assertEquals(5, carts.get(user.getId()).items().getFirst().quantity());
@@ -299,11 +297,11 @@ class PasswordLoginIntegrationTest {
     @Test void legacyLoginOtpCannotAuthenticateOrResend() throws Exception {
         var user = customer();
         var challenge = challenges.saveAndFlush(new OtpChallenge(user.getEmail(), "LOGIN", passwords.encode("123456"), Instant.now().minusSeconds(61)));
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("challengeId", challenge.getId(), "code", "123456"))))
                 .andExpect(status().isConflict());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/otp/resend").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("challengeId", challenge.getId()))))
                 .andExpect(status().isTooManyRequests());
@@ -314,32 +312,32 @@ class PasswordLoginIntegrationTest {
         var user = customer();
         var current = session(user);
         var other = session(user);
-        mvc.perform(post("/api/users/me/password").session(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/users/me/password").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("currentPassword", PASSWORD, "newPassword", NEW_PASSWORD))))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/api/users/me").session(current)).andExpect(status().isOk());
-        mvc.perform(get("/api/users/me").session(other)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(current)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(other)).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("identifier", user.getEmail(), "password", PASSWORD))))
                 .andExpect(status().isUnauthorized());
-        var fresh = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(fresh).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var fresh = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(fresh).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("identifier", user.getEmail(), "password", NEW_PASSWORD))))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/users/me").session(fresh)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(fresh)).andExpect(status().isOk());
     }
 
     @Test void failedPasswordChangeAndProfileEditKeepOtherSessionsValid() throws Exception {
         var user = customer();
         var current = session(user);
         var other = session(user);
-        mvc.perform(post("/api/users/me/password").session(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/users/me/password").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("currentPassword", "WrongPassword123!", "newPassword", NEW_PASSWORD))))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(put("/api/users/me").session(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/api/users/me").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"fullName\":\"Updated\",\"phone\":\"0900000000\",\"address\":\"Address\"}"))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/users/me").session(other)).andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("Updated"));
+        mvc.perform(get("/api/users/me").with(other)).andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("Updated"));
     }
 
     @Test void passwordResetRevokesEveryOldSessionIncludingTheRequestingSession() throws Exception {
@@ -348,15 +346,15 @@ class PasswordLoginIntegrationTest {
         var other = session(user);
         var code = new AtomicReference<String>();
         doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
-        var response = mvc.perform(post("/api/auth/password-reset").session(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var response = mvc.perform(post("/api/auth/password-reset").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("email", user.getEmail()))))
                 .andExpect(status().isAccepted()).andReturn();
         var challengeId = mapper.readTree(response.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/password-reset/confirm").session(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/password-reset/confirm").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get(), "newPassword", NEW_PASSWORD))))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/api/users/me").session(current)).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/users/me").session(other)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(current)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(other)).andExpect(status().isUnauthorized());
     }
 
     @Test void roleChangeAndDeletionRevokeExistingSessions() throws Exception {
@@ -364,11 +362,11 @@ class PasswordLoginIntegrationTest {
         var beforeRoleChange = session(user);
         user.changeRole(UserAccount.Role.ADMIN);
         user = users.saveAndFlush(user);
-        mvc.perform(get("/api/users/me").session(beforeRoleChange)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(beforeRoleChange)).andExpect(status().isUnauthorized());
         var beforeDeletion = session(users.findById(user.getId()).orElseThrow());
         user.disableAndDelete();
         users.saveAndFlush(user);
-        mvc.perform(get("/api/users/me").session(beforeDeletion)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(beforeDeletion)).andExpect(status().isUnauthorized());
     }
 
     @Test void restoringThePriorRoleDoesNotRestoreAnOldSession() throws Exception {
@@ -378,7 +376,7 @@ class PasswordLoginIntegrationTest {
         user = users.saveAndFlush(user);
         user.changeRole(UserAccount.Role.CUSTOMER);
         users.saveAndFlush(user);
-        mvc.perform(get("/api/users/me").session(stale)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(stale)).andExpect(status().isUnauthorized());
     }
 
     private UserAccount customer() {
@@ -411,13 +409,8 @@ class PasswordLoginIntegrationTest {
                 "guestCart", List.of(Map.of("variantId", variantId, "quantity", quantity)), "guestCartMergeId", mergeId));
     }
 
-    private MockHttpSession session(UserAccount user) {
-        var context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(new AccountPrincipal(user.getId(), user.getCredentialVersion()), null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
-        var session = new MockHttpSession();
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
-        return session;
+    private JwtTestClient session(UserAccount user) {
+        return JwtTestClient.authenticated(tokens, user);
     }
 
     private record Guest(String token, UUID guestId, UUID conversationId) {}
