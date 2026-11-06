@@ -64,7 +64,17 @@ mvn test
 mvn spring-boot:run
 ```
 
-API mặc định ở `http://localhost:8080/api`. Client cần lấy CSRF token tại `/api/auth/csrf`, lưu cookie phiên và gửi token khi thực hiện thao tác thay đổi.
+API mặc định ở `http://localhost:8080/api`. Client lấy CSRF token tại `/api/auth/csrf`, gửi cookie JWT cùng `X-XSRF-TOKEN` khi thực hiện thao tác thay đổi.
+
+## JWT và thiết bị đăng nhập
+
+Đăng nhập và hoàn tất OTP đăng ký cấp cookie HttpOnly `SPAI_ACCESS` có JWT hạn 15 phút tại `/api`, cùng `SPAI_REFRESH` hạn 7 ngày tại `/api/auth`. Cả hai dùng SameSite Strict. `POST /api/auth/refresh` nhận cookie và CSRF, xoay refresh token rồi trả 204 cùng cookie mới. Database chỉ lưu hash refresh token. Mỗi thiết bị có một bản ghi trong `refresh_sessions`, được tạo bởi migration V25. BE kiểm tra chữ ký, thuật toán HS256, issuer, audience, thời hạn, vai trò, phiên bản xác thực và trạng thái thiết bị/tài khoản.
+
+`POST /api/auth/logout` thu hồi thiết bị hiện tại và xóa cookie. Đổi mật khẩu cấp lại thông tin xác thực cho thiết bị đang thao tác, các thiết bị khác phải đăng nhập lại. Quên mật khẩu, đổi vai trò, vô hiệu hóa hoặc xóa mềm làm mất hiệu lực thông tin xác thực cũ. FE tự gọi refresh một lần khi nhận 401 từ API cần xác thực và chặn gửi lại thao tác của tài khoản cũ sau khi người dùng đổi tài khoản.
+
+Các request của tài khoản trên FE gửi `X-Account-Id`. BE yêu cầu JWT có cùng chủ sở hữu trước khi xử lý, gồm các API AI có hỗ trợ Guest. Token hết hạn trả 401 để client gia hạn, tài khoản khác trả 409 `AUTH_CONTEXT_CHANGED`. GET `/users/me` xác định danh tính hiện tại và vẫn hoạt động khi shop bảo trì.
+
+`JWT_SECRET` trong `BE/.env` là Base64 của ít nhất 32 byte ngẫu nhiên, có thể để trống khi chạy local để BE tạo khóa cho mỗi lần chạy. Khi khóa thay đổi, refresh token còn hợp lệ trong DB có thể cấp lại access JWT. Dùng khóa riêng ổn định khi chạy nhiều BE hoặc triển khai. `AUTH_COOKIE_SECURE=false` phục vụ localhost HTTP, đặt true khi dùng HTTPS. Các giá trị mẫu nằm trong `.env.example`. Cơ chế JWT sử dụng Spring Security JOSE. [Tài liệu Spring Security](https://docs.spring.io/spring-security/reference/6.5/servlet/oauth2/resource-server/jwt.html)
 
 Link kích hoạt tài khoản mặc định trỏ tới `http://localhost:5173/account/invite`. Có thể thay Spring property `app.account-invitation-url` khi FE dùng địa chỉ khác. Cấu hình `app.admin-invitation-url` và link Admin cũ vẫn được hỗ trợ. Chạy BE cùng FE theo [README dự án](../README.md).
 
@@ -82,7 +92,7 @@ Migration V24 thêm `disabled` mặc định false. Trường này độc lập 
 
 Admin dùng portal và hồ sơ cá nhân `/admin/profile`. API catalog công khai, giỏ và AI của shop từ chối người đang đăng nhập bằng vai trò ADMIN. Product Form của Admin đọc thương hiệu qua API quản trị. Xóa Admin thường đánh dấu deleted/inactive.
 
-Migration V22 thêm `credential_version` mặc định 0 cho tài khoản cũ. Phiên lưu phiên bản lúc xác thực và kiểm tra với DB ở mỗi request. Đổi mật khẩu làm mất hiệu lực các phiên khác, phiên đang đổi mật khẩu được cập nhật phiên bản sau transaction thành công. Quên mật khẩu thu hồi toàn bộ phiên cũ.
+Migration V22 thêm `credential_version` mặc định 0 cho tài khoản cũ. JWT và thiết bị lưu phiên bản lúc xác thực, được kiểm tra với DB ở mỗi request. Đổi mật khẩu làm mất hiệu lực các thiết bị khác và cấp lại cookie sau khi transaction thành công. Quên mật khẩu thu hồi toàn bộ thông tin xác thực cũ.
 
 Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đăng nhập lại bằng email và mật khẩu đã nhập để nhận OTP đăng ký mới (áp dụng thời gian chờ gửi lại 60 giây). Phiên chat Guest hết hạn sau 24 giờ; tác vụ chạy mỗi giờ xóa tối đa 100 phiên hết hạn cùng hội thoại Guest còn gắn với chúng. Hội thoại đã chuyển vào tài khoản được giữ lại.
 
@@ -93,6 +103,8 @@ Bộ kiểm thử tự động sử dụng H2 và mock cho các dịch vụ ngo�
 ## AI và tài liệu RAG
 
 Hai chủ đề hiển thị là PHONE_CONSULTATION và SHOP_SUPPORT. PHONE_CONSULTATION gộp tư vấn, so sánh và kiến thức AI, đồng thời truy xuất tài liệu khi có nguồn phù hợp. SHOP_SUPPORT tiếp tục trả lời chính sách theo bằng chứng RAG. Topic cũ PHONE_COMPARISON và GENERAL_CHAT được ánh xạ về tư vấn để mở lịch sử và link cũ. Giá/phiên bản tại cửa hàng lấy từ catalog, trích dẫn phải thuộc tài liệu thực sự được truy xuất. Kiến thức AI phục vụ giải thích tham khảo.
+
+Tư vấn dựa trên mức tiền khách cung cấp, giữ mức tiền ở các câu hỏi tiếp theo và lấy đầu trên của khoảng giá. Các lựa chọn đúng ngân sách được ưu tiên. Phiên bản có giá cao hơn được gợi ý tối đa 10% và kèm thông báo giá, số tiền cùng tỷ lệ vượt do BE tính từ catalog. Ví dụ ngân sách 10 triệu cho phép máy tối đa 11 triệu, máy giá 10,5 triệu được ghi vượt 500.000đ (5%). Giá vượt giới hạn bị loại khỏi thẻ gợi ý.
 
 Mỗi lần gọi Chat được thử tối đa hai lần khi nhà cung cấp trả HTTP 503, cách nhau 750 ms. Sau lần thử cuối, lỗi vẫn được trả về nếu provider tiếp tục quá tải. HTTP 429 sử dụng quy tắc key dự phòng đã cấu hình. Bộ đọc JSON AI chấp nhận JSON thuần và JSON trong khối Markdown cho phân loại chủ đề, chọn sản phẩm và câu trả lời RAG.
 

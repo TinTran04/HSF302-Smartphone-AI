@@ -1,6 +1,6 @@
 import type { Api } from './contracts';
-import { ApiError, http, jsonBody } from './httpClient';
-import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview } from '../types/models';
+import { ApiError, http, jsonBody, setAuthAccount } from './httpClient';
+import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview, User } from '../types/models';
 import { guestCartMergeId } from '../utils/guestCartMerge';
 
 type ServerCart = { items: (CartEntry & { product: Product | null; variant: CartItem['variant'] | null; unavailable: boolean; priceAtAdd: number })[]; total: number };
@@ -52,7 +52,11 @@ async function chatRequest<T>(path: string, options: RequestInit = {}): Promise<
   }
 }
 export const realAuth = {
-  verify: async (challengeId: string, code: string, guestCart: CartEntry[]) => authRequest<{user: import('../types/models').User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) }),
+  verify: async (challengeId: string, code: string, guestCart: CartEntry[]) => {
+    const result = await authRequest<{user: User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) });
+    setAuthAccount(result.user.id);
+    return result;
+  },
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
   reset: (email: string) => post<{challengeId:string}>('/auth/password-reset', { email }),
   resetConfirm: (challengeId: string, code: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, code, newPassword }),
@@ -61,18 +65,27 @@ export const realAuth = {
 export const realApi: Api = {
   me: async () => {
     try {
-      return await http('/users/me');
+      const user = await http<User>('/users/me');
+      setAuthAccount(user.id);
+      return user;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return null;
+      if (e instanceof ApiError && e.status === 401 && e.code !== 'AUTH_CONTEXT_CHANGED') {
+        setAuthAccount(null);
+        return null;
+      }
       throw e;
     }
   },
   login: async (data) => {
     const result = await authRequest<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password, guestCart: data.guestCart, guestCartMergeId: await guestCartMergeId(data.guestCart) });
+    if (result.user) setAuthAccount(result.user.id);
     return result.user ?? { challengeId: result.challengeId!, expiresAt: result.expiresAt, resendAfter: result.resendAfter };
   },
   register: (data) => post('/auth/register', { email: data.email, password: data.password, fullName: data.fullName, phone: data.phone }),
-  logout: () => post('/auth/logout'),
+  logout: async () => {
+    await post('/auth/logout');
+    setAuthAccount(null);
+  },
   updateProfile: (data) => http('/users/me', { method: 'PUT', body: jsonBody(data) }),
   products: (params = new URLSearchParams(), admin = false) => {
     const searchParams = new URLSearchParams(params);

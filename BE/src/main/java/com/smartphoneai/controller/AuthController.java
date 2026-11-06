@@ -13,19 +13,13 @@ import com.smartphoneai.service.OtpChallengeService;
 import com.smartphoneai.service.LoginService;
 import com.smartphoneai.service.PasswordResetService;
 import com.smartphoneai.service.AdminManagementService;
-import com.smartphoneai.entity.UserAccount;
-import com.smartphoneai.config.AccountPrincipal;
+import com.smartphoneai.service.AuthTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -36,9 +30,10 @@ public class AuthController {
     private final LoginService login;
     private final PasswordResetService passwordReset;
     private final AdminManagementService admins;
+    private final AuthTokenService tokens;
     public AuthController(RegistrationService registration, OtpChallengeService otp, LoginService login,
-                          PasswordResetService passwordReset, AdminManagementService admins) {
-        this.registration = registration; this.otp = otp; this.login = login; this.passwordReset = passwordReset; this.admins = admins;
+                          PasswordResetService passwordReset, AdminManagementService admins, AuthTokenService tokens) {
+        this.registration = registration; this.otp = otp; this.login = login; this.passwordReset = passwordReset; this.admins = admins; this.tokens = tokens;
     }
 
     @PostMapping({"/admin-invitations/accept", "/account-invitations/accept"})
@@ -65,7 +60,7 @@ public class AuthController {
                                    @RequestHeader(value="X-Guest-Session",required=false) String guestToken) {
         var result = login.beginLogin(input, guestToken);
         if (result.user() != null) {
-            establishSession(result.user(), request, response);
+            tokens.issue(result.user()).writeTo(response);
             return ResponseEntity.ok(Map.of("user", UserResponse.from(result.user()), "mergedConversationIds", result.mergedConversationIds()));
         }
         var challenge = result.challenge();
@@ -74,11 +69,15 @@ public class AuthController {
                 "resendAfter", challenge.getIssuedAt().plusSeconds(60)));
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
+        tokens.refresh(request).writeTo(response);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
-        var session = request.getSession(false);
-        if (session != null) session.invalidate();
-        SecurityContextHolder.clearContext();
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        tokens.logout(request).writeTo(response);
         return ResponseEntity.noContent().build();
     }
 
@@ -108,16 +107,8 @@ public class AuthController {
         var verified = registration.verify(input.challengeId(), input.code(), input.guestCart(), guestToken, input.guestCartMergeId()).orElse(null);
         if (verified == null) return ResponseEntity.status(409).body(Map.of("code", "INVALID_OTP", "message", "Mã không hợp lệ hoặc đã hết hạn"));
         var user = verified.user();
-        establishSession(user, request, response);
+        tokens.issue(user).writeTo(response);
         return ResponseEntity.ok(Map.of("user", UserResponse.from(user), "mergedConversationIds", verified.mergedConversationIds()));
     }
 
-    private void establishSession(UserAccount user, HttpServletRequest request, HttpServletResponse response) {
-        if (request.getSession(false) != null) request.changeSessionId();
-        var context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new UsernamePasswordAuthenticationToken(new AccountPrincipal(user.getId(), user.getCredentialVersion()), null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
-        SecurityContextHolder.setContext(context);
-        new HttpSessionSecurityContextRepository().saveContext(context, request, response);
-    }
 }

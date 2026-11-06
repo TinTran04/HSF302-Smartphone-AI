@@ -8,7 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.root-admin.email=rootadmin@example.com",
         "app.root-admin.password=TestRootPassword123!"})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 @Transactional
 class RootAdminIntegrationTest {
     @Autowired MockMvc mvc;
@@ -52,40 +54,33 @@ class RootAdminIntegrationTest {
     }
 
     @Test void staleAccountSessionDoesNotBlockPublicRegistration() throws Exception {
-        mvc.perform(post("/api/auth/register").session(staleSession()).with(csrf())
+        mvc.perform(post("/api/auth/register").with(staleSession()).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-        mvc.perform(get("/api/auth/csrf").session(staleSession())).andExpect(status().isOk());
-        mvc.perform(get("/api/users/me").session(staleSession())).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/admin/admins").session(staleSession())).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/csrf").with(staleSession())).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(staleSession())).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/admins").with(staleSession())).andExpect(status().isUnauthorized());
     }
 
-    private MockHttpSession staleSession() {
-        var principal = new com.smartphoneai.config.AccountPrincipal(java.util.UUID.randomUUID());
-        var authentication = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
-                principal, null, java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN")));
-        var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        var session = new MockHttpSession();
-        session.setAttribute(org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
-        return session;
+    private JwtTestClient staleSession() {
+        return JwtTestClient.invalid();
     }
 
     @Test void rootAdminLogsInWithoutOtp() throws Exception {
-        var session = new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"rootadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("ADMIN"))
                 .andExpect(jsonPath("$.user.email").value("rootadmin@example.com"));
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isOk())
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.role").value("ADMIN"));
-        mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/users/me/password").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"currentPassword\":\"wrongpass\",\"newPassword\":\"NewRootPass123!\"}"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/users/me/password").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"currentPassword\":\"TestRootPassword123!\",\"newPassword\":\"NewRootPass123!\"}"))
                 .andExpect(status().isNoContent());
-        mvc.perform(post("/api/auth/logout").session(session).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(post("/api/auth/logout").with(session).with(csrf())).andExpect(status().isNoContent());
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"rootadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
                 .andExpect(status().isUnauthorized());

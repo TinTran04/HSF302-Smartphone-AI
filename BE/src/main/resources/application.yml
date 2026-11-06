@@ -34,3 +34,7 @@ app:
   root-admin:
     email: ${ROOT_ADMIN_EMAIL:}
     password: ${ROOT_ADMIN_PASSWORD:}
+
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}

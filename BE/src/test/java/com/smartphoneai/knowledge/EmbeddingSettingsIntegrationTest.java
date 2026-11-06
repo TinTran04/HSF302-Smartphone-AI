@@ -9,7 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.*;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.root-admin.email=embedadmin@example.com", "app.root-admin.password=TestRootPassword123!",
         "app.ai.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class EmbeddingSettingsIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired EmbeddingConfigRepository configs;
@@ -32,10 +34,10 @@ class EmbeddingSettingsIntegrationTest {
         var model=mock(EmbeddingModel.class);
         when(factory.create(eq("OPENAI"),eq("embed-model"),eq("embedding-secret"),eq(3),eq(false))).thenReturn(model);
         when(model.embed(anyString())).thenReturn(new float[]{0.1f,0.2f,0.3f});
-        var session=new MockHttpSession();
-        mvc.perform(post("/api/auth/login").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session=new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"embedadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
-        mvc.perform(put("/api/admin/embedding-settings").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/api/admin/embedding-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"OPENAI\",\"model\":\"embed-model\",\"apiKey\":\"embedding-secret\",\"dimensions\":3}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
                 .andExpect(content().string(not(containsString("embedding-secret"))));

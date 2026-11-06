@@ -53,7 +53,10 @@ function render(path: string, admin = false) {
   );
 }
 
-beforeEach(() => session('ADMIN'));
+beforeEach(() => {
+  session('ADMIN');
+  client.setQueryData(['maintenance'], { enabled: false });
+});
 afterEach(() => client.clear());
 
 describe('Admin portal separation', () => {

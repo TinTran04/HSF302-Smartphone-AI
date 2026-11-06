@@ -78,7 +78,9 @@ VITE_API_BASE_URL=/api
 VITE_API_TARGET=http://localhost:8080
 ```
 
-Khởi động lại Vite. `.env.local` có ưu tiên cao hơn `.env` nếu cùng tồn tại. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie phiên. Cấu hình Gmail, database và khóa mã hóa AI nằm trong `BE/.env`. Các giá trị `VITE_*` có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
+Khởi động lại Vite. `.env.local` có ưu tiên cao hơn `.env` nếu cùng tồn tại. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie JWT HttpOnly. Access JWT hạn 15 phút, refresh token hạn 7 ngày. Client tự refresh một lần khi API cần xác thực trả 401, giữ nguyên nội dung và idempotency key khi thử lại. Việc xoay cookie được điều phối giữa các request và các tab có Web Locks. Mã đánh dấu ngữ cảnh tài khoản trong localStorage giúp chặn thao tác cũ khi người dùng đổi tài khoản. Cấu hình Gmail, database, JWT và khóa mã hóa AI nằm trong `BE/.env`. Các giá trị `VITE_*` có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
+
+Khi bật bảo trì, phần shop hiển thị màn hình riêng **Shop đang bảo trì**. Trạng thái được kiểm tra lại mỗi 30 giây và bằng nút **Thử lại**. Các màn đăng nhập, đăng ký, quên mật khẩu và nhận lời mời vẫn truy cập được. Admin sử dụng dashboard để tắt bảo trì. Khi bảo trì kết thúc, shop mở lại và các truy vấn shop đang lỗi được tải lại.
 
 `npm run build` sử dụng cấu hình Vite hiện có; không bật demo khi muốn dùng API thật. `VITE_API_TARGET` chỉ cấu hình proxy khi chạy Vite; môi trường khác cần có proxy tương ứng. Xem `docs/API_INTEGRATION.md` nếu tài liệu có trên máy.
 
@@ -89,6 +91,8 @@ Thời gian chờ gửi tin nhắn và xác nhận chuyển chủ đề là tố
 Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho từng nhà cung cấp. Thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Để trống trường key giữ key đã lưu. Chọn **Xóa API Key dự phòng khi lưu** để gỡ key trong bản cấu hình mới. Khi Chat nhận HTTP 429, BE thử key dự phòng một lần với cùng model. Giao diện tăng thời gian chờ cho kiểm tra hai key và gửi tin nhắn AI để chờ kết quả chuyển key. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 Màn hình AI có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ từ catalog, tài liệu phù hợp và kiến thức AI tham khảo. Hỗ trợ cửa hàng dùng tài liệu chính sách. Admin cấu hình chat model, embedding model và tải PDF/TXT đến READY để kiểm thử phần truy xuất tài liệu. FE gọi BE để nhận câu trả lời.
+
+Khi khách cung cấp mức tiền mua máy, AI ưu tiên máy đúng ngân sách. Các gợi ý cao hơn tối đa 10% hiển thị thông báo giá, số tiền và tỷ lệ vượt do BE tính. Mức tiền được giữ cho câu hỏi tiếp theo trong hội thoại.
 
 ## Kiểm tra
 

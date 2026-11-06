@@ -24,6 +24,7 @@ class SecurityConfigTest {
     @Autowired MockMvc mvc;
     @MockitoBean ProductService service;
     @MockitoBean UserAccountRepository users;
+    @MockitoBean com.smartphoneai.service.AuthTokenService tokens;
     @MockitoBean MaintenanceService maintenance;
 
     @Test void catalogIsPublic() throws Exception {

@@ -10,7 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -21,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:registration;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class RegistrationIntegrationTest {
     @Autowired MockMvc mvc;
@@ -137,40 +139,40 @@ class RegistrationIntegrationTest {
     @Test void registrationActivatesOnlyAfterCorrectOtpAndCreatesSession() throws Exception {
         var sent = new AtomicReference<String>();
         doAnswer(inv -> { sent.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
-        var session = new MockHttpSession();
-        var registration = mvc.perform(post("/api/auth/register").session(session).with(csrf())
+        var session = new JwtTestClient();
+        var registration = mvc.perform(post("/api/auth/register").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"customer@example.com\",\"password\":\"Goodpass123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
                 .andExpect(status().isAccepted()).andReturn();
         String id = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         String wrongCode = sent.get().equals("000000") ? "111111" : "000000";
         String wrongBody = mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", wrongCode));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(wrongBody))
                 .andExpect(status().isConflict());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         String body = mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", sent.get()));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("customer@example.com"));
-        mvc.perform(get("/api/users/me").session(session))
+        mvc.perform(get("/api/users/me").with(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("customer@example.com"));
-        mvc.perform(put("/api/users/me").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/api/users/me").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fullName\":\"An Nguyen\",\"phone\":\"0912345678\",\"address\":\"123 Nguyen Hue\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("An Nguyen"));
-        mvc.perform(get("/api/users/me").session(session))
+        mvc.perform(get("/api/users/me").with(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.address").value("123 Nguyen Hue"));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict());
 
-        mvc.perform(post("/api/auth/logout").session(session).with(csrf())).andExpect(status().isNoContent());
-        var loginSession = new MockHttpSession();
-        mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/auth/login").session(loginSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/logout").with(session).with(csrf())).andExpect(status().isNoContent());
+        var loginSession = new JwtTestClient();
+        mvc.perform(get("/api/users/me").with(loginSession)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/login").with(loginSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"customer@example.com\",\"password\":\"Goodpass123!\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("customer@example.com"));
-        mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(loginSession)).andExpect(status().isOk());
     }
 }

@@ -11,7 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.Map;
 import static org.mockito.ArgumentMatchers.*;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:chatflow;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class ChatFlowIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -108,16 +110,16 @@ class ChatFlowIntegrationTest {
         mvc.perform(get("/api/ai/conversations/" + id)).andExpect(status().isUnauthorized());
         var code = new AtomicReference<String>();
         doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(otpSender).send(anyString(), anyString());
-        var session = new MockHttpSession();
-        var registration = mvc.perform(post("/api/auth/register").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        var registration = mvc.perform(post("/api/auth/register").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"chat@example.com\",\"password\":\"Password123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
                 .andExpect(status().isAccepted()).andReturn();
         String challengeId = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/otp/verify").session(session).header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).header("X-Guest-Session", token).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.mergedConversationIds.length()").value(2));
-        mvc.perform(get("/api/ai/conversations/" + id).session(session)).andExpect(status().isOk());
-        mvc.perform(get("/api/ai/conversations/" + emptyId).session(session)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/ai/conversations/" + id).with(session)).andExpect(status().isOk());
+        mvc.perform(get("/api/ai/conversations/" + emptyId).with(session)).andExpect(status().isNotFound());
         mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", token)).andExpect(status().isUnauthorized());
     }
 }
