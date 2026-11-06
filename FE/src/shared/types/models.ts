@@ -1,10 +1,20 @@
 export type Role = 'CUSTOMER' | 'ADMIN';
+export interface MapLocation {
+  latitude: number;
+  longitude: number;
+}
+export interface AddressSuggestion {
+  id: string;
+  label: string;
+  location: MapLocation;
+}
 export interface User {
   id: string;
   fullName: string;
   email: string | null;
   phone: string;
   address: string;
+  location?: MapLocation | null;
   role: Role;
 }
 export type ActiveStatus = 'ACTIVE' | 'INACTIVE';
@@ -63,6 +73,7 @@ export interface ShippingInfo {
   phone: string;
   address: string;
   note: string;
+  location?: MapLocation | null;
 }
 export interface Order {
   id: string;

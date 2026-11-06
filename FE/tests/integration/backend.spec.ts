@@ -20,8 +20,10 @@ test.beforeEach(async ({ request }) => {
 
 test.afterEach(async ({ request }) => { await resetMaintenance(request); });
 
-test('real BE: admin login, brand and product creation, guest cart and guest chat session', async ({ page }) => {
+test('real BE: admin catalog, guest cart, authenticated chat and profile', async ({ page, request }) => {
   test.setTimeout(120000);
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 10.7769, longitude: 106.7009 });
   const errors: string[] = [];
   const suffix = Date.now().toString();
   const brandName = `Integration Brand ${suffix}`;
@@ -72,6 +74,14 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('combobox', { name: 'Thương hiệu', exact: true }).selectOption({ label: brandName });
   await page.getByLabel('Màu sắc', { exact: true }).fill('Đen');
   await page.getByLabel('Giá (VNĐ)', { exact: true }).fill('10000000');
+  const uploaded = page.waitForResponse(response => response.url().endsWith('/api/admin/products/images') && response.status() === 201);
+  await page.getByLabel('Hình ảnh sản phẩm', { exact: true }).setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
+  const imageUrl = (await (await uploaded).json()).url as string;
+  expect(imageUrl).toMatch(/^\/api\/product-images\/[a-f0-9-]+\.(png|jpg|webp)$/);
+  await expect(page.getByRole('img', { name: 'Hình ảnh sản phẩm 1', exact: true })).toHaveAttribute('src', imageUrl);
+  await page.getByLabel('Ảnh phiên bản 1', { exact: true }).setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
+  await expect(page.getByRole('img', { name: 'Ảnh phiên bản 1 1', exact: true })).toHaveAttribute('src', /^\/api\/product-images\//);
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   await page.getByRole('button', { name: 'Lưu sản phẩm', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/products$/);
   await page.goto('/admin/products/new');
@@ -89,6 +99,8 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.goto('/products');
   await expect(page.getByText(productName).first()).toBeVisible();
   await page.getByRole('link', { name: `Xem ${productName}`, exact: true }).click();
+  const productId = page.url().split('/').pop()!;
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   await page.getByRole('button', { name: '256GB', exact: true }).click();
   await page.getByRole('button', { name: 'Đen', exact: true }).click();
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
@@ -100,10 +112,7 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('button', { name: 'Đen', exact: true }).click();
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
   await page.goto('/ai');
-  await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
-  await page.screenshot({ path: 'test-results/ai-two-modes.png', fullPage: true });
-  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
-  await expect(page).toHaveURL(/\/ai\/conversations\//);
+  await expect(page).toHaveURL(/\/login$/);
   await page.goto('/register');
   await page.getByLabel('Họ và tên', { exact: true }).fill('Khách kiểm thử');
   await page.getByLabel('Số điện thoại', { exact: true }).fill('0900000000');
@@ -126,12 +135,50 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
   await liveChatRenewal;
   await expect(page).toHaveURL(/\/ai\/conversations\//);
+  const conversationUrl = page.url();
+  await page.locator('.chat-history-row').getByRole('button', { name: /Xóa cuộc trò chuyện/ }).click();
+  const deleteChatDialog = page.getByRole('dialog', { name: 'Xóa cuộc trò chuyện' });
+  let failedDelete = false;
+  await page.route(`**/api/ai/conversations/${conversationUrl.split('/').pop()}`, async route => {
+    if (route.request().method() === 'DELETE' && !failedDelete) {
+      failedDelete = true;
+      await route.fulfill({ status: 503, json: { message: 'Chưa thể xóa cuộc trò chuyện kiểm thử.' } });
+    } else await route.continue();
+  });
+  await deleteChatDialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
+  await expect(page.locator('.toast-error').filter({ hasText: 'Chưa thể xóa cuộc trò chuyện kiểm thử.' })).toHaveCount(1);
+  await expect(deleteChatDialog).toBeVisible();
+  await expect(page.locator('.chat-history-row')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/chat-delete-error.png', fullPage: true });
+  await deleteChatDialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
+  await expect(page).toHaveURL(/\/ai$/);
+  await expect(page.locator('.chat-history-row')).toHaveCount(0);
+  expect((await page.request.get(`/api/ai/conversations/${conversationUrl.split('/').pop()}`)).status()).toBe(404);
+  await page.goto('/profile');
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toBeDisabled();
+  await page.screenshot({ path: 'test-results/profile-view.png', fullPage: true });
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin' }).click();
+  await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+  await page.getByLabel('Họ và tên', { exact: true }).fill('Khách đã cập nhật');
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('0912345678');
+  await page.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
+  await page.screenshot({ path: 'test-results/profile-edit.png', fullPage: true });
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toHaveValue('Khách đã cập nhật');
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(`customer.${suffix}@example.com`);
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: productName })).toBeVisible();
   await expect(page.getByRole('heading', { name: secondName })).toBeVisible();
   await page.getByLabel(`Chọn ${secondName}`).uncheck();
   await page.getByRole('link', { name: 'Tiến hành đặt hàng' }).click();
-  await page.getByLabel('Địa chỉ nhận hàng').fill('123 Nguyễn Huệ, Hồ Chí Minh');
+  await page.getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true }).fill('123 Nguyễn Huệ, Hồ Chí Minh');
+  await expect(page.locator('.location-picker')).toContainText('Chưa chọn vị trí trên bản đồ.');
+  await page.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await page.getByRole('button', { name: 'Kiểm tra đơn hàng' }).click();
   await expect(page.getByText('Đã kiểm tra giá với máy chủ. Vui lòng xác nhận đặt hàng.')).toBeVisible();
   let dropped = false;
@@ -148,21 +195,24 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await expect(page.getByRole('button', { name: /Thử lại xác nhận/ })).toBeVisible({ timeout: 3000 });
   await page.getByRole('button', { name: /Thử lại xác nhận/ }).click();
   await expect(page).toHaveURL(/\/orders\//);
+  const placedOrderUrl = page.url();
   await expect(page.getByText(/Đặt hàng thành công!/)).toBeVisible();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await expect(page.getByRole('heading', { name: productName })).toBeVisible();
   await expect(page.getByRole('heading', { name: secondName })).toHaveCount(0);
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: secondName })).toBeVisible();
   await page.getByLabel('Menu tài khoản').click();
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('header').getByRole('link', { name: 'Đăng nhập', exact: true })).toBeVisible();
   await page.goto('/products');
   await page.getByRole('link', { name: `Xem ${secondName}`, exact: true }).click();
   await page.getByRole('button', { name: '256GB', exact: true }).click();
   await page.getByRole('button', { name: 'Đen', exact: true }).click();
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
   await page.goto('/ai');
-  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
-  await expect(page).toHaveURL(/\/ai\/conversations\//);
+  await expect(page).toHaveURL(/\/login$/);
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(`customer.${suffix}@example.com`);
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
@@ -178,11 +228,58 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('alert').last()).toBeVisible();
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/ai$/);
   await expect(page.getByLabel('Mã OTP')).toHaveCount(0);
   await page.goto('/cart');
   await expect(page.locator('.cart-item').filter({ hasText: secondName }).locator('.quantity > span[aria-live]')).toHaveText('2');
+  const csrf = await (await request.get('/api/auth/csrf')).json();
+  const deleted = await request.delete(`/api/admin/products/${productId}`, { headers: { 'X-XSRF-TOKEN': csrf.token } });
+  expect(deleted.status()).toBe(204);
+  expect((await page.request.get(`/api/products/${productId}`)).status()).toBe(404);
+  await page.goto(placedOrderUrl);
+  await expect(page.getByRole('heading', { name: productName })).toBeVisible();
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   expect(errors).toEqual([]);
+});
+
+test('real BE: address autocomplete ignores stale responses and allows manual input on provider errors', async ({ page }) => {
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eef2e8"/></svg>' }));
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto('/admin/profile');
+  const address = page.getByRole('combobox', { name: 'Địa chỉ mặc định', exact: true });
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true }).click();
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('0900000000');
+  const seen: string[] = [];
+  await page.route('**/api/locations/autocomplete?*', async route => {
+    const query = new URL(route.request().url()).searchParams.get('text')!;
+    seen.push(query);
+    expect(route.request().url()).not.toContain('apiKey');
+    if (query === 'Lỗi thử nghiệm') return route.fulfill({ status: 503, json: { message: 'Gợi ý tạm ngưng.' } });
+    if (query === 'Không kết quả') return route.fulfill({ json: [] });
+    if (query === 'Địa chỉ cũ') await new Promise(resolve => setTimeout(resolve, 1200));
+    return route.fulfill({ json: [{ id: query, label: query === 'Địa chỉ cũ' ? 'Kết quả cũ' : 'Địa chỉ mới, Việt Nam', location: { latitude: 21.0287, longitude: 105.8524 } }] });
+  });
+  await address.fill('Lỗi thử nghiệm');
+  await expect(page.getByRole('status').filter({ hasText: 'Gợi ý địa chỉ đang tạm ngưng.' })).toBeVisible();
+  await expect(address).toBeEnabled();
+  await address.fill('Không kết quả');
+  await expect(page.getByText('Chưa tìm thấy địa chỉ phù hợp. Bạn vẫn có thể nhập thủ công.')).toBeVisible();
+  await address.fill('Địa chỉ cũ');
+  await expect.poll(() => seen.includes('Địa chỉ cũ')).toBe(true);
+  await address.fill('Địa chỉ mới');
+  await page.getByRole('option', { name: 'Địa chỉ mới, Việt Nam', exact: true }).click();
+  await expect(address).toHaveValue('Địa chỉ mới, Việt Nam');
+  await expect(page.locator('.location-picker')).toContainText('21.028700, 105.852400');
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(address).toBeDisabled();
+  await expect(page.getByRole('option', { name: 'Kết quả cũ', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(address).toHaveValue('Địa chỉ mới, Việt Nam');
+  await expect(page.locator('.location-picker')).toContainText('21.028700, 105.852400');
 });
 
 test('real BE: manage accounts and activate an emailed CUSTOMER invitation', async ({ page, browser }) => {
@@ -388,6 +485,21 @@ test('real BE: maintenance screen, JWT renewal and Admin recovery', async ({ pag
   try {
     const guest = await context.newPage();
     await guest.goto('http://127.0.0.1:15173/products');
+    const customerEmail = `maintenance.${Date.now()}@example.com`;
+    let guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    const registration = await guest.request.post('/api/auth/register', {
+      headers: { 'X-XSRF-TOKEN': guestCsrf },
+      data: { email: customerEmail, password: 'MaintenancePass123!', fullName: 'Khách bảo trì', phone: '0912345678' },
+    });
+    expect(registration.status()).toBe(202);
+    const { challengeId } = await registration.json();
+    const { otp } = await (await guest.request.get('http://127.0.0.1:12526')).json();
+    expect((await guest.request.post('/api/auth/otp/verify', {
+      headers: { 'X-XSRF-TOKEN': guestCsrf }, data: { challengeId, code: otp },
+    })).ok()).toBe(true);
+    guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    expect((await guest.request.post('/api/auth/logout', { headers: { 'X-XSRF-TOKEN': guestCsrf } })).status()).toBe(204);
+    await guest.goto('http://127.0.0.1:15173/products');
     await expect(guest.getByRole('heading', { name: 'Khám phá điện thoại', exact: true })).toBeVisible();
     await page.goto('/admin/maintenance');
     await page.getByRole('button', { name: 'Bật bảo trì', exact: true }).click();
@@ -400,8 +512,25 @@ test('real BE: maintenance screen, JWT renewal and Admin recovery', async ({ pag
     await guest.setViewportSize({ width: 390, height: 844 });
     expect(await guest.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await guest.screenshot({ path: 'test-results/maintenance-mobile.png', fullPage: true });
-    await guest.getByRole('link', { name: 'Đăng nhập quản trị' }).click();
+    await expect(guest.getByRole('button', { name: 'Thử lại', exact: true })).toHaveCount(0);
+    await guest.getByRole('link', { name: 'Đăng nhập', exact: true }).click();
     await expect(guest.getByLabel('Email', { exact: true })).toBeVisible();
+    await guest.getByLabel('Email', { exact: true }).fill(customerEmail);
+    await guest.getByLabel('Mật khẩu', { exact: true }).fill('MaintenancePass123!');
+    await guest.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(guest).toHaveURL(/\/products$/);
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì' })).toBeVisible();
+    await expect(guest.getByRole('link', { name: /Đăng nhập/ })).toHaveCount(0);
+    await guest.screenshot({ path: 'test-results/maintenance-customer.png', fullPage: true });
+    guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    expect((await guest.request.post('/api/auth/logout', { headers: { 'X-XSRF-TOKEN': guestCsrf } })).status()).toBe(204);
+    await guest.reload();
+    await guest.getByRole('link', { name: 'Đăng nhập', exact: true }).click();
+    await guest.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+    await guest.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+    await guest.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(guest).toHaveURL(/\/admin$/);
+    await guest.getByRole('button', { name: 'Đăng xuất quản trị', exact: true }).click();
     await guest.goto('http://127.0.0.1:15173/register');
     await expect(guest.getByLabel('Họ và tên', { exact: true })).toBeVisible();
     await guest.goto('http://127.0.0.1:15173/products');
@@ -424,7 +553,9 @@ test('real BE: maintenance screen, JWT renewal and Admin recovery', async ({ pag
     await page.getByRole('button', { name: 'Tắt bảo trì', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
     await expect(page.locator('.toast').filter({ hasText: 'Đã tắt bảo trì cửa hàng.' })).toHaveCount(1);
-    await guest.getByRole('button', { name: 'Thử lại', exact: true }).click();
+    await guest.bringToFront();
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì', exact: true })).toBeVisible();
+    await guest.reload();
     await expect(guest.getByRole('heading', { name: 'Khám phá điện thoại', exact: true })).toBeVisible();
 
     const logoutCookies = await page.context().cookies();

@@ -55,8 +55,10 @@ class PhoneAssistanceIntegrationTest {
         var affordable=save("Demo A", 9000000L, true);
         var expensive=save("Demo B", 15000000L, true);
         var hidden=save("Demo C", 8000000L, false);
+        var unavailable=save("Demo D", 7000000L, true);
+        unavailable.getVariants().getFirst().setActive(false); products.saveAndFlush(unavailable);
         var provider=mock(AiProviderService.class);
-        when(provider.chat(anyString())).thenReturn("{\"ids\":[\""+affordable.getId()+"\",\""+expensive.getId()+"\",\""+hidden.getId()+"\",\"99999\"]}");
+        when(provider.chat(anyString())).thenReturn("{\"ids\":[\""+affordable.getId()+"\",\""+expensive.getId()+"\",\""+hidden.getId()+"\",\""+unavailable.getId()+"\",\"99999\"]}");
         var service=new PhoneAssistanceServiceImpl(products,provider,new ObjectMapper(), mock(com.smartphoneai.service.RagService.class));
         var answer=service.consult("Mình có 10 triệu, cần điện thoại", java.util.List.of());
         assertEquals(1,answer.recommendedProducts().size());

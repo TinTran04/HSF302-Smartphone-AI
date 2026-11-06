@@ -15,12 +15,12 @@ import com.smartphoneai.entity.*;
 import com.smartphoneai.exception.*;
 import com.smartphoneai.repository.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.*;
 
@@ -35,8 +35,7 @@ public class AiChatServiceImpl implements AiChatService {
     private final ChatResponder responder;
     private final ObjectMapper mapper;
     private final Clock clock;
-    private final SecureRandom random = new SecureRandom();
-    private record Actor(UUID userId, AiGuestSession guest) {}
+    private record Actor(UUID userId) {}
     public AiChatServiceImpl(AiGuestSessionRepository guests, AiConversationRepository conversations, AiMessageRepository messages,
                          AiTopicSwitchRepository switches, TopicRouter router, ChatResponder responder, ObjectMapper mapper, Clock clock) {
         this.guests=guests; this.conversations=conversations; this.messages=messages; this.switches=switches;
@@ -44,38 +43,37 @@ public class AiChatServiceImpl implements AiChatService {
     }
     @Override
     @Transactional
-    public String createGuestSession() {
-        byte[] bytes=new byte[32]; random.nextBytes(bytes);
-        String token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        guests.save(new AiGuestSession(hash(token), clock.instant()));
-        return token;
-    }
-    @Override
-    @Transactional
     public UUID create(Authentication auth, String token, CreateConversationRequest request) {
-        var actor=actor(auth,token);
-        var conversation=new AiConversation(actor.userId(), actor.guest()==null ? null : actor.guest().getId(),
+        var actor=actor(auth);
+        var conversation=new AiConversation(actor.userId(), null,
                 ChatTopics.normalize(request.topic()), json(request.productIds()==null ? List.of() : request.productIds()), clock.instant());
         return conversations.save(conversation).getId();
     }
     @Override
     @Transactional
     public List<Map<String,Object>> list(Authentication auth, String token) {
-        var actor=actor(auth,token);
-        var found=actor.userId()!=null ? conversations.findAllByUserIdOrderByCreatedAtDesc(actor.userId())
-                : conversations.findAllByGuestIdOrderByCreatedAtDesc(actor.guest().getId());
+        var actor=actor(auth);
+        var found=conversations.findAllByUserIdOrderByCreatedAtDesc(actor.userId());
         return found.stream().map(this::conversationView).toList();
     }
     @Override
     @Transactional
     public Map<String,Object> detail(Authentication auth, String token, UUID id) {
-        var actor=actor(auth,token); return conversationView(owned(actor,id));
+        var actor=actor(auth); return conversationView(owned(actor,id));
+    }
+    @Override
+    @Transactional
+    public void delete(Authentication auth, UUID id) {
+        var conversation=owned(actor(auth),id);
+        // Switch retries hold the switch row lock. Remove those references before deleting answer messages.
+        switches.deleteConversationReferences(id);
+        messages.deleteConversationMessages(id);
+        conversations.delete(conversation);
     }
     @Override
     @Transactional
     public Map<String,Object> send(Authentication auth, String token, UUID id, String rawContent) {
-        var actor=actor(auth,token); var conversation=owned(actor,id);
-        if (actor.guest()!=null && actor.guest().getMessageCount()>=2) throw new GuestMessageLimitException();
+        var actor=actor(auth); var conversation=owned(actor,id);
         var pending = switches.findFirstByConversationIdAndStatus(id,"PENDING");
         if (pending.isPresent()) {
             if (pending.get().canConfirm(clock.instant())) throw new InvalidTopicSwitchException();
@@ -91,26 +89,23 @@ public class AiChatServiceImpl implements AiChatService {
                 && TOPICS.contains(suggestedTopic) && !currentTopic.equals(suggestedTopic)) {
             addMessage(id,"user",content,List.of());
             var request=switches.save(new AiTopicSwitch(id,suggestedTopic,content,clock.instant()));
-            if (actor.guest()!=null) actor.guest().countMessage();
             return switchView(request,currentTopic);
         }
         if (!"SAME_TOPIC".equals(decision.result()) && !("DIFFERENT_TOPIC".equals(decision.result()) && currentTopic.equals(suggestedTopic))) {
             addMessage(id,"user",content,List.of());
             String clarification="Bạn muốn hỏi về chủ đề nào? Vui lòng nói rõ thêm.";
             addMessage(id,"assistant",clarification,List.of());
-            if (actor.guest()!=null) actor.guest().countMessage();
             return Map.of("type","CLARIFICATION_REQUIRED","message",clarification);
         }
         var answer=responder.answer(currentTopic,content,history,productIds(conversation.getProductIds()));
         validateAnswer(answer);
         addMessage(id,"user",content,List.of()); addAnswer(id,answer);
-        if (actor.guest()!=null) actor.guest().countMessage();
         return answerView(id,null,answer);
     }
     @Override
     @Transactional
     public Map<String,Object> confirm(Authentication auth, String token, UUID switchId) {
-        var actor=actor(auth,token);
+        var actor=actor(auth);
         var conversationId=switches.findConversationId(switchId).orElseThrow(InvalidTopicSwitchException::new);
         owned(actor,conversationId);
         var request=switches.findLocked(switchId).orElseThrow(InvalidTopicSwitchException::new);
@@ -122,7 +117,7 @@ public class AiChatServiceImpl implements AiChatService {
         if (!request.canConfirm(clock.instant())) throw new InvalidTopicSwitchException();
         var answer=responder.answer(request.getSuggestedTopic(),request.getQuestion(),List.of(),List.of());
         validateAnswer(answer);
-        var next=conversations.saveAndFlush(new AiConversation(actor.userId(),actor.guest()==null ? null : actor.guest().getId(),
+        var next=conversations.saveAndFlush(new AiConversation(actor.userId(),null,
                 ChatTopics.normalize(request.getSuggestedTopic()),"[]",clock.instant()));
         addMessage(next.getId(),"user",request.getQuestion(),List.of());
         addAnswer(next.getId(),answer);
@@ -132,7 +127,7 @@ public class AiChatServiceImpl implements AiChatService {
     @Override
     @Transactional
     public void cancel(Authentication auth, String token, UUID switchId) {
-        var actor=actor(auth,token);
+        var actor=actor(auth);
         var conversationId=switches.findConversationId(switchId).orElseThrow(InvalidTopicSwitchException::new);
         owned(actor,conversationId);
         var request=switches.findLocked(switchId).orElseThrow(InvalidTopicSwitchException::new);
@@ -153,9 +148,13 @@ public class AiChatServiceImpl implements AiChatService {
         guest.revoke();
         return List.copyOf(claimed);
     }
-    private Actor actor(Authentication auth, String token) {
-        if (auth!=null && auth.getPrincipal() instanceof AccountPrincipal principal) return new Actor(principal.id(),null);
-        return new Actor(null,guest(token));
+    private Actor actor(Authentication auth) {
+        if (auth==null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof AccountPrincipal principal))
+            throw new ChatUnauthorizedException();
+        if (auth.getAuthorities().stream().noneMatch(a -> "ROLE_CUSTOMER".equals(a.getAuthority()))
+                || auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))
+            throw new AccessDeniedException("Customer account required");
+        return new Actor(principal.id());
     }
     private AiGuestSession guest(String token) {
         if (token==null || token.length()<32 || token.length()>128) throw new ChatUnauthorizedException();
@@ -165,8 +164,7 @@ public class AiChatServiceImpl implements AiChatService {
     }
     private AiConversation owned(Actor actor, UUID id) {
         var conversation=conversations.findLocked(id).orElseThrow(ConversationNotFoundException::new);
-        boolean owns=actor.userId()!=null ? actor.userId().equals(conversation.getUserId())
-                : actor.guest().getId().equals(conversation.getGuestId());
+        boolean owns=actor.userId().equals(conversation.getUserId());
         if (!owns) throw new ConversationNotFoundException();
         return conversation;
     }

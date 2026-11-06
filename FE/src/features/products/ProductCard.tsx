@@ -4,6 +4,7 @@ import { ProductImage } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import { formatVnd, productPrice } from '../../shared/utils/format';
 import { useComparison } from '../comparison/ComparisonProvider';
+import { isProductAvailable } from './availability';
 export function ProductCard({ product }: { product: Product }) {
   const comparison = useComparison();
   const selected = comparison.products.some((p) => p.id === product.id);
@@ -20,6 +21,7 @@ export function ProductCard({ product }: { product: Product }) {
       <Link to={`/products/${product.id}`}>
         <h3>{product.name}</h3>
       </Link>
+      {!isProductAvailable(product) && <span className="badge badge-error mt-3">Hết hàng</span>}
       <p className="spec-preview">
         {product.specifications['Chip xử lý']} · {product.specifications.RAM} RAM
         <br />

@@ -29,6 +29,11 @@ spring:
       ddl-auto: validate
     open-in-view: false
 app:
+  product-images:
+    directory: ${PRODUCT_IMAGES_DIRECTORY:./uploads/product-images}
+  maps:
+    geoapify-api-key: ${GEOAPIFY_API_KEY:}
+    geoapify-base-url: ${GEOAPIFY_BASE_URL:https://api.geoapify.com}
   ai:
     encryption-key: ${AI_CONFIG_ENCRYPTION_KEY:}
   root-admin:

@@ -4,16 +4,22 @@ import com.smartphoneai.dto.request.*;
 import com.smartphoneai.dto.response.*;
 import com.smartphoneai.service.AdminProductService;
 import com.smartphoneai.service.BrandService;
+import com.smartphoneai.service.ProductImageService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController @RequestMapping("/api/admin")
 public class AdminCatalogController {
     private final AdminProductService products;
     private final BrandService brands;
-    public AdminCatalogController(AdminProductService products, BrandService brands) { this.products=products; this.brands=brands; }
+    private final ProductImageService images;
+    public AdminCatalogController(AdminProductService products, BrandService brands, ProductImageService images) {
+        this.products=products; this.brands=brands; this.images=images;
+    }
     @GetMapping("/brands") public List<BrandResponse> brands() { return brands.list(); }
     @PostMapping("/brands") public ResponseEntity<BrandResponse> createBrand(@Valid @RequestBody BrandRequest input) {
         return ResponseEntity.status(201).body(brands.create(input.name()));
@@ -30,6 +36,11 @@ public class AdminCatalogController {
     }
     @GetMapping("/products/{id}") public ProductResponse product(@PathVariable Long id) { return products.get(id); }
     @PostMapping("/products") public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductMutationRequest input) { return ResponseEntity.status(201).body(products.create(input)); }
+    @PostMapping(value="/products/images", consumes="multipart/form-data")
+    public ResponseEntity<Map<String, String>> uploadImage(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.status(201).body(Map.of("url", images.upload(file)));
+    }
+    @DeleteMapping("/products/{id}") public ResponseEntity<Void> delete(@PathVariable Long id) { products.delete(id); return ResponseEntity.noContent().build(); }
     @PutMapping("/products/{id}") public ProductResponse update(@PathVariable Long id, @Valid @RequestBody ProductMutationRequest input) { return products.update(id,input); }
     @PatchMapping("/products/{id}/status") public ProductResponse status(@PathVariable Long id, @Valid @RequestBody ProductStatusRequest input) { return products.status(id,input.status()); }
 }

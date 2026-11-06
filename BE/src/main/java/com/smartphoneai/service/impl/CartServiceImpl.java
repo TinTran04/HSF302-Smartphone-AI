@@ -61,7 +61,7 @@ public class CartServiceImpl implements CartService {
     @Transactional
     public CartResponse add(UUID userId, Long variantId, int quantity) {
         lockUser(userId);
-        var variant = variants.findById(variantId).orElseThrow(CartActionException::new);
+        var variant = variants.findLocked(variantId).orElseThrow(CartActionException::new);
         if (!variant.isActive() || !variant.getProduct().isActive()) throw new CartActionException();
         if (!carts.existsById(userId)) carts.saveAndFlush(new Cart(userId));
         var item = items.findByUserIdAndVariantId(userId, variantId).orElse(null);
@@ -77,8 +77,9 @@ public class CartServiceImpl implements CartService {
     @Transactional
     public CartResponse update(UUID userId, Long variantId, int quantity) {
         lockUser(userId);
+        var variant = variants.findLocked(variantId).orElseThrow(CartActionException::new);
         var item = items.findByUserIdAndVariantId(userId, variantId).orElseThrow(CartActionException::new);
-        if (!item.getVariant().isActive() || !item.getVariant().getProduct().isActive()) throw new CartActionException();
+        if (!variant.isActive() || !variant.getProduct().isActive()) throw new CartActionException();
         item.setQuantity(quantity); items.flush(); return response(userId);
     }
     @Override
@@ -114,8 +115,8 @@ public class CartServiceImpl implements CartService {
         }
         if (emptyCart) return;
         if (!carts.existsById(userId)) carts.saveAndFlush(new Cart(userId));
-        for (var entry : guestItems) {
-            var variant = variants.findById(entry.variantId()).orElse(null);
+        for (var entry : guestItems.stream().sorted(Comparator.comparing(CartItemRequest::variantId)).toList()) {
+            var variant = variants.findLocked(entry.variantId()).orElse(null);
             if (variant == null) continue;
             var item = items.findByUserIdAndVariantId(userId, entry.variantId()).orElse(null);
             if (item == null) items.saveAndFlush(new CartItem(userId, variant, entry.quantity()));
@@ -152,10 +153,12 @@ public class CartServiceImpl implements CartService {
         return new CartResponse(values, total);
     }
     private static CartResponse.Item itemResponse(CartItem item) {
-        ProductVariant v = item.getVariant();
-        var product = ProductMapper.toResponse(v.getProduct());
-        var variant = product.variants().stream().filter(entry -> entry.id().equals(v.getId().toString())).findFirst().orElseThrow();
-        return new CartResponse.Item(v.getId().toString(), item.getQuantity(), product, variant,
-                item.getPriceAtAdd(), !v.isActive() || !v.getProduct().isActive());
+        try {
+            ProductVariant v = item.getVariant();
+            var product = ProductMapper.toResponse(v.getProduct());
+            var variant = product.variants().stream().filter(entry -> entry.id().equals(v.getId().toString())).findFirst().orElseThrow(CartActionException::new);
+            return new CartResponse.Item(v.getId().toString(), item.getQuantity(), product, variant,
+                    item.getPriceAtAdd(), !v.isActive() || !v.getProduct().isActive());
+        } catch (jakarta.persistence.EntityNotFoundException ex) { throw new CartActionException(); }
     }
 }

@@ -10,4 +10,7 @@ public interface AiTopicSwitchRepository extends JpaRepository<AiTopicSwitch, UU
     Optional<UUID> findConversationId(@Param("id") UUID id);
     @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select s from AiTopicSwitch s where s.id = :id")
     Optional<AiTopicSwitch> findLocked(@Param("id") UUID id);
+    @Modifying
+    @Query("delete from AiTopicSwitch s where s.conversationId = :conversationId or s.newConversationId = :conversationId")
+    void deleteConversationReferences(@Param("conversationId") UUID conversationId);
 }

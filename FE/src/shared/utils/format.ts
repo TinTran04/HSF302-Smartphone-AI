@@ -32,7 +32,8 @@ export const knowledgeLabels = {
   DISABLED: 'Đã tắt',
 };
 export const productPrice = (p: { variants: { price: number; status: string }[] }) => {
-  const prices = p.variants.filter((v) => v.status === 'ACTIVE').map((v) => v.price);
+  const active = p.variants.filter((v) => v.status === 'ACTIVE');
+  const prices = (active.length ? active : p.variants).map((v) => v.price);
   return prices.length ? Math.min(...prices) : null;
 };
 export const safeReturnPath = (value: unknown, role?: Role) =>

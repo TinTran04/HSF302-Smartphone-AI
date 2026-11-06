@@ -19,42 +19,14 @@ function mapOrder(order: ServerOrder): Order {
 const post = <T>(path: string, body?: unknown) =>
   http<T>(path, { method: 'POST', body: body === undefined ? undefined : jsonBody(body) });
 const tokenKey = 'smartphone-ai-guest-session';
-let guestSessionRequest: Promise<string> | undefined;
-export function guestToken() { return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(tokenKey); }
-export function clearGuestToken() { sessionStorage.removeItem(tokenKey); }
-async function chatHeaders() {
-  let token = guestToken();
-  if (!token) {
-    guestSessionRequest ??= post<{guestSessionToken:string}>('/ai/guest-sessions').then(result => {
-      sessionStorage.setItem(tokenKey, result.guestSessionToken);
-      return result.guestSessionToken;
-    }).finally(() => { guestSessionRequest = undefined; });
-    token = await guestSessionRequest;
-  }
-  return { 'X-Guest-Session': token };
-}
-function authHeaders(): Record<string, string> { const token = guestToken(); return token ? { 'X-Guest-Session': token } : {}; }
-async function authRequest<T>(path: string, body: unknown): Promise<T> {
-  const token = guestToken();
-  try { return await http<T>(path, { method: 'POST', headers: authHeaders(), body: jsonBody(body) }); }
-  catch (error) {
-    if (!token || !(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error;
-    clearGuestToken();
-    return http<T>(path, { method: 'POST', headers: {}, body: jsonBody(body) });
-  }
-}
-async function chatRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  try { return await http<T>(path, { ...options, headers: await chatHeaders() }); }
-  catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error;
-    clearGuestToken();
-    return http<T>(path, { ...options, headers: await chatHeaders() });
-  }
+export function clearGuestToken() {
+  try { sessionStorage.removeItem(tokenKey); } catch { /* Legacy storage can be unavailable. */ }
 }
 export const realAuth = {
   verify: async (challengeId: string, code: string, guestCart: CartEntry[]) => {
-    const result = await authRequest<{user: User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) });
+    const result = await post<{user: User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) });
     setAuthAccount(result.user.id);
+    clearGuestToken();
     return result;
   },
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
@@ -77,8 +49,11 @@ export const realApi: Api = {
     }
   },
   login: async (data) => {
-    const result = await authRequest<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password, guestCart: data.guestCart, guestCartMergeId: await guestCartMergeId(data.guestCart) });
-    if (result.user) setAuthAccount(result.user.id);
+    const result = await post<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password, guestCart: data.guestCart, guestCartMergeId: await guestCartMergeId(data.guestCart) });
+    if (result.user) {
+      setAuthAccount(result.user.id);
+      clearGuestToken();
+    }
     return result.user ?? { challengeId: result.challengeId!, expiresAt: result.expiresAt, resendAfter: result.resendAfter };
   },
   register: (data) => post('/auth/register', { email: data.email, password: data.password, fullName: data.fullName, phone: data.phone }),
@@ -87,6 +62,8 @@ export const realApi: Api = {
     setAuthAccount(null);
   },
   updateProfile: (data) => http('/users/me', { method: 'PUT', body: jsonBody(data) }),
+  addressSuggestions: (text, signal) => http(`/locations/autocomplete?${new URLSearchParams({ text: text.trim() })}`, { signal }),
+  reverseLocation: (point, signal) => http(`/locations/reverse?${new URLSearchParams({ latitude: String(point.latitude), longitude: String(point.longitude) })}`, { signal }),
   products: (params = new URLSearchParams(), admin = false) => {
     const searchParams = new URLSearchParams(params);
     if (searchParams.has('keyword') && !searchParams.has('q')) {
@@ -122,19 +99,26 @@ export const realApi: Api = {
       method: 'PATCH',
       body: jsonBody({ status }),
     }).then(mapOrder),
-  conversations: () => chatRequest('/ai/conversations'),
+  conversations: () => http('/ai/conversations'),
   createConversation: async (topic, context) => {
-    const result = await chatRequest<{ conversationId: string }>('/ai/conversations', { method: 'POST', body: jsonBody({
+    const result = await http<{ conversationId: string }>('/ai/conversations', { method: 'POST', body: jsonBody({
       topic,
       ...context,
     }) });
-    return chatRequest(`/ai/conversations/${encodeURIComponent(result.conversationId)}`);
+    return http(`/ai/conversations/${encodeURIComponent(result.conversationId)}`);
   },
-  conversation: (id) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}`),
-  sendMessage: (id, content) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }), signal: AbortSignal.timeout(400000) }),
-  confirmSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST', signal: AbortSignal.timeout(400000) }),
-  cancelSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+  conversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`),
+  deleteConversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  sendMessage: (id, content) => http(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }), signal: AbortSignal.timeout(400000) }),
+  confirmSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST', signal: AbortSignal.timeout(400000) }),
+  cancelSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   dashboard: () => http('/admin/dashboard'),
+  uploadProductImage: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return http('/admin/products/images', { method: 'POST', body });
+  },
+  deleteProduct: (id) => http(`/admin/products/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   saveProduct: (product, creating) =>
     http(`/admin/products${creating ? '' : `/${encodeURIComponent(product.id)}`}`, {
       method: creating ? 'POST' : 'PUT',

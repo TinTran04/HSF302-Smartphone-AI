@@ -45,13 +45,13 @@ class StorefrontRoleSecurityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/products", "/api/products/1", "/api/brands", "/api/ai/conversations"})
+    @ValueSource(strings = {"/api/products", "/api/products/1", "/api/brands"})
     void guestCanReadPublicStorefrontApis(String path) throws Exception {
         mvc.perform(get(path)).andExpect(status().isOk());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/cart/resolve", "/api/ai/guest-sessions", "/api/ai/conversations"})
+    @ValueSource(strings = {"/api/cart/resolve"})
     void guestCanCreateStorefrontGuestState(String path) throws Exception {
         mvc.perform(post(path).with(csrf())).andExpect(status().isOk());
     }

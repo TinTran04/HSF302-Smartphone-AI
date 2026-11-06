@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.test.context.support.WithMockUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:productfilters;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Transactional
 class ProductFiltersIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ProductRepository products;
@@ -62,11 +64,49 @@ class ProductFiltersIntegrationTest {
                 .andExpect(jsonPath("$.items[1].name").value("Unpriced-sort"));
     }
 
-    private void save(String name, String ram, long price) {
+    @Test void priceAndStorageFiltersIncludeSoldOutProductsAndUseLastKnownVariants() throws Exception {
+        var soldOut = save("Availability sold out", "8 GB", 150);
+        soldOut.setActive(false);
+        products.saveAndFlush(soldOut);
+        var variantsSoldOut = save("Availability variants sold out", "8 GB", 100);
+        variantsSoldOut.getVariants().getFirst().setActive(false);
+        products.saveAndFlush(variantsSoldOut);
+        save("Availability available", "8 GB", 200);
+
+        mvc.perform(get("/api/products").param("q", "Availability").param("ram", "8GB")
+                        .param("storage", "128GB").param("minPrice", "90").param("maxPrice", "210")
+                        .param("sort", "price,asc"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(3))
+                .andExpect(jsonPath("$.items[0].name").value("Availability variants sold out"))
+                .andExpect(jsonPath("$.items[0].variants[0].status").value("INACTIVE"))
+                .andExpect(jsonPath("$.items[1].status").value("INACTIVE"))
+                .andExpect(jsonPath("$.items[2].name").value("Availability available"));
+        mvc.perform(get("/api/products").param("q", "Availability").param("sort", "price,desc"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].name").value("Availability available"))
+                .andExpect(jsonPath("$.items[1].name").value("Availability sold out"))
+                .andExpect(jsonPath("$.items[2].name").value("Availability variants sold out"));
+    }
+
+    @Test void availableVariantPricesTakePrecedenceOverInactiveVariantPrices() throws Exception {
+        var product = save("Mixed availability", "8 GB", 200);
+        var inactive = new ProductVariant();
+        inactive.setColor("White"); inactive.setStorage("256GB"); inactive.setPrice(50); inactive.setActive(false);
+        product.addVariant(inactive); products.saveAndFlush(product);
+        save("Mixed comparison", "8 GB", 100);
+
+        mvc.perform(get("/api/products").param("q", "Mixed").param("sort", "price,asc"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].name").value("Mixed comparison"));
+        mvc.perform(get("/api/products").param("q", "Mixed availability").param("maxPrice", "100"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(0));
+        mvc.perform(get("/api/products").param("q", "Mixed availability").param("storage", "256GB"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(0));
+    }
+
+    private Product save(String name, String ram, long price) {
         var product = new Product();
         product.setName(name); product.setActive(true); product.getSpecifications().put("RAM", ram);
         var variant = new ProductVariant();
         variant.setColor("Black"); variant.setStorage("128GB"); variant.setPrice(price); variant.setActive(true);
-        product.addVariant(variant); products.saveAndFlush(product);
+        product.addVariant(variant); return products.saveAndFlush(product);
     }
 }

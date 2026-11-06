@@ -1,6 +1,9 @@
 package com.smartphoneai.knowledge;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartphoneai.entity.UserAccount;
+import com.smartphoneai.repository.UserAccountRepository;
+import com.smartphoneai.service.AuthTokenService;
 import com.smartphoneai.service.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RagIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired UserAccountRepository users;
+    @Autowired AuthTokenService tokens;
     @Autowired KnowledgeDocumentRepository documents;
     @MockitoBean OtpSender sender;
     @MockitoBean KnowledgeVectorStore vectors;
@@ -54,17 +59,18 @@ class RagIntegrationTest {
         when(vectors.search(anyString(),anySet(),eq("embedding-v1"))).thenReturn(List.of(new KnowledgeVectorStore.Hit(chunkId.get(),0.9)));
         when(ai.chat(anyString())).thenReturn("```json\n{\"answer\":\"Bảo hành 12 tháng.\",\"citedChunkIds\":[\""+chunkId.get()+"\"]}\n```");
         when(router.route(anyString(),anyString(),anyList())).thenReturn(new TopicRouter.Decision("SAME_TOPIC",null));
-        var guest=mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        String token=mapper.readTree(guest.getResponse().getContentAsString()).path("guestSessionToken").asText();
-        var conversation=mvc.perform(post("/api/ai/conversations").header("X-Guest-Session",token).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var user = UserAccount.pendingCustomer(java.util.UUID.randomUUID() + "@example.com", "Customer", "0900000000", "x");
+        user.activate();
+        var customer = JwtTestClient.authenticated(tokens, users.saveAndFlush(user));
+        var conversation=mvc.perform(post("/api/ai/conversations").with(customer).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"topic\":\"SHOP_SUPPORT\"}")).andExpect(status().isCreated()).andReturn();
         String id=mapper.readTree(conversation.getResponse().getContentAsString()).path("conversationId").asText();
-        mvc.perform(post("/api/ai/conversations/"+id+"/messages").header("X-Guest-Session",token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(customer).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Bảo hành bao lâu?\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.sources[0].documentId").value(docId));
         mvc.perform(patch("/api/admin/knowledge/documents/"+docId+"/status").with(admin).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}")).andExpect(status().isOk());
-        mvc.perform(post("/api/ai/conversations/"+id+"/messages").header("X-Guest-Session",token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(customer).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Còn bảo hành không?\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.sources.length()").value(0));
         verify(ai,times(1)).chat(anyString());

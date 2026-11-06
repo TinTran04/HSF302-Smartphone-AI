@@ -4,18 +4,26 @@ Website bán điện thoại có trợ lý AI, gồm giao diện React và backe
 
 Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đăng nhập bằng email và mật khẩu. Gmail gửi OTP và lời mời kích hoạt tài khoản được cấu hình riêng.
 
-Xác thực dùng access JWT 15 phút và refresh token xoay vòng 7 ngày trong cookie HttpOnly, kèm CSRF. Mỗi thiết bị có thể bị thu hồi khi đăng xuất hoặc khi thông tin tài khoản thay đổi. BE áp dụng migration V25 khi khởi động.
+Xác thực dùng access JWT 15 phút và refresh token xoay vòng 7 ngày trong cookie HttpOnly, kèm CSRF. Mỗi thiết bị có thể bị thu hồi khi đăng xuất hoặc khi thông tin tài khoản thay đổi. Khi khởi động, BE áp dụng migration V26 để bổ sung ảnh dataset và V27 để lưu vị trí bản đồ cho hồ sơ, bản xem trước và đơn hàng.
 
 ## Chức năng chính
 
 - **Cửa hàng:** xem, tìm kiếm và lọc điện thoại; xem phiên bản; so sánh sản phẩm; dùng giỏ hàng và đặt hàng COD.
 - **Tài khoản** đăng nhập bằng email và mật khẩu. OTP qua email dùng cho đăng ký và quên mật khẩu. Chủ tài khoản quản lý thông tin cá nhân và theo dõi đơn hàng. Đổi mật khẩu thu hồi phiên trên thiết bị khác, đặt lại mật khẩu thu hồi các phiên cũ.
-- **Trợ lý AI** có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ bằng catalog, tài liệu và kiến thức AI. Hỗ trợ cửa hàng trả lời chính sách theo RAG có nguồn. Khách chưa đăng nhập được gửi tối đa hai tin trong mỗi phiên Guest.
+- **Trợ lý AI** dành cho CUSTOMER đã đăng nhập, có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ bằng catalog, tài liệu và kiến thức AI. Hỗ trợ cửa hàng trả lời chính sách theo RAG có nguồn. Chủ tài khoản có thể xóa hội thoại bằng hộp thoại xác nhận.
 - **Quản trị** quản lý sản phẩm, thương hiệu, đơn hàng, tài khoản CUSTOMER/ADMIN, chế độ bảo trì, tài liệu AI và cấu hình nhà cung cấp AI/embedding. Admin tạo tài khoản qua email để người nhận tự đặt mật khẩu và đổi vai trò của tài khoản đã kích hoạt.
 
 Admin sử dụng khu vực `/admin`, gồm hồ sơ cá nhân tại `/admin/profile`. CUSTOMER sử dụng các luồng mua hàng và AI. Xóa Admin thường là xóa mềm.
 
 Bật bảo trì hiển thị màn hình riêng **Shop đang bảo trì** cho khách, Admin vẫn truy cập dashboard. AI tư vấn theo mức tiền khách đưa ra, các gợi ý vượt tối đa 10% phải nêu rõ số tiền và tỷ lệ vượt.
+
+Trang bảo trì hướng dẫn tải lại trang để cập nhật khi bảo trì kết thúc. Guest thấy liên kết **Đăng nhập**. Đăng nhập ADMIN vào dashboard, CUSTOMER trở lại trang đã mở và liên kết đăng nhập được ẩn. Hồ sơ mở ở chế độ xem, bấm **Chỉnh sửa thông tin** để sửa họ tên, số điện thoại và địa chỉ. Email luôn bị khóa.
+
+Đơn hàng của Customer và Admin được sắp xếp theo thời gian đặt mới nhất trước. Sản phẩm có hai nhãn **Đang mở bán** và **Hết hàng**. Máy hết hàng vẫn xuất hiện trong danh mục, tìm kiếm, chi tiết và so sánh, với thao tác mua bị khóa.
+
+Hồ sơ và checkout có gợi ý địa chỉ Việt Nam bằng Geoapify và bản đồ Leaflet/OpenStreetMap. Nhập từ 3 ký tự, chọn gợi ý để cập nhật địa chỉ và ghim vị trí trên bản đồ; có thể chọn điểm, lấy vị trí hiện tại hoặc nhập địa chỉ thủ công. Vị trí là tùy chọn, được lưu cùng hồ sơ hoặc snapshot đơn hàng. Đặt `GEOAPIFY_API_KEY` trong `BE/.env` và khởi động lại BE để bật gợi ý. Khóa được giữ tại BE. Geoapify có gói miễn phí không cần thẻ; hạn mức theo [bảng giá nhà cung cấp](https://www.geoapify.com/pricing/). [Quy định sử dụng bản đồ OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/).
+
+Admin chọn ảnh từ máy cho bộ ảnh sản phẩm và ảnh từng phiên bản, xem trước rồi lưu sản phẩm. Ảnh hỗ trợ PNG, JPEG, WebP, tối đa 5 MiB mỗi ảnh. Nút **Xóa sản phẩm** xóa vĩnh viễn sản phẩm, các phiên bản và mục giỏ liên quan sau khi xác nhận; đơn đã đặt vẫn giữ thông tin lịch sử. Ảnh tải lên lưu tại `BE/uploads/product-images` mặc định, cần giữ thư mục này khi chuyển máy hoặc triển khai.
 
 Trang **Quản lý tài khoản** hỗ trợ vô hiệu hóa và cho CUSTOMER hoặc ADMIN thường hoạt động lại. Mỗi lần chuyển trạng thái thu hồi phiên cũ và giữ dữ liệu. Admin gốc và tài khoản đang thao tác được bảo vệ. Các thao tác nghiệp vụ trên FE có toast kết quả và hộp thoại xác nhận cho thao tác cần xác nhận.
 

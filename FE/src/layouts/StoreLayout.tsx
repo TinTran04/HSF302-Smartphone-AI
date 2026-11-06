@@ -76,14 +76,14 @@ export function DemoBanner({ admin = false }: { admin?: boolean }) {
 }
 export function StoreLayout() {
   const { user, loading } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const client = useQueryClient();
   const authRoute = authPaths.has(pathname.replace(/\/+$/, '').toLowerCase());
   const maintenance = useQuery({
     queryKey: ['maintenance'],
     queryFn: ({ signal }) => http<{ enabled: boolean }>('/maintenance', { signal }),
     enabled: !isDemo && !loading && user?.role !== 'ADMIN',
-    refetchInterval: 30000,
+    refetchInterval: (query) => (query.state.data?.enabled ? false : 30000),
     retry: false,
   });
   useEffect(() => {
@@ -114,20 +114,16 @@ export function StoreLayout() {
               <p>Vui lòng chờ một chút nhé.</p>
             </div>
           )}
-          <Link to="/login" className="text-link">
-            Đăng nhập quản trị
-          </Link>
+          {!user && (
+            <Link to="/login" state={{ from: `${pathname}${search}` }} className="text-link">
+              Đăng nhập
+            </Link>
+          )}
         </section>
       </main>
     );
   if (!authRoute && !isDemo && maintenance.data?.enabled)
-    return (
-      <MaintenanceScreen
-        busy={maintenance.isFetching}
-        onRetry={() => void maintenance.refetch()}
-        error={maintenance.error}
-      />
-    );
+    return <MaintenanceScreen />;
   const showChrome = !authRoute || (!loading && (isDemo || maintenance.data?.enabled === false));
   return (
     <div className="min-h-screen flex flex-col">

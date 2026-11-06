@@ -1,17 +1,11 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../features/auth/AuthProvider';
 import { Icon } from '../shared/components/Icon';
-import { Button } from '../shared/components/Ui';
 import './MaintenanceScreen.css';
 
-export function MaintenanceScreen({
-  busy,
-  onRetry,
-  error,
-}: {
-  busy: boolean;
-  onRetry: () => void;
-  error: unknown;
-}) {
+export function MaintenanceScreen() {
+  const { user } = useAuth();
+  const { pathname, search } = useLocation();
   return (
     <main id="main" className="maintenance-page">
       <div className="brand maintenance-brand" aria-label="SmartPhone AI">
@@ -52,22 +46,20 @@ export function MaintenanceScreen({
           <span />
         </div>
         <p className="maintenance-update" role="status" aria-live="polite">
-          {busy
-            ? 'Đang kiểm tra trạng thái cửa hàng…'
-            : error
-              ? 'Chưa thể cập nhật trạng thái. Bạn thử lại sau một chút nhé.'
-              : 'Trang sẽ tự động mở lại khi cửa hàng sẵn sàng.'}
+          Vui lòng tải lại trang để cập nhật khi bảo trì kết thúc.
         </p>
-        <div className="maintenance-actions">
-          <Button busy={busy} onClick={onRetry}>
-            {!busy && <Icon name="refresh" />}
-            Thử lại
-          </Button>
-          <Link to="/login" className="button button-secondary">
-            <Icon name="admin_panel_settings" />
-            Đăng nhập quản trị
-          </Link>
-        </div>
+        {!user && (
+          <div className="maintenance-actions">
+            <Link
+              to="/login"
+              state={{ from: `${pathname}${search}` }}
+              className="button button-secondary"
+            >
+              <Icon name="login" />
+              Đăng nhập
+            </Link>
+          </div>
+        )}
       </section>
       <p className="maintenance-signoff">SmartPhone AI · Hẹn bạn ở lần khám phá tiếp theo</p>
     </main>

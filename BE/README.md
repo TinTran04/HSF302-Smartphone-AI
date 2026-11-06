@@ -45,6 +45,8 @@ Các giá trị trong file gồm những nhóm sau.
 | `SMTP_LOCALHOST` | Tên máy dùng khi gửi lệnh SMTP; mặc định `localhost` |
 | `ROOT_ADMIN_EMAIL`, `ROOT_ADMIN_PASSWORD` | Email và mật khẩu khởi tạo Admin gốc |
 | `AI_CONFIG_ENCRYPTION_KEY` | Khóa AES 32 byte mã hóa Base64 để bảo vệ API key AI |
+| `GEOAPIFY_API_KEY` | Khóa riêng cho gợi ý địa chỉ Việt Nam; tùy chọn |
+| `PRODUCT_IMAGES_DIRECTORY` | Thư mục ảnh tải lên, mặc định `./uploads/product-images` |
 
 File `.env` được Git bỏ qua và chia sẻ riêng. File `.env.example` đi cùng repository. Các kiểm thử tự động được tách khỏi `.env` để sử dụng database và dịch vụ thử nghiệm. Có thể chỉ định vị trí cấu hình riêng qua `APP_ENV_FILE` với cú pháp Spring config import khi chạy ứng dụng từ thư mục khác.
 
@@ -72,7 +74,7 @@ API mặc định ở `http://localhost:8080/api`. Client lấy CSRF token tại
 
 `POST /api/auth/logout` thu hồi thiết bị hiện tại và xóa cookie. Đổi mật khẩu cấp lại thông tin xác thực cho thiết bị đang thao tác, các thiết bị khác phải đăng nhập lại. Quên mật khẩu, đổi vai trò, vô hiệu hóa hoặc xóa mềm làm mất hiệu lực thông tin xác thực cũ. FE tự gọi refresh một lần khi nhận 401 từ API cần xác thực và chặn gửi lại thao tác của tài khoản cũ sau khi người dùng đổi tài khoản.
 
-Các request của tài khoản trên FE gửi `X-Account-Id`. BE yêu cầu JWT có cùng chủ sở hữu trước khi xử lý, gồm các API AI có hỗ trợ Guest. Token hết hạn trả 401 để client gia hạn, tài khoản khác trả 409 `AUTH_CONTEXT_CHANGED`. GET `/users/me` xác định danh tính hiện tại và vẫn hoạt động khi shop bảo trì.
+Các request của tài khoản trên FE gửi `X-Account-Id`. BE yêu cầu JWT có cùng chủ sở hữu trước khi xử lý. API `/api/ai/**` yêu cầu CUSTOMER, Guest nhận 401 và ADMIN nhận 403. Token hết hạn trả 401 để client gia hạn, tài khoản khác trả 409 `AUTH_CONTEXT_CHANGED`. GET `/users/me` xác định danh tính hiện tại và vẫn hoạt động khi shop bảo trì.
 
 `JWT_SECRET` trong `BE/.env` là Base64 của ít nhất 32 byte ngẫu nhiên, có thể để trống khi chạy local để BE tạo khóa cho mỗi lần chạy. Khi khóa thay đổi, refresh token còn hợp lệ trong DB có thể cấp lại access JWT. Dùng khóa riêng ổn định khi chạy nhiều BE hoặc triển khai. `AUTH_COOKIE_SECURE=false` phục vụ localhost HTTP, đặt true khi dùng HTTPS. Các giá trị mẫu nằm trong `.env.example`. Cơ chế JWT sử dụng Spring Security JOSE. [Tài liệu Spring Security](https://docs.spring.io/spring-security/reference/6.5/servlet/oauth2/resource-server/jwt.html)
 
@@ -94,7 +96,29 @@ Admin dùng portal và hồ sơ cá nhân `/admin/profile`. API catalog công kh
 
 Migration V22 thêm `credential_version` mặc định 0 cho tài khoản cũ. JWT và thiết bị lưu phiên bản lúc xác thực, được kiểm tra với DB ở mỗi request. Đổi mật khẩu làm mất hiệu lực các thiết bị khác và cấp lại cookie sau khi transaction thành công. Quên mật khẩu thu hồi toàn bộ thông tin xác thực cũ.
 
-Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đăng nhập lại bằng email và mật khẩu đã nhập để nhận OTP đăng ký mới (áp dụng thời gian chờ gửi lại 60 giây). Phiên chat Guest hết hạn sau 24 giờ; tác vụ chạy mỗi giờ xóa tối đa 100 phiên hết hạn cùng hội thoại Guest còn gắn với chúng. Hội thoại đã chuyển vào tài khoản được giữ lại.
+Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đăng nhập lại bằng email và mật khẩu đã nhập để nhận OTP đăng ký mới (áp dụng thời gian chờ gửi lại 60 giây). Phiên chat Guest cũ còn được hỗ trợ chuyển lịch sử khi đăng nhập bằng client cũ và được dọn khi hết hạn. Hệ thống hiện yêu cầu CUSTOMER đăng nhập để tạo và sử dụng chat.
+
+`DELETE /api/ai/conversations/{id}` xóa hội thoại của chính CUSTOMER, trả 204. ID không tồn tại hoặc thuộc người khác trả 404. Trong một transaction, BE xóa tham chiếu chuyển chủ đề, tin nhắn rồi hội thoại. Hồ sơ chỉ cho cập nhật họ tên, số điện thoại và địa chỉ, email được giữ nguyên.
+
+Migration V26 bổ sung ảnh local cho 138 sản phẩm dataset theo thông số `URL nguồn`, giữ các ảnh riêng Admin đã nhập. Ảnh được phục vụ từ `FE/public/images/phones`. Nguồn và giới hạn quyền sử dụng ảnh có trong `datasets/phones/README.md`.
+
+Migration V27 thêm cặp tọa độ nullable cho users, order_previews và orders. Profile/ShippingInfo nhận `location: { latitude, longitude }` hoặc null. Tọa độ hợp lệ trong [-90,90] và [-180,180], đủ cả cặp. API lưu snapshot vị trí vào preview/đơn và kiểm tra cả vị trí khi xác nhận hoặc gửi lại idempotency key. Địa chỉ dạng chữ vẫn được yêu cầu cho checkout. Đổi hồ sơ sau khi đặt hàng giữ snapshot của đơn đã tạo.
+
+## Gợi ý địa chỉ
+
+Đặt `GEOAPIFY_API_KEY` trong `.env` và khởi động lại BE. Khóa chỉ dùng ở máy chủ, không đặt vào biến `VITE_*`. Geoapify cung cấp gói miễn phí không cần thẻ; xem hạn mức hiện hành tại [Geoapify Pricing](https://www.geoapify.com/pricing/).
+
+`GET /api/locations/autocomplete?text=...` yêu cầu CUSTOMER hoặc ADMIN đăng nhập, trả danh sách `{id,label,location:{latitude,longitude}}`. BE gọi Geoapify Autocomplete với `countrycode:vn`, tiếng Việt và tối đa 5 kết quả. Dưới 3 ký tự trả danh sách rỗng. Có cache tối đa 100 truy vấn trong 10 phút và giới hạn 4 lượt gọi provider/giây trong mỗi tiến trình. Lỗi thiếu cấu hình hoặc provider trả lỗi được chuyển thành lỗi có kiểm soát; không trả khóa hoặc URL có khóa cho FE. Hồ sơ/checkout vẫn chấp nhận địa chỉ nhập tay khi gợi ý không khả dụng.
+
+## Tải ảnh và xóa sản phẩm
+
+- `POST /api/admin/products/images`: ADMIN gửi multipart trường `file`, nhận `201 {"url":"/api/product-images/<tên-ảnh>"}`. PNG/JPEG/WebP tối đa 5 MiB, BE kiểm tra nội dung ảnh.
+- `GET /api/product-images/{filename}`: phục vụ ảnh công khai theo tên do máy chủ tạo, bao gồm truy cập từ trang quản trị.
+- `DELETE /api/admin/products/{id}`: ADMIN xóa cứng sản phẩm, biến thể, ảnh liên kết, thông số và mục giỏ liên quan, trả 204. Bản kiểm tra đơn chưa đặt có sản phẩm đó bị vô hiệu để khách kiểm tra lại. Đơn đã đặt giữ snapshot sản phẩm; thao tác tranh chấp với checkout trả lỗi có kiểm soát để thử lại.
+
+File ảnh lưu tại `app.product-images.directory`, mặc định `./uploads/product-images` khi chạy từ `BE`. Thư mục uploads được Git bỏ qua; sao lưu/chia sẻ riêng cùng dữ liệu khi chuyển máy. Xóa sản phẩm hoặc gỡ ảnh khỏi form không tự xóa file ảnh trên đĩa, vì ảnh có thể đang được dùng ở phiên bản khác hoặc lịch sử đơn. Ảnh được tải ngay lúc chọn; hủy form cũng có thể để lại file chưa gắn sản phẩm.
+
+Danh mục công khai trả cả trạng thái ACTIVE và INACTIVE. INACTIVE hiển thị Hết hàng, bị chặn thêm giỏ và đặt hàng. Bộ lọc/giá dùng biến thể đang mở bán, khi hết toàn bộ biến thể sẽ dùng thông số/giá đã lưu để tiếp tục tra cứu. AI gợi ý mua vẫn lọc sản phẩm và biến thể đang mở bán. API danh sách đơn của Customer/Admin sắp xếp createdAt giảm dần, rồi ID giảm dần.
 
 ## Kiểm thử
 

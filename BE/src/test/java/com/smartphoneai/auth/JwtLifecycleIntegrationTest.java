@@ -373,15 +373,22 @@ class JwtLifecycleIntegrationTest {
     }
 
     private String guestToken() throws Exception {
-        var response = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        return mapper.readTree(response.getResponse().getContentAsString()).path("guestSessionToken").asText();
+        String token = "legacy-guest-token-" + UUID.randomUUID();
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        jdbc.update("insert into ai_guest_sessions(id,token_hash,created_at,expires_at) values(?,?,?,?)",
+                UUID.randomUUID(), hash, java.sql.Timestamp.from(NOW), java.sql.Timestamp.from(NOW.plusSeconds(3600)));
+        return token;
     }
 
     private String guestConversation(String token) throws Exception {
-        var response = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"SHOP_SUPPORT\"}"))
-                .andExpect(status().isCreated()).andReturn();
-        return mapper.readTree(response.getResponse().getContentAsString()).path("conversationId").asText();
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        UUID guestId = jdbc.queryForObject("select id from ai_guest_sessions where token_hash = ?", UUID.class, hash);
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into ai_conversations(id,guest_id,topic,title,created_at,product_ids) values(?,?,?,?,?,?)",
+                id, guestId, "SHOP_SUPPORT", "Legacy chat", java.sql.Timestamp.from(NOW), "[]");
+        return id.toString();
     }
     private UserAccount customer() {
         var user = UserAccount.pendingCustomer(UUID.randomUUID() + "@example.com", "Customer", "0900000000", passwords.encode(PASSWORD));
