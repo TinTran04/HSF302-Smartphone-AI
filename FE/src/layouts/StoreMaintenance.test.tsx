@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useId, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryObserver,
+  type QueryObserverOptions,
+} from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { CartProvider } from '../features/cart/CartProvider';
@@ -63,14 +68,18 @@ afterEach(() => client.clear());
 
 describe('Store maintenance gate', () => {
   it.each(['/', '/products/phone', '/cart', '/checkout', '/orders', '/ai/conversations/old'])(
-    'replaces the shop at %s with retry and Admin access during maintenance',
+    'replaces the shop at %s with reload guidance and guest sign-in during maintenance',
     (path) => {
       client.setQueryData(['maintenance'], { enabled: true });
       const html = render(path);
 
       expect(html).toContain('Shop đang bảo trì');
-      expect(html).toContain('Thử lại');
+      expect(html).toContain('Vui lòng tải lại trang để cập nhật khi bảo trì kết thúc.');
+      expect(html).not.toContain('Trang sẽ tự động mở lại');
+      expect(html).not.toContain('Thử lại');
       expect(html).toContain('href="/login"');
+      expect(html).toContain('Đăng nhập');
+      expect(html).not.toContain('Đăng nhập quản trị');
       expect(html).not.toContain('Requested page content');
       expect(html).not.toContain('class="store-header"');
       expect(html).not.toContain('class="store-footer"');
@@ -79,6 +88,32 @@ describe('Store maintenance gate', () => {
     },
   );
 
+  it.each([
+    { enabled: true, expected: false },
+    { enabled: false, expected: 30000 },
+    { enabled: undefined, expected: 30000 },
+  ])('sets status polling to $expected when maintenance is $enabled', ({ enabled, expected }) => {
+    if (enabled !== undefined) client.setQueryData(['maintenance'], { enabled });
+    render('/products');
+
+    const maintenance = client.getQueryCache().find({ queryKey: ['maintenance'], exact: true });
+    expect(maintenance).toBeDefined();
+    const interval = (maintenance!.options as QueryObserverOptions).refetchInterval;
+    expect(typeof interval === 'function' ? interval(maintenance!) : interval).toBe(expected);
+  });
+
+  it('hides login and retry controls for a customer during maintenance', () => {
+    session('CUSTOMER');
+    client.setQueryData(['maintenance'], { enabled: true });
+
+    const html = render('/products?brand=samsung');
+
+    expect(html).toContain('Shop đang bảo trì');
+    expect(html).not.toContain('href="/login"');
+    expect(html).not.toContain('Thử lại');
+    expect(html).toContain('role="status"');
+  });
+
   it('withholds shop content until its maintenance status is known', () => {
     const html = render('/products');
 
@@ -86,6 +121,7 @@ describe('Store maintenance gate', () => {
     expect(html).not.toContain('class="store-header"');
     expect(html).toContain('Đang kiểm tra cửa hàng');
     expect(html).toContain('href="/login"');
+    expect(html).not.toContain('Đăng nhập quản trị');
   });
 
   it('restores the requested shop page when maintenance is disabled', () => {

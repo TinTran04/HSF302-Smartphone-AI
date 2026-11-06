@@ -30,8 +30,8 @@ Mở **http://localhost:5173**. Nếu cổng 5173 đã được sử dụng, xem
 - Ứng dụng chính refactor theo `layouts / pages / features / shared`, với header, footer, sidebar, thẻ sản phẩm, bảng so sánh, hộp thoại và thông báo dùng chung.
 - Trang chủ, danh mục tìm kiếm/lọc/sắp xếp qua URL, chi tiết chọn màu/dung lượng/số lượng, so sánh tối đa 3 mẫu máy.
 - Đăng nhập/đăng ký, hồ sơ, giỏ Guest, hợp nhất giỏ sau xác thực, checkout COD hai bước kiểm tra giá và xác nhận, lịch sử/chi tiết/hủy đơn PENDING.
-- Một giao diện AI với 4 chủ đề, lịch sử theo phiên/tài khoản, gợi ý sản phẩm, bảng so sánh, nguồn RAG, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
-- Admin: dashboard, danh sách/thêm/sửa/ẩn sản phẩm và biến thể, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt OpenAI hoặc Gemini.
+- Một giao diện AI với 2 chủ đề, lịch sử theo tài khoản, gợi ý sản phẩm, bảng so sánh, nguồn RAG, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
+- Admin quản lý dashboard, danh sách/thêm/sửa sản phẩm và biến thể, chuyển Đang mở bán/Hết hàng, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt OpenAI hoặc Gemini.
 - Bổ sung các màn chưa có bản Stitch riêng: hồ sơ, danh sách/chi tiết đơn và form sản phẩm. File `dang_ki` ban đầu có cả panel đăng nhập lẫn đăng ký; React tách thành `/login` và `/register`.
 - 50 ảnh gốc đã tải về `public/images`. Inter (có tiếng Việt) và Material Symbols nằm trong `public/fonts`; không dùng Tailwind CDN khi chạy ứng dụng.
 
@@ -80,7 +80,7 @@ VITE_API_TARGET=http://localhost:8080
 
 Khởi động lại Vite. `.env.local` có ưu tiên cao hơn `.env` nếu cùng tồn tại. Request `/api` được proxy đến Spring Boot. Auth adapter lấy CSRF cookie và gửi `X-XSRF-TOKEN` cùng cookie JWT HttpOnly. Access JWT hạn 15 phút, refresh token hạn 7 ngày. Client tự refresh một lần khi API cần xác thực trả 401, giữ nguyên nội dung và idempotency key khi thử lại. Việc xoay cookie được điều phối giữa các request và các tab có Web Locks. Mã đánh dấu ngữ cảnh tài khoản trong localStorage giúp chặn thao tác cũ khi người dùng đổi tài khoản. Cấu hình Gmail, database, JWT và khóa mã hóa AI nằm trong `BE/.env`. Các giá trị `VITE_*` có thể xuất hiện trong mã trình duyệt. Để chạy BE và khởi tạo Admin gốc, xem [README backend](../BE/README.md).
 
-Khi bật bảo trì, phần shop hiển thị màn hình riêng **Shop đang bảo trì**. Trạng thái được kiểm tra lại mỗi 30 giây và bằng nút **Thử lại**. Các màn đăng nhập, đăng ký, quên mật khẩu và nhận lời mời vẫn truy cập được. Admin sử dụng dashboard để tắt bảo trì. Khi bảo trì kết thúc, shop mở lại và các truy vấn shop đang lỗi được tải lại.
+Khi bật bảo trì, phần shop hiển thị màn hình riêng **Shop đang bảo trì** và hướng dẫn tải lại trang để cập nhật khi bảo trì kết thúc. Guest thấy liên kết **Đăng nhập**. ADMIN đăng nhập vào dashboard, CUSTOMER trở lại đường dẫn trước đó và liên kết đăng nhập được ẩn. Các màn đăng ký, quên mật khẩu và nhận lời mời vẫn truy cập được. Khách tải lại trang sau khi Admin tắt bảo trì để mở lại shop.
 
 `npm run build` sử dụng cấu hình Vite hiện có; không bật demo khi muốn dùng API thật. `VITE_API_TARGET` chỉ cấu hình proxy khi chạy Vite; môi trường khác cần có proxy tương ứng. Xem `docs/API_INTEGRATION.md` nếu tài liệu có trên máy.
 
@@ -92,7 +92,29 @@ Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho t
 
 Màn hình AI có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ từ catalog, tài liệu phù hợp và kiến thức AI tham khảo. Hỗ trợ cửa hàng dùng tài liệu chính sách. Admin cấu hình chat model, embedding model và tải PDF/TXT đến READY để kiểm thử phần truy xuất tài liệu. FE gọi BE để nhận câu trả lời.
 
+Chat yêu cầu CUSTOMER đăng nhập. Link từ sản phẩm hoặc so sánh giữ chủ đề và ID sản phẩm khi chuyển qua đăng nhập. Nút xóa trong lịch sử mở hộp thoại xác nhận và có toast kết quả. Xóa hội thoại đang mở trở về `/ai`.
+
+Hồ sơ ban đầu khóa và làm mờ các trường. Bấm **Chỉnh sửa thông tin** để sửa họ tên, số điện thoại và địa chỉ, bấm **Hủy** để bỏ thay đổi. Email luôn bị vô hiệu hóa. 138 ảnh dataset có sẵn tại `public/images/phones`, migration V26 cập nhật ảnh thiếu trong DB khi BE khởi động.
+
+Danh sách đơn Customer/Admin hiển thị mới nhất trước, giữ độ chính xác thời gian từ BE và dùng ID giảm dần khi thời điểm bằng nhau. Máy Hết hàng vẫn có card, chi tiết, bộ lọc và so sánh, với nút mua bị khóa. API tiếp tục dùng ACTIVE/INACTIVE cho trạng thái bán.
+
+### Bản đồ địa chỉ
+
+Ô địa chỉ trong hồ sơ và checkout gợi ý địa điểm Việt Nam sau khi nhập từ 3 ký tự và dừng 400 ms. Chọn gợi ý bằng chuột hoặc phím mũi tên + Enter sẽ cập nhật đồng thời địa chỉ, tọa độ và mở bản đồ. FE gọi `/api/locations/autocomplete`; `GEOAPIFY_API_KEY` chỉ nằm trong `BE/.env`. Chế độ demo dùng địa điểm mẫu, không gọi Geoapify.
+
+`LocationPicker` tải Leaflet khi mở bản đồ. Khách bấm chọn điểm, dùng phím mũi tên và Enter để chọn tâm, hoặc bấm **Vị trí hiện tại** để yêu cầu quyền định vị. Có thể bổ sung số nhà và hướng dẫn giao hàng bằng cách nhập địa chỉ thủ công. Lưu hồ sơ lưu cả vị trí, Hủy khôi phục vị trí cũ. Sửa địa chỉ xóa điểm cũ để chọn lại. Chọn lại địa chỉ hoặc điểm ở checkout yêu cầu kiểm tra đơn hàng lại trước khi xác nhận. Nếu gợi ý lỗi hoặc hết hạn mức, khách vẫn nhập địa chỉ và chọn bản đồ được.
+
+Vị trí tùy chọn có dạng `location: { latitude, longitude }`, hoặc `null`. Đơn hàng giữ snapshot vị trí, cả Customer và Admin có thể mở xem trong chi tiết đơn. Hồ sơ/đơn cũ có địa chỉ dạng chữ vẫn sử dụng được. Bản đồ cần mạng, quyền định vị do trình duyệt quản lý. Khi tải bản đồ hoặc định vị gặp lỗi, khách vẫn nhập địa chỉ trực tiếp.
+
+Mặc định dùng tiles HTTPS OpenStreetMap, giữ attribution và cache của trình duyệt. `VITE_MAP_TILE_URL` và `VITE_MAP_ATTRIBUTION` trong `.env.example` cho phép chọn nguồn tiles cùng attribution tương ứng. Kiểm thử trình duyệt giả lập tiles và GPS. [Quy định sử dụng tiles](https://operations.osmfoundation.org/policies/tiles/).
+
 Khi khách cung cấp mức tiền mua máy, AI ưu tiên máy đúng ngân sách. Các gợi ý cao hơn tối đa 10% hiển thị thông báo giá, số tiền và tỷ lệ vượt do BE tính. Mức tiền được giữ cho câu hỏi tiếp theo trong hội thoại.
+
+## Ảnh và xóa sản phẩm
+
+Form sản phẩm dùng bộ chọn ảnh từ máy cho bộ ảnh và ảnh phiên bản. Hỗ trợ PNG/JPEG/WebP tối đa 5 MiB mỗi ảnh, có xem trước và gỡ ảnh khỏi form. Chờ tải ảnh xong rồi lưu sản phẩm. Tải ảnh qua `POST /api/admin/products/images` bằng multipart, BE trả đường dẫn ảnh để lưu vào sản phẩm. Chế độ demo lưu ảnh dạng data URL trong phiên tab.
+
+Danh sách sản phẩm có nút **Xóa sản phẩm** với hộp thoại xác nhận xóa vĩnh viễn và toast kết quả. Xóa thành công cập nhật danh mục, giỏ và dashboard. Đơn đã đặt vẫn giữ thông tin sản phẩm tại thời điểm mua. Thao tác gỡ ảnh hoặc hủy form không tự xóa file đã tải lên máy chủ.
 
 ## Kiểm tra
 

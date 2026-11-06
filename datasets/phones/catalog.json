@@ -27,7 +27,7 @@
       "price": 5800000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-note-17-china.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM4450-AF Snapdragon 4 Gen 4",
         "RAM": "6 GB",
@@ -56,7 +56,7 @@
       "price": 6700000,
       "color": "Fresh Mint",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-n6.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6360 Apex (6 nm)",
         "RAM": "4 GB",
@@ -85,7 +85,7 @@
       "price": 8000000,
       "color": "Gray",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-ace-5.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -114,7 +114,7 @@
       "price": 13000000,
       "color": "Gray",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-ace-5-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -143,7 +143,7 @@
       "price": 10800000,
       "color": "Astral Trail",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-13r.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -172,7 +172,7 @@
       "price": 12400000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-13t.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -201,7 +201,7 @@
       "price": 12000000,
       "color": "Midnight Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-400.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7550-AB Snapdragon 7 Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -230,7 +230,7 @@
       "price": 16000000,
       "color": "Midnight Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-400-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -259,7 +259,7 @@
       "price": 6000000,
       "color": "Marrs Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-x8c.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6225 Snapdragon 685 (6 nm)",
         "RAM": "6 GB",
@@ -288,7 +288,7 @@
       "price": 22000000,
       "color": "Phantom Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/asus-rog-phone-9-fe.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "16 GB",
@@ -317,7 +317,7 @@
       "price": 26000000,
       "color": "Ebony Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/asus-zenfone-12-ultra.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -346,7 +346,7 @@
       "price": 20000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-16e.webp",
       "specifications": {
         "Chip xử lý": "Apple A18 (3 nm)",
         "RAM": "8 GB",
@@ -375,7 +375,7 @@
       "price": 3800000,
       "color": "Thunder Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-m16.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -404,7 +404,7 @@
       "price": 12000000,
       "color": "Pink",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-a56.webp",
       "specifications": {
         "Chip xử lý": "Exynos 1580 (4 nm)",
         "RAM": "8 GB",
@@ -433,7 +433,7 @@
       "price": 7200000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-a26.webp",
       "specifications": {
         "Chip xử lý": "Exynos 1380 (5 nm) - GlobalExynos 1280 (5 nm) - LATAM",
         "RAM": "6 GB",
@@ -462,7 +462,7 @@
       "price": 29000000,
       "color": "Phantom Black",
       "storage": "512GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/asus-rog-phone-9-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "16 GB",
@@ -491,7 +491,7 @@
       "price": 9300000,
       "color": "Lavender",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-a36.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6475-AB Snapdragon 6 Gen 3 (4 nm)",
         "RAM": "6 GB",
@@ -520,7 +520,7 @@
       "price": 7600000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-3a.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7635 Snapdragon 7s Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -549,7 +549,7 @@
       "price": 8700000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-3a-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7635 Snapdragon 7s Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -578,7 +578,7 @@
       "price": 4200000,
       "color": "Bling Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-f16.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -607,7 +607,7 @@
       "price": 6000000,
       "color": "Midnight Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-note-14s.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Helio G99 Ultra",
         "RAM": "8 GB",
@@ -636,7 +636,7 @@
       "price": 2600000,
       "color": "Black",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-a5-4g.webp",
       "specifications": {
         "Chip xử lý": "Unisoc T7250 (12 nm)",
         "RAM": "4 GB",
@@ -665,7 +665,7 @@
       "price": 14000000,
       "color": "Obsidian",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-9a.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "8 GB",
@@ -694,7 +694,7 @@
       "price": 12400000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-poco-f7-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -723,7 +723,7 @@
       "price": 15000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-poco-f7-ultra.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -752,7 +752,7 @@
       "price": 8400000,
       "color": "Silver",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-14.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm Snapdragon 6 Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -781,7 +781,7 @@
       "price": 2900000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-13x.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Helio G91 Ultra (12 nm)",
         "RAM": "6 GB",
@@ -810,7 +810,7 @@
       "price": 7000000,
       "color": "Marrs Green",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-400-lite.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7025 Ultra (6 nm)",
         "RAM": "8 GB",
@@ -839,7 +839,7 @@
       "price": 6000000,
       "color": "Blaze Blue",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-m47.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6475-AB Snapdragon 6 Gen 3 (4 nm)",
         "RAM": "6 GB",
@@ -868,7 +868,7 @@
       "price": 4000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-play-60.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "6 GB",
@@ -897,7 +897,7 @@
       "price": 3400000,
       "color": "Power Black",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-poco-c71.webp",
       "specifications": {
         "Chip xử lý": "Unisoc T7250 (12 nm)",
         "RAM": "4 GB",
@@ -926,7 +926,7 @@
       "price": 4000000,
       "color": "Blazing Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-m06.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -955,7 +955,7 @@
       "price": 27000000,
       "color": "Phantom Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/asus-rog-phone-9.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -984,7 +984,7 @@
       "price": 15400000,
       "color": "Black Eclipse",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-13.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -1013,7 +1013,7 @@
       "price": 8000000,
       "color": "Gray",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-turbo-6x-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7400 Super (4 nm)",
         "RAM": "8 GB",
@@ -1042,7 +1042,7 @@
       "price": 9200000,
       "color": "Pink",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-4a.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7635-AC Snapdragon 7s Gen 4 (4 nm)",
         "RAM": "8 GB",
@@ -1071,7 +1071,7 @@
       "price": 33000000,
       "color": "Space Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-17-air.webp",
       "specifications": {
         "Chip xử lý": "Apple A19 Pro (3 nm)",
         "RAM": "12 GB",
@@ -1100,7 +1100,7 @@
       "price": 29600000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-17.webp",
       "specifications": {
         "Chip xử lý": "Apple A19 (3 nm)",
         "RAM": "8 GB",
@@ -1129,7 +1129,7 @@
       "price": 37400000,
       "color": "Silver",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-17-pro.webp",
       "specifications": {
         "Chip xử lý": "Apple A19 Pro (3 nm)",
         "RAM": "12 GB",
@@ -1158,7 +1158,7 @@
       "price": 41000000,
       "color": "Silver",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-17-pro-max.webp",
       "specifications": {
         "Chip xử lý": "Apple A19 Pro (3 nm)",
         "RAM": "12 GB",
@@ -1187,7 +1187,7 @@
       "price": 13000000,
       "color": "White",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/sony-xperia-10-vii.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6475-AB Snapdragon 6 Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -1216,7 +1216,7 @@
       "price": 6600000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-3a-lite.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 Pro (4 nm)",
         "RAM": "8 GB",
@@ -1245,7 +1245,7 @@
       "price": 11400000,
       "color": "Obsidian",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-10a.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "8 GB",
@@ -1274,7 +1274,7 @@
       "price": 23000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-17e.webp",
       "specifications": {
         "Chip xử lý": "Apple A19 (3 nm)",
         "RAM": "8 GB",
@@ -1303,7 +1303,7 @@
       "price": 11200000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-4a-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7635-AC Snapdragon 7s Gen 4 (4 nm)",
         "RAM": "8 GB",
@@ -1332,7 +1332,7 @@
       "price": 22000000,
       "color": "Frost",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-11.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G6 (3 nm)",
         "RAM": "12 GB",
@@ -1361,7 +1361,7 @@
       "price": 28000000,
       "color": "Canyon",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-11-pro.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G6 (3 nm)",
         "RAM": "12 GB",
@@ -1390,7 +1390,7 @@
       "price": 35000000,
       "color": "Canyon",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-11-pro-xl.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G6 (3 nm)",
         "RAM": "12 GB",
@@ -1419,7 +1419,7 @@
       "price": 48000000,
       "color": "Obsidian",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-11-pro-fold.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G6",
         "RAM": "16 GB",
@@ -1448,7 +1448,7 @@
       "price": 9600000,
       "color": "Obsidian",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-8a.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G3 (4 nm)",
         "RAM": "8 GB",
@@ -1477,7 +1477,7 @@
       "price": 51000000,
       "color": "Graphite Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/sony-xperia-1-viii.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8850-AC Snapdragon 8 Elite Gen 5 (3 nm)",
         "RAM": "12 GB",
@@ -1506,7 +1506,7 @@
       "price": 22000000,
       "color": "Eternal Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/asus-zenfone-11-ultra.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -1535,7 +1535,7 @@
       "price": 7000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-turbo-6x.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7360 Super (4 nm)",
         "RAM": "8 GB",
@@ -1564,7 +1564,7 @@
       "price": 40000000,
       "color": "Black Titanium",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-16-pro-max.webp",
       "specifications": {
         "Chip xử lý": "Apple A18 Pro (3 nm)",
         "RAM": "8 GB",
@@ -1593,7 +1593,7 @@
       "price": 34000000,
       "color": "Black Titanium",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-16-pro.webp",
       "specifications": {
         "Chip xử lý": "Apple A18 Pro (3 nm)",
         "RAM": "8 GB",
@@ -1622,7 +1622,7 @@
       "price": 33000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-16-plus.webp",
       "specifications": {
         "Chip xử lý": "Apple A18 (3 nm)",
         "RAM": "8 GB",
@@ -1651,7 +1651,7 @@
       "price": 24000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/apple-iphone-16.webp",
       "specifications": {
         "Chip xử lý": "Apple A18 (3 nm)",
         "RAM": "8 GB",
@@ -1680,7 +1680,7 @@
       "price": 25000000,
       "color": "Porcelain",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-9-pro-xl.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "16 GB",
@@ -1709,7 +1709,7 @@
       "price": 4000000,
       "color": "Deep Ocean",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-narzo-80x.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6400 (6 nm)",
         "RAM": "6 GB",
@@ -1738,7 +1738,7 @@
       "price": 18600000,
       "color": "Porcelain",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-9-pro.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "16 GB",
@@ -1767,7 +1767,7 @@
       "price": 44400000,
       "color": "Obsidian",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-9-pro-fold.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "16 GB",
@@ -1796,7 +1796,7 @@
       "price": 7600000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-2a-plus.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7350 Pro (4 nm)",
         "RAM": "12 GB",
@@ -1825,7 +1825,7 @@
       "price": 7600000,
       "color": "Obsidian Midnight",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-nord-4.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7675 Snapdragon 7+ Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -1854,7 +1854,7 @@
       "price": 4200000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-cmf-phone-1.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 (4 nm)",
         "RAM": "6 GB",
@@ -1883,7 +1883,7 @@
       "price": 28000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/sony-xperia-1-vi.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -1912,7 +1912,7 @@
       "price": 9000000,
       "color": "Blue",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/sony-xperia-10-vi.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6450 Snapdragon 6 Gen 1 (4 nm)",
         "RAM": "8 GB",
@@ -1941,7 +1941,7 @@
       "price": 18000000,
       "color": "Obsidian",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-9.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G4 (4 nm)",
         "RAM": "12 GB",
@@ -1970,7 +1970,7 @@
       "price": 5800000,
       "color": "Racing Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-narzo-80-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7400 (4 nm)",
         "RAM": "8 GB",
@@ -1999,7 +1999,7 @@
       "price": 25200000,
       "color": "Matte Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-find-x8-ultra.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -2028,7 +2028,7 @@
       "price": 17000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-find-x8s.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400+ (3 nm)",
         "RAM": "12 GB",
@@ -2057,7 +2057,7 @@
       "price": 9000000,
       "color": "Gray",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-civi-5-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8735 Snapdragon 8s Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -2086,7 +2086,7 @@
       "price": 3100000,
       "color": "Pearl Silver",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-y19s-pro.webp",
       "specifications": {
         "Chip xử lý": "Unisoc Tiger T612 (12 nm)",
         "RAM": "4 GB",
@@ -2115,7 +2115,7 @@
       "price": 9600000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-ace-5-racing.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400e (4 nm)",
         "RAM": "12 GB",
@@ -2144,7 +2144,7 @@
       "price": 9100000,
       "color": "White",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-4b.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm Snapdragon 6 Gen 4 (4 nm)",
         "RAM": "8 GB",
@@ -2173,7 +2173,7 @@
       "price": 23500000,
       "color": "Black",
       "storage": "512GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-15s-pro.webp",
       "specifications": {
         "Chip xử lý": "Xring O1 (3 nm)",
         "RAM": "16 GB",
@@ -2202,7 +2202,7 @@
       "price": 7600000,
       "color": "Inferno Red",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-iqoo-neo10.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8735 Snapdragon 8s Gen 4 (4 nm)",
         "RAM": "8 GB",
@@ -2231,7 +2231,7 @@
       "price": 4000000,
       "color": "Tranquil Lake Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-a5x.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2260,7 +2260,7 @@
       "price": 3800000,
       "color": "Moonlight Silver",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-m17.webp",
       "specifications": {
         "Chip xử lý": "Exynos 1330 (5 nm)",
         "RAM": "4 GB",
@@ -2289,7 +2289,7 @@
       "price": 15000000,
       "color": "IceSense Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-gt-7.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400e (4 nm)",
         "RAM": "8 GB",
@@ -2318,7 +2318,7 @@
       "price": 9600000,
       "color": "IceSense Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-gt-7t.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 8400 Max (4 nm)",
         "RAM": "8 GB",
@@ -2347,7 +2347,7 @@
       "price": 14000000,
       "color": "Deep Forest",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-edge-2025.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7400 Ultra (4 nm)",
         "RAM": "8 GB",
@@ -2376,7 +2376,7 @@
       "price": 10400000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-s30.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7750-AB Snapdragon 7 Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -2405,7 +2405,7 @@
       "price": 11100000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-s30-pro-mini.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9300+ (4 nm)",
         "RAM": "12 GB",
@@ -2434,7 +2434,7 @@
       "price": 9000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-neo7-turbo.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400e (4 nm)",
         "RAM": "12 GB",
@@ -2463,7 +2463,7 @@
       "price": 7000000,
       "color": "Pantone (Black Oyster",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-moto-g56.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7060 (6 nm)",
         "RAM": "8 GB",
@@ -2492,7 +2492,7 @@
       "price": 9000000,
       "color": "Pantone: Spellbound",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-moto-g86.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 (4 nm)",
         "RAM": "8 GB",
@@ -2521,7 +2521,7 @@
       "price": 5400000,
       "color": "Pantone: Spellbound",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-moto-g86-power.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 (4 nm) - GlobalMediatek Dimensity 7400 (4 nm) - India",
         "RAM": "8 GB",
@@ -2550,7 +2550,7 @@
       "price": 28000000,
       "color": "Titanium",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-x-fold5.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -2579,7 +2579,7 @@
       "price": 8000000,
       "color": "Glossy Pink",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-reno14-f.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM6450 Snapdragon 6 Gen 1 (4 nm)",
         "RAM": "8 GB",
@@ -2608,7 +2608,7 @@
       "price": 3100000,
       "color": "Prism Blue",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-t4-lite.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2637,7 +2637,7 @@
       "price": 4000000,
       "color": "Sunset Peach",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-k13x.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2666,7 +2666,7 @@
       "price": 14000000,
       "color": "Luxe Grey (Black Luxe)",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-x200-fe.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9300+ (4 nm)",
         "RAM": "12 GB",
@@ -2695,7 +2695,7 @@
       "price": 6100000,
       "color": "Fest Gold",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-y400-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 (4 nm)",
         "RAM": "8 GB",
@@ -2724,7 +2724,7 @@
       "price": 7400000,
       "color": "Midnight Blue",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-y500.webp",
       "specifications": {
         "Chip xử lý": "Unisoc T7300 (6 nm)",
         "RAM": "8 GB",
@@ -2753,7 +2753,7 @@
       "price": 3800000,
       "color": "Titanium Blue",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-iqoo-z10-lite.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2782,7 +2782,7 @@
       "price": 8400000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-poco-f7.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8735 Snapdragon 8s Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -2811,7 +2811,7 @@
       "price": 10000000,
       "color": "Phoenix Gold",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-t4-ultra.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9300+ (4 nm)",
         "RAM": "8 GB",
@@ -2840,7 +2840,7 @@
       "price": 4000000,
       "color": "Midnight Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-x6c.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Helio G81 Ultra (12 nm)",
         "RAM": "6 GB",
@@ -2869,7 +2869,7 @@
       "price": 14000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-400-pro-china.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8650-AB Snapdragon 8 Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -2898,7 +2898,7 @@
       "price": 10000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-400-china.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7750-AB Snapdragon 7 Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -2927,7 +2927,7 @@
       "price": 3000000,
       "color": "Jade Green",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-c73.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2956,7 +2956,7 @@
       "price": 3300000,
       "color": "Crystal Purple",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-narzo-80-lite.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -2985,7 +2985,7 @@
       "price": 34000000,
       "color": "Moonstone",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/google-pixel-10-pro-fold.webp",
       "specifications": {
         "Chip xử lý": "Google Tensor G5 (4 nm)",
         "RAM": "16 GB",
@@ -3014,7 +3014,7 @@
       "price": 13600000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/vivo-iqoo-neo10-pro-plus.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3043,7 +3043,7 @@
       "price": 6000000,
       "color": "Aurora Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-a5.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -3072,7 +3072,7 @@
       "price": 18000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-xcover7-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7635 Snapdragon 7s Gen 3 (4 nm)",
         "RAM": "6 GB",
@@ -3101,7 +3101,7 @@
       "price": 10000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-power.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM7550-AB Snapdragon 7 Gen 3 (4 nm)",
         "RAM": "8 GB",
@@ -3130,7 +3130,7 @@
       "price": 6000000,
       "color": "Black",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-m56.webp",
       "specifications": {
         "Chip xử lý": "Exynos 1480 (4 nm)",
         "RAM": "8 GB",
@@ -3159,7 +3159,7 @@
       "price": 12800000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-k90-ultra.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3188,7 +3188,7 @@
       "price": 5200000,
       "color": "Icy Purple",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-k13.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm Snapdragon 6 Gen 4 (4 nm)",
         "RAM": "8 GB",
@@ -3217,7 +3217,7 @@
       "price": 9000000,
       "color": "Silver",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-x60-gt.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8475 Snapdragon 8+ Gen 1 (4 nm)",
         "RAM": "12 GB",
@@ -3246,7 +3246,7 @@
       "price": 13200000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-gt-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3275,7 +3275,7 @@
       "price": 12800000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-gt7-china.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400+ (3 nm)",
         "RAM": "12 GB",
@@ -3304,7 +3304,7 @@
       "price": 8400000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/xiaomi-redmi-turbo-4-pro.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8735 Snapdragon 8s Gen 4 (4 nm)",
         "RAM": "12 GB",
@@ -3333,7 +3333,7 @@
       "price": 7000000,
       "color": "Pantone (Gibraltar sea",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-edge-60.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 (4 nm)",
         "RAM": "8 GB",
@@ -3362,7 +3362,7 @@
       "price": 7800000,
       "color": "Pantone (Shadow",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-edge-60-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 8350 Extreme (4 nm)",
         "RAM": "8 GB",
@@ -3391,7 +3391,7 @@
       "price": 17000000,
       "color": "Pantone (Gibraltar Sea",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-razr-2025.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7400X (4 nm)",
         "RAM": "8 GB",
@@ -3420,7 +3420,7 @@
       "price": 25000000,
       "color": "Pantone (Mocha Mousse",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-razr-plus-2025.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8635 Snapdragon 8s Gen 3 (4 nm)",
         "RAM": "12 GB",
@@ -3449,7 +3449,7 @@
       "price": 5000000,
       "color": "Black",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/honor-x70i.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7025 Ultra (6 nm)",
         "RAM": "8 GB",
@@ -3478,7 +3478,7 @@
       "price": 6400000,
       "color": "Surf Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-14t.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "8 GB",
@@ -3507,7 +3507,7 @@
       "price": 32000000,
       "color": "Pantone (Rio Red",
       "storage": "512GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-razr-ultra-2025.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "16 GB",
@@ -3536,7 +3536,7 @@
       "price": 10200000,
       "color": "Stellar Purple",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-reno16c.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 Energy (4 nm)",
         "RAM": "8 GB",
@@ -3565,7 +3565,7 @@
       "price": 12600000,
       "color": "Titanium Gray",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-reno14-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 8450 (4 nm)",
         "RAM": "12 GB",
@@ -3594,7 +3594,7 @@
       "price": 12000000,
       "color": "Tranquil Green (Forest Green)",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-reno14.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 8350 (4 nm)",
         "RAM": "8 GB",
@@ -3623,7 +3623,7 @@
       "price": 3600000,
       "color": "Midnight Purple",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-a5-4g.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM-6115 Snapdragon 6s 4G Gen1 (11 nm)",
         "RAM": "4 GB",
@@ -3652,7 +3652,7 @@
       "price": 2600000,
       "color": "Midnight Blue",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oppo-a5x-4g.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM-6115 Snapdragon 6s 4G Gen1 (11 nm)",
         "RAM": "4 GB",
@@ -3681,7 +3681,7 @@
       "price": 31600000,
       "color": "Moss Green",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/sony-xperia-1-vii.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3710,7 +3710,7 @@
       "price": 15600000,
       "color": "Titanium Icyblue",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-s25-edge.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3739,7 +3739,7 @@
       "price": 3200000,
       "color": "Midnight Lily",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-c71.webp",
       "specifications": {
         "Chip xử lý": "Unisoc T7250 (12 nm)",
         "RAM": "4 GB",
@@ -3768,7 +3768,7 @@
       "price": 7000000,
       "color": "Green",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/samsung-galaxy-f56.webp",
       "specifications": {
         "Chip xử lý": "Exynos 1480 (4 nm)",
         "RAM": "8 GB",
@@ -3797,7 +3797,7 @@
       "price": 13400000,
       "color": "Green Silk",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-13s.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)",
         "RAM": "12 GB",
@@ -3826,7 +3826,7 @@
       "price": 6000000,
       "color": "Pantone Slipstream",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-edge-60s.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7400 (4 nm)",
         "RAM": "12 GB",
@@ -3855,7 +3855,7 @@
       "price": 4000000,
       "color": "Midnight Lily",
       "storage": "64GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/realme-c75.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -3884,7 +3884,7 @@
       "price": 6000000,
       "color": "Pantone: Slipstream",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-moto-g-2026.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6300 (6 nm)",
         "RAM": "4 GB",
@@ -3913,7 +3913,7 @@
       "price": 6600000,
       "color": "Pantone: Impenetrable Gray",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/motorola-moto-g77-power.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 6400 (6 nm)",
         "RAM": "8 GB",
@@ -3942,7 +3942,7 @@
       "price": 6000000,
       "color": "White",
       "storage": "128GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-cmf-phone-2-pro.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 7300 Pro (4 nm)",
         "RAM": "8 GB",
@@ -3971,7 +3971,7 @@
       "price": 10400000,
       "color": "Blue",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/oneplus-ace-5-ultra.webp",
       "specifications": {
         "Chip xử lý": "Mediatek Dimensity 9400+ (3 nm)",
         "RAM": "12 GB",
@@ -4000,7 +4000,7 @@
       "price": 12100000,
       "color": "White",
       "storage": "256GB",
-      "image": "/images/placeholder.svg",
+      "image": "/images/phones/nothing-phone-3.webp",
       "specifications": {
         "Chip xử lý": "Qualcomm SM8735 Snapdragon 8s Gen 4 (4 nm)",
         "RAM": "12 GB",

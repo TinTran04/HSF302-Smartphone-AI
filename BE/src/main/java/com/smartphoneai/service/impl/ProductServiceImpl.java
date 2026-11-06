@@ -21,13 +21,13 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Optional<ProductResponse> findActive(Long id) {
-        return products.findByIdAndActiveTrue(id).map(ProductMapper::toResponse);
+        return products.findById(id).map(ProductMapper::toResponse);
     }
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listActive(String query, int page, int size) {
         if (page < 1 || size < 1 || size > 100) throw new InvalidPaginationException();
-        var found = products.findByActiveTrueAndNameContainingIgnoreCase(
+        var found = products.findByNameContainingIgnoreCase(
                 query == null ? "" : query.trim(), PageRequest.of(page - 1, size, Sort.by("id")));
         return new PageResponse<>(found.getContent().stream()
                 .map(ProductMapper::toResponse).toList(),

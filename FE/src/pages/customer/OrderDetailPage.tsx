@@ -14,6 +14,7 @@ import {
 } from '../../shared/components/Ui';
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
 import type { OrderStatus as Status } from '../../shared/types/models';
+import { LocationPicker } from '../../shared/components/LocationPicker';
 export default function OrderDetailPage({ admin = false }: { admin?: boolean }) {
   const { id } = useParams();
   const { user } = useAuth();
@@ -143,6 +144,7 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
           <h3 className="!text-base">{data.shipping.fullName}</h3>
           <p className="muted mt-3 text-sm">{data.shipping.phone}</p>
           <p className="muted mt-3 text-sm leading-7">{data.shipping.address}</p>
+          {data.shipping.location && <LocationPicker value={data.shipping.location} />}
           {data.shipping.note && <p className="help-text mt-6">Ghi chú: {data.shipping.note}</p>}
         </section>
       </div>

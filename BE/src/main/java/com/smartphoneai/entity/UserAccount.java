@@ -15,6 +15,8 @@ public class UserAccount {
     @Column(name = "full_name", nullable = false) private String fullName;
     @Column(nullable = false) private String phone;
     @Column(nullable = false) private String address;
+    private Double latitude;
+    private Double longitude;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private Role role;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private boolean deleted;
@@ -87,7 +89,16 @@ public class UserAccount {
         }
     }
     public void updateProfile(String name, String phone, String address) {
+        if (!this.address.equals(address.trim())) {
+            latitude = null;
+            longitude = null;
+        }
         this.fullName = name.trim(); this.phone = phone.trim(); this.address = address.trim();
+    }
+    public void updateProfile(String name, String phone, String address, Double latitude, Double longitude) {
+        this.fullName = name.trim(); this.phone = phone.trim(); this.address = address.trim();
+        this.latitude = latitude;
+        this.longitude = longitude;
     }
     public UUID getId() { return id; }
     public String getEmail() { return email; }
@@ -95,6 +106,8 @@ public class UserAccount {
     public String getFullName() { return fullName; }
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
     public String getPasswordHash() { return passwordHash; }
     public long getCredentialVersion() { return credentialVersion; }
     public Role getRole() { return role; }

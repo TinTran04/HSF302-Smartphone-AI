@@ -1,0 +1,56 @@
+.address-autocomplete {
+  min-width: 0;
+}
+
+.address-autocomplete-list {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(22 34 55 / 6%);
+}
+
+.address-autocomplete-list[hidden] {
+  display: none;
+}
+
+.address-autocomplete-option {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.address-autocomplete-option:hover,
+.address-autocomplete-option[aria-selected='true'] {
+  color: var(--action-primary);
+  background: #f3f0ff;
+}
+
+.address-autocomplete-status,
+.address-autocomplete-help {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.address-autocomplete-help a {
+  white-space: nowrap;
+  color: var(--action-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

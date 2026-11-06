@@ -45,7 +45,9 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateProfile(String id, UpdateProfileRequest input) {
         var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted())
                 .orElseThrow(InvalidCredentialsException::new);
-        user.updateProfile(input.fullName(), input.phone(), input.address());
+        var location = input.location();
+        user.updateProfile(input.fullName(), input.phone(), input.address(),
+                location == null ? null : location.latitude(), location == null ? null : location.longitude());
         return UserResponse.from(user);
     }
 }

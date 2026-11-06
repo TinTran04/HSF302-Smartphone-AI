@@ -6,6 +6,7 @@ import { useAuth } from '../../features/auth/AuthProvider';
 import { OrderStatus } from '../../features/orders/OrderStatus';
 import { EmptyState, ErrorState, PageHeading, Skeleton } from '../../shared/components/Ui';
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
+import { sortOrdersNewestFirst } from '../../features/orders/sortOrders';
 export default function OrderListPage() {
   const { user } = useAuth();
   const orders = useQuery({
@@ -17,7 +18,8 @@ export default function OrderListPage() {
     },
   });
   const [status, setStatus] = useState('');
-  const filtered = orders.data?.filter((o) => !status || o.status === status);
+  const filtered = orders.data &&
+    sortOrdersNewestFirst(orders.data).filter((o) => !status || o.status === status);
   return (
     <>
       <PageHeading

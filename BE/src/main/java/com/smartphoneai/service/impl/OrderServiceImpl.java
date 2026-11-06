@@ -35,11 +35,17 @@ public class OrderServiceImpl implements OrderService {
         lockUser(userId);
         var ids = request.variantIds();
         if (new HashSet<>(ids).size() != ids.size()) throw new OrderConflictException("INVALID_ORDER");
+        var lockedVariants = new HashMap<Long, ProductVariant>();
+        // Serialize preview FK creation with catalog deletion, using checkout's variant order.
+        for (Long id : ids.stream().sorted().toList())
+            lockedVariants.put(id, variants.findLocked(id).orElseThrow(() -> new OrderConflictException("PRODUCT_UNAVAILABLE")));
         ShippingInfo shipping = request.shipping().normalized();
-        var preview = new OrderPreview(userId, shipping.fullName(), shipping.phone(), shipping.address(), shipping.note(), clock.instant().plusSeconds(900));
+        var location = shipping.location();
+        var preview = new OrderPreview(userId, shipping.fullName(), shipping.phone(), shipping.address(), shipping.note(),
+                clock.instant().plusSeconds(900), location == null ? null : location.latitude(), location == null ? null : location.longitude());
         for (Long id : ids) {
             var cart = cartItems.findByUserIdAndVariantId(userId, id).orElseThrow(() -> new OrderConflictException("INVALID_ORDER"));
-            var variant = cart.getVariant();
+            var variant = lockedVariants.get(id);
             if (!variant.isActive() || !variant.getProduct().isActive()) throw new OrderConflictException("PRODUCT_UNAVAILABLE");
             preview.addItem(new OrderPreviewItem(id, cart.getQuantity(), cart.getPriceAtAdd(), variant.getPrice()));
         }
@@ -94,7 +100,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly=true)
-    public List<OrderResponse> list(UUID userId) { return orders.findAllByUserIdOrderByCreatedAtDesc(userId).stream().map(OrderResponse::from).toList(); }
+    public List<OrderResponse> list(UUID userId) { return orders.findAllByUserIdOrderByCreatedAtDescIdDesc(userId).stream().map(OrderResponse::from).toList(); }
     @Override
     @Transactional(readOnly=true)
     public OrderResponse get(UUID userId, UUID id) {
@@ -110,7 +116,7 @@ public class OrderServiceImpl implements OrderService {
     }
     @Override
     @Transactional(readOnly=true)
-    public List<OrderResponse> listAdmin() { return orders.findAll().stream().map(OrderResponse::from).toList(); }
+    public List<OrderResponse> listAdmin() { return orders.findAllByOrderByCreatedAtDescIdDesc().stream().map(OrderResponse::from).toList(); }
     @Override
     @Transactional(readOnly=true)
     public OrderResponse getAdmin(UUID id) { return OrderResponse.from(orders.findById(id).orElseThrow(OrderNotFoundException::new)); }
@@ -133,9 +139,17 @@ public class OrderServiceImpl implements OrderService {
         return total;
     }
     private static boolean sameShipping(OrderPreview p, ShippingInfo s) {
-        return p.getFullName().equals(s.fullName()) && p.getPhone().equals(s.phone()) && p.getAddress().equals(s.address()) && p.getNote().equals(s.note());
+        var location = s.location();
+        return p.getFullName().equals(s.fullName()) && p.getPhone().equals(s.phone())
+                && p.getAddress().equals(s.address()) && p.getNote().equals(s.note())
+                && Objects.equals(p.getLatitude(), location == null ? null : location.latitude())
+                && Objects.equals(p.getLongitude(), location == null ? null : location.longitude());
     }
     private static boolean sameShipping(OrderRecord o, ShippingInfo s) {
-        return o.getFullName().equals(s.fullName()) && o.getPhone().equals(s.phone()) && o.getAddress().equals(s.address()) && o.getNote().equals(s.note());
+        var location = s.location();
+        return o.getFullName().equals(s.fullName()) && o.getPhone().equals(s.phone())
+                && o.getAddress().equals(s.address()) && o.getNote().equals(s.note())
+                && Objects.equals(o.getLatitude(), location == null ? null : location.latitude())
+                && Objects.equals(o.getLongitude(), location == null ? null : location.longitude());
     }
 }

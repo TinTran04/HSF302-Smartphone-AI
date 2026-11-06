@@ -5,6 +5,18 @@ param(
     [ValidateRange(1, 1000)][decimal]$BdtToVnd = 200
 )
 $ErrorActionPreference = 'Stop'
+$imageManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'images.json') -Raw | ConvertFrom-Json
+$images = @{}
+foreach ($image in $imageManifest.images) {
+    if ($images.ContainsKey($image.sourceUrl)) { throw "Duplicate image source URL: $($image.sourceUrl)" }
+    if ($image.localPath -notmatch '^/images/phones/[a-z0-9-]+\.(webp|png|jpg)$') { throw 'Invalid local image path.' }
+    $assetPath = Join-Path $PSScriptRoot ("../../FE/public" + $image.localPath)
+    if (!(Test-Path -LiteralPath $assetPath) -or
+        (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $image.sha256) {
+        throw "Missing or changed image asset: $($image.localPath)"
+    }
+    $images[$image.sourceUrl] = $image
+}
 $brandNames = @{
     Apple='Apple'; Samsung='Samsung'; Xiaomi='Xiaomi'; Oppo='OPPO'; Vivo='vivo'
     Realme='realme'; OnePlus='OnePlus'; Google='Google'; Nothing='Nothing'
@@ -62,11 +74,16 @@ Import-Csv -LiteralPath (Join-Path $PSScriptRoot 'raw.csv') | ForEach-Object {
     if ($row.Platform_OS) { $specifications['Hệ điều hành'] = Limit-Text $row.Platform_OS }
     if ($row.Battery_Charging) { $specifications['Sạc'] = Limit-Text $row.Battery_Charging }
     if ($row.Display_Resolution) { $specifications['Độ phân giải'] = Limit-Text $row.Display_Resolution }
+    $imagePath = '/images/placeholder.svg'
+    if ($images.ContainsKey($row.URL)) {
+        if ($images[$row.URL].sourceName -ne $row.Name) { throw "Image model mismatch: $($row.Name)" }
+        $imagePath = $images[$row.URL].localPath
+    }
     $phones.Add([ordered]@{
         name=$name; sourceName=$row.Name; brand=$brand; sourceUrl=$row.URL
         description="Dữ liệu tham khảo từ bộ Global Mobile Phone Specifications & Prices của UTSHO DEY trên Kaggle. Giá bán hiển thị là giá minh họa quy đổi từ BDT để kiểm thử dự án, hệ số $BdtToVnd VNĐ/BDT. Thông số và phiên bản theo dữ liệu nguồn. Nguồn chi tiết được ghi trong phần thông số."
         sourcePriceBdt=$priceBdt; price=$priceVnd; color=$color; storage=$storage
-        image='/images/placeholder.svg'; specifications=$specifications
+        image=$imagePath; specifications=$specifications
     })
     $null = $seen.Add($row.URL)
     $counts[$brand] = 1 + [int]$counts[$brand]
@@ -86,5 +103,7 @@ $rowsJson = ConvertTo-Json -InputObject $products -Depth 8 -Compress
 if ($rowsJson.Contains('$phone_dataset$')) { throw 'Dataset conflicts with the SQL literal delimiter.' }
 $sql = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'import.template.sql') -Raw
 $sql = $sql.Replace('@@CATALOG_JSON@@', $rowsJson)
+$backfillSql = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'backfill-images.template.sql') -Raw
+$sql = $sql.Replace('@@IMAGE_BACKFILL_SQL@@', $backfillSql.TrimEnd())
 [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'import.sql'), $sql, [Text.UTF8Encoding]::new($false))
 [pscustomobject]@{selectedProducts=$products.Count;brands=$counts.Count;priceVndIsIllustrative=$true;bdtToVnd=$BdtToVnd} | ConvertTo-Json -Compress

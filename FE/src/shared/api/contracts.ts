@@ -1,4 +1,5 @@
 import type {
+  AddressSuggestion,
   AiProvider,
   AiSettings,
   Brand,
@@ -10,6 +11,7 @@ import type {
   Dashboard,
   KnowledgeDocument,
   LoginInput,
+  MapLocation,
   Order,
   OrderPreview,
   OrderStatus,
@@ -25,7 +27,9 @@ export interface Api {
   login(data: LoginInput): Promise<AuthResult>;
   register(data: RegisterInput): Promise<AuthResult>;
   logout(): Promise<void>;
-  updateProfile(data: Pick<User, 'fullName' | 'phone' | 'address'>): Promise<User>;
+  updateProfile(data: Pick<User, 'fullName' | 'phone' | 'address' | 'location'>): Promise<User>;
+  addressSuggestions(text: string, signal?: AbortSignal): Promise<AddressSuggestion[]>;
+  reverseLocation(point: MapLocation, signal?: AbortSignal): Promise<{ label: string } | null>;
   products(params?: URLSearchParams, admin?: boolean): Promise<PageResult<Product>>;
   product(id: string, admin?: boolean): Promise<Product>;
   brands(admin?: boolean): Promise<Brand[]>;
@@ -46,11 +50,14 @@ export interface Api {
   conversations(): Promise<Conversation[]>;
   createConversation(topic: ChatTopic, context?: { productIds?: string[] }): Promise<Conversation>;
   conversation(id: string): Promise<Conversation>;
+  deleteConversation(id: string): Promise<void>;
   sendMessage(id: string, content: string): Promise<ChatSendResponse>;
   confirmSwitch(id: string): Promise<ChatSendResponse>;
   cancelSwitch(id: string): Promise<void>;
   dashboard(): Promise<Dashboard>;
   saveProduct(product: Product, creating: boolean): Promise<Product>;
+  uploadProductImage(file: File): Promise<{ url: string }>;
+  deleteProduct(id: string): Promise<void>;
   productStatus(id: string, status: Product['status']): Promise<Product>;
   documents(): Promise<KnowledgeDocument[]>;
   uploadDocument(file: File): Promise<KnowledgeDocument>;

@@ -13,10 +13,12 @@ export function useChat(id: string) {
   const conversation = useQuery({
     queryKey: key,
     queryFn: () => api.conversation(id),
+    enabled: user?.role === 'CUSTOMER',
     retry: false,
   });
   const pending = pendingSwitch ?? conversation.data?.pendingSwitch;
   const send = useMutation({
+    mutationKey: ['chat', user?.id, id, 'send'],
     meta: { toast: { success: 'Đã gửi tin nhắn.' } },
     mutationFn: (content: string) => api.sendMessage(id, content),
     onSuccess: async (result) => {
@@ -26,6 +28,7 @@ export function useChat(id: string) {
     },
   });
   const confirm = useMutation({
+    mutationKey: ['chat', user?.id, id, 'confirm-switch'],
     meta: { toast: { success: 'Đã chuyển chủ đề tư vấn.' } },
     mutationFn: () => api.confirmSwitch(pending!.switchRequestId),
     onSuccess: async (result) => {
@@ -38,6 +41,7 @@ export function useChat(id: string) {
     },
   });
   const cancel = useMutation({
+    mutationKey: ['chat', user?.id, id, 'cancel-switch'],
     meta: { toast: { success: 'Đã giữ chủ đề hiện tại.' } },
     mutationFn: () => api.cancelSwitch(pending!.switchRequestId),
     onSuccess: async () => {

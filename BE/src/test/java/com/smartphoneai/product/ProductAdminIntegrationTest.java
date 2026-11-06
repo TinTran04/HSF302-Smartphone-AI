@@ -60,7 +60,12 @@ class ProductAdminIntegrationTest {
                 .andExpect(jsonPath("$.variants[0].price").value(13000000));
         mvc.perform(patch("/api/admin/products/" + productId + "/status").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"INACTIVE\"}")).andExpect(status().isOk());
-        mvc.perform(get("/api/products/" + productId)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/products/" + productId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INACTIVE"))
+                .andExpect(jsonPath("$.variants[0].price").value(13000000));
+        mvc.perform(get("/api/products").param("q", "Example Phone")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].status").value("INACTIVE"));
         mvc.perform(get("/api/admin/products/" + productId).with(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("INACTIVE"));
     }

@@ -46,13 +46,16 @@ class ProductCatalogIntegrationTest {
         assertEquals("8 GB", response.specifications().get("RAM"));
     }
 
-    @Test void publicCatalogReturnsOnlyActiveProductsMatchingSearch() {
+    @Test void publicCatalogReturnsAvailableAndSoldOutProductsMatchingSearch() {
         save("iPhone 15", true);
         save("iPhone 14", false);
         save("Samsung Galaxy", true);
         var result = new ProductServiceImpl(repository).listActive("IPHONE", 1, 10);
-        assertEquals(1, result.totalItems());
+        assertEquals(2, result.totalItems());
         assertEquals("iPhone 15", result.items().getFirst().name());
+        assertEquals("ACTIVE", result.items().getFirst().status());
+        assertEquals("iPhone 14", result.items().get(1).name());
+        assertEquals("INACTIVE", result.items().get(1).status());
         assertEquals(1, result.page());
     }
 

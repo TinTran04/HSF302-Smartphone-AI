@@ -1,5 +1,12 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { createBrowserRouter, Outlet, useLocation, useRouteError, Link, Navigate } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  Outlet,
+  useLocation,
+  useRouteError,
+  Link,
+  Navigate,
+} from 'react-router-dom';
 import { StoreLayout } from '../layouts/StoreLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AccountLayout } from '../layouts/AccountLayout';
@@ -89,13 +96,13 @@ export const router = createBrowserRouter([
                   { path: 'orders/:id', element: <OrderDetail /> },
                 ],
               },
-            ],
-          },
-          {
-            element: <ChatLayout />,
-            children: [
-              { path: 'ai', element: <Topics /> },
-              { path: 'ai/conversations/:id', element: <Chat /> },
+              {
+                element: <ChatLayout />,
+                children: [
+                  { path: 'ai', element: <Topics /> },
+                  { path: 'ai/conversations/:id', element: <Chat /> },
+                ],
+              },
             ],
           },
           { path: '*', element: <NotFound /> },

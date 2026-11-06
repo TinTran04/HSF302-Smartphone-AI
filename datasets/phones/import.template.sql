@@ -53,5 +53,12 @@ SELECT phone.product_id, spec.key, spec.value
 FROM phone_dataset_new phone
 CROSS JOIN LATERAL jsonb_each_text(phone.specifications) spec;
 
+CREATE TEMP TABLE phone_dataset_images ON COMMIT DROP AS
+SELECT "sourceUrl" AS source_url, image AS image_url
+FROM phone_dataset_rows
+WHERE image LIKE '/images/phones/%';
+
+@@IMAGE_BACKFILL_SQL@@
+
 SELECT count(*) AS imported_products FROM phone_dataset_new;
 COMMIT;

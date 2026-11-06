@@ -13,6 +13,8 @@ public class OrderPreview {
     @Column(name="full_name", nullable=false) private String fullName;
     @Column(nullable=false) private String phone;
     @Column(nullable=false) private String address;
+    private Double latitude;
+    private Double longitude;
     @Column(nullable=false) private String note;
     @Column(name="expires_at", nullable=false) private Instant expiresAt;
     @Column(nullable=false) private boolean used;
@@ -20,8 +22,13 @@ public class OrderPreview {
     @OneToMany(mappedBy="preview", cascade=CascadeType.ALL) private List<OrderPreviewItem> items = new ArrayList<>();
     protected OrderPreview() {}
     public OrderPreview(UUID userId, String fullName, String phone, String address, String note, Instant expiresAt) {
+        this(userId, fullName, phone, address, note, expiresAt, null, null);
+    }
+    public OrderPreview(UUID userId, String fullName, String phone, String address, String note, Instant expiresAt,
+                        Double latitude, Double longitude) {
         id=UUID.randomUUID(); this.userId=userId; this.fullName=fullName; this.phone=phone;
         this.address=address; this.note=note; this.expiresAt=expiresAt;
+        this.latitude=latitude; this.longitude=longitude;
     }
     public void addItem(OrderPreviewItem item) { items.add(item); item.setPreview(this); }
     public UUID getId() { return id; }
@@ -29,6 +36,8 @@ public class OrderPreview {
     public String getFullName() { return fullName; }
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
     public String getNote() { return note; }
     public Instant getExpiresAt() { return expiresAt; }
     public boolean isUsed() { return used; }

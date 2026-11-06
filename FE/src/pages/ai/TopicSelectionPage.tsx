@@ -5,14 +5,17 @@ import { chatTopics, normalizeTopic } from '../../features/ai-chat/constants/cha
 import { Icon } from '../../shared/components/Icon';
 import { ErrorState } from '../../shared/components/Ui';
 import type { ChatTopic } from '../../shared/types/models';
+import { useAuth } from '../../features/auth/AuthProvider';
 export default function TopicSelectionPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const { user } = useAuth();
   const productIds = [
     ...new Set((params.get('productIds') || '').split(',').filter(Boolean)),
   ].slice(0, 3);
   const create = useMutation({
+    mutationKey: ['chat', user?.id, 'create'],
     meta: { toast: { success: 'Đã tạo cuộc hội thoại mới.' } },
     mutationFn: (topic: ChatTopic) =>
       api.createConversation(topic, productIds.length ? { productIds } : undefined),

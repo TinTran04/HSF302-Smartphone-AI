@@ -15,6 +15,9 @@ import com.smartphoneai.exception.ProductNotFoundException;
 import com.smartphoneai.repository.BrandRepository;
 import com.smartphoneai.repository.ProductRepository;
 import com.smartphoneai.repository.ProductVariantRepository;
+import com.smartphoneai.repository.CartItemRepository;
+import com.smartphoneai.repository.OrderPreviewRepository;
+import com.smartphoneai.repository.OrderPreviewItemRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -26,8 +29,13 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final ProductRepository products;
     private final ProductVariantRepository variants;
     private final BrandRepository brands;
-    public AdminProductServiceImpl(ProductRepository products, ProductVariantRepository variants, BrandRepository brands) {
+    private final CartItemRepository cartItems;
+    private final OrderPreviewRepository previews;
+    private final OrderPreviewItemRepository previewItems;
+    public AdminProductServiceImpl(ProductRepository products, ProductVariantRepository variants, BrandRepository brands,
+            CartItemRepository cartItems, OrderPreviewRepository previews, OrderPreviewItemRepository previewItems) {
         this.products=products; this.variants=variants; this.brands=brands;
+        this.cartItems=cartItems; this.previews=previews; this.previewItems=previewItems;
     }
     @Override
     @Transactional(readOnly=true)
@@ -86,6 +94,25 @@ public class AdminProductServiceImpl implements AdminProductService {
         var product = products.findLocked(id).orElseThrow(ProductNotFoundException::new);
         product.setActive("ACTIVE".equals(status));
         return ProductMapper.toResponse(product);
+    }
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        var variantIds = variants.findIdsByProductId(id);
+        // Match checkout's ascending variant -> product lock order.
+        for (Long variantId : variantIds) variants.findLocked(variantId).orElseThrow(CatalogConflictException::new);
+        var product = products.findLocked(id).orElseThrow(ProductNotFoundException::new);
+        // An Admin may have added a variant while the initial IDs were being read; retry from a fresh snapshot.
+        if (!new HashSet<>(variantIds).equals(product.getVariants().stream().map(ProductVariant::getId).collect(java.util.stream.Collectors.toSet())))
+            throw new CatalogConflictException();
+        if (!variantIds.isEmpty()) {
+            for (var preview : previews.findAffectedLocked(variantIds)) if (!preview.isUsed()) preview.markUsed();
+            previews.flush();
+            previewItems.deleteByVariantIds(variantIds);
+            cartItems.deleteByVariantIds(variantIds);
+        }
+        products.delete(product);
+        products.flush();
     }
     private void validateVariants(Product product) {
         var seen = new java.util.HashSet<java.util.List<String>>();

@@ -1,0 +1,31 @@
+.location-picker {
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.location-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.location-actions .button {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.location-map-canvas {
+  width: 100%;
+  height: 300px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  z-index: 0;
+}
+
+.location-map-canvas .leaflet-control-attribution {
+  font-size: 10px;
+}

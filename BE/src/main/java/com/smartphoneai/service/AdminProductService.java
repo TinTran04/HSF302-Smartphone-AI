@@ -16,4 +16,6 @@ public interface AdminProductService {
     ProductResponse update(Long id, ProductMutationRequest input);
 
     ProductResponse status(Long id, String status);
+
+    void delete(Long id);
 }

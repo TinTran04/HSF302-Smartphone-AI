@@ -15,13 +15,15 @@ public class MaintenanceFilter extends OncePerRequestFilter {
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                               FilterChain chain) throws ServletException, IOException {
         String path = request.getRequestURI().substring(request.getContextPath().length());
+        boolean productImage = path.startsWith("/api/product-images/") && request.getMethod().equals("GET");
         boolean shopApi = path.startsWith("/api/") && !path.startsWith("/api/auth/")
-                && !path.startsWith("/api/admin/") && !path.equals("/api/maintenance");
+                && !path.startsWith("/api/admin/") && !path.equals("/api/maintenance") && !productImage;
         var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         boolean profileApi = path.equals("/api/users/me") || path.equals("/api/users/me/password");
+        boolean locationLookup = path.equals("/api/locations/autocomplete") && request.getMethod().equals("GET");
         boolean identityDiscovery = path.equals("/api/users/me") && request.getMethod().equals("GET");
-        boolean unauthenticatedProfile = profileApi && authentication == null;
-        boolean adminProfile = profileApi && authentication != null
+        boolean unauthenticatedProfile = (profileApi || locationLookup) && authentication == null;
+        boolean adminProfile = (profileApi || locationLookup) && authentication != null
                 && authentication.getPrincipal() instanceof AccountPrincipal
                 && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         if (shopApi && !identityDiscovery && !unauthenticatedProfile && !adminProfile && maintenance.isEnabled()) {
