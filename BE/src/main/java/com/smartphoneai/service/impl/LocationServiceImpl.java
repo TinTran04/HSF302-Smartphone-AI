@@ -3,6 +3,7 @@ package com.smartphoneai.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.dto.GeoLocation;
 import com.smartphoneai.dto.response.AddressSuggestionResponse;
+import com.smartphoneai.dto.response.ReverseLocationResponse;
 import com.smartphoneai.exception.InvalidLocationQueryException;
 import com.smartphoneai.exception.LocationSearchException;
 import com.smartphoneai.service.LocationService;
@@ -19,6 +20,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -33,7 +35,7 @@ public class LocationServiceImpl implements LocationService {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-    private final Map<String, CachedSuggestions> cache = new LinkedHashMap<>(16, 0.75f, true);
+    private final Map<String, CacheEntry> cache = new LinkedHashMap<>(16, 0.75f, true);
     private final ArrayDeque<Instant> providerRequests = new ArrayDeque<>();
 
     public LocationServiceImpl(@Value("${app.maps.geoapify-api-key:}") String apiKey,
@@ -55,7 +57,11 @@ public class LocationServiceImpl implements LocationService {
             Instant now = clock.instant();
             cache.values().removeIf(entry -> !entry.expiresAt().isAfter(now));
             var cached = cache.get(query);
-            if (cached != null) return cached.suggestions();
+            if (cached != null) {
+                @SuppressWarnings("unchecked")
+                var list = (List<AddressSuggestionResponse>) cached.value();
+                return list;
+            }
             Instant windowStart = now.minusSeconds(1);
             while (!providerRequests.isEmpty() && !providerRequests.peekFirst().isAfter(windowStart)) {
                 providerRequests.removeFirst();
@@ -65,10 +71,54 @@ public class LocationServiceImpl implements LocationService {
         }
         var suggestions = fetchSuggestions(query);
         synchronized (cache) {
-            cache.put(query, new CachedSuggestions(suggestions, clock.instant().plus(CACHE_TTL)));
+            cache.put(query, new CacheEntry(suggestions, clock.instant().plus(CACHE_TTL)));
             if (cache.size() > CACHE_CAPACITY) cache.remove(cache.keySet().iterator().next());
         }
         return suggestions;
+    }
+
+    @Override
+    public Optional<ReverseLocationResponse> reverse(String latitude, String longitude) {
+        if (latitude == null || longitude == null || latitude.isBlank() || longitude.isBlank()) {
+            throw new InvalidLocationQueryException();
+        }
+        double lat;
+        double lon;
+        try {
+            lat = Double.parseDouble(latitude.trim());
+            lon = Double.parseDouble(longitude.trim());
+        } catch (NumberFormatException e) {
+            throw new InvalidLocationQueryException();
+        }
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+            throw new InvalidLocationQueryException();
+        }
+        if (apiKey == null || apiKey.isBlank()) throw new LocationSearchException(false);
+
+        String cacheKey = "rev:" + lat + "," + lon;
+        synchronized (cache) {
+            Instant now = clock.instant();
+            cache.values().removeIf(entry -> !entry.expiresAt().isAfter(now));
+            var cached = cache.get(cacheKey);
+            if (cached != null) {
+                @SuppressWarnings("unchecked")
+                var result = (Optional<ReverseLocationResponse>) cached.value();
+                return result;
+            }
+            Instant windowStart = now.minusSeconds(1);
+            while (!providerRequests.isEmpty() && !providerRequests.peekFirst().isAfter(windowStart)) {
+                providerRequests.removeFirst();
+            }
+            if (providerRequests.size() >= PROVIDER_REQUESTS_PER_SECOND) throw new LocationSearchException(true);
+            providerRequests.addLast(now);
+        }
+
+        var result = fetchReverse(latitude.trim(), longitude.trim());
+        synchronized (cache) {
+            cache.put(cacheKey, new CacheEntry(result, clock.instant().plus(CACHE_TTL)));
+            if (cache.size() > CACHE_CAPACITY) cache.remove(cache.keySet().iterator().next());
+        }
+        return result;
     }
 
     private List<AddressSuggestionResponse> fetchSuggestions(String query) {
@@ -113,5 +163,36 @@ public class LocationServiceImpl implements LocationService {
         }
     }
 
-    private record CachedSuggestions(List<AddressSuggestionResponse> suggestions, Instant expiresAt) {}
+    private Optional<ReverseLocationResponse> fetchReverse(String latStr, String lonStr) {
+        try {
+            var uri = UriComponentsBuilder.fromUriString(baseUrl).path("/v1/geocode/reverse")
+                    .queryParam("lat", latStr).queryParam("lon", lonStr)
+                    .queryParam("apiKey", apiKey)
+                    .queryParam("format", "json")
+                    .queryParam("lang", "vi").queryParam("limit", 1).build().encode().toUri();
+            var response = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(3)).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) throw new LocationSearchException(response.statusCode() == 429);
+            var root = mapper.readTree(response.body());
+            if (root == null || root.isNull()) throw new LocationSearchException(false);
+            var results = root.get("results");
+            if (results == null || !results.isArray()) throw new LocationSearchException(false);
+            if (results.isEmpty()) return Optional.empty();
+            var first = results.get(0);
+            if (first == null || !first.isObject()) return Optional.empty();
+            var formatted = first.get("formatted");
+            if (formatted == null || !formatted.isTextual() || formatted.asText().isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ReverseLocationResponse(formatted.asText().trim()));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new LocationSearchException(false);
+        } catch (IOException | IllegalArgumentException exception) {
+            // Provider exceptions and URIs can contain the private API key; never retain or log them.
+            throw new LocationSearchException(false);
+        }
+    }
+
+    private record CacheEntry(Object value, Instant expiresAt) {}
 }

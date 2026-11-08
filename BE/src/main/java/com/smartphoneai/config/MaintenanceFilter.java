@@ -20,7 +20,7 @@ public class MaintenanceFilter extends OncePerRequestFilter {
                 && !path.startsWith("/api/admin/") && !path.equals("/api/maintenance") && !productImage;
         var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         boolean profileApi = path.equals("/api/users/me") || path.equals("/api/users/me/password");
-        boolean locationLookup = path.equals("/api/locations/autocomplete") && request.getMethod().equals("GET");
+        boolean locationLookup = (path.equals("/api/locations/autocomplete") || path.equals("/api/locations/reverse")) && request.getMethod().equals("GET");
         boolean identityDiscovery = path.equals("/api/users/me") && request.getMethod().equals("GET");
         boolean unauthenticatedProfile = (profileApi || locationLookup) && authentication == null;
         boolean adminProfile = (profileApi || locationLookup) && authentication != null
