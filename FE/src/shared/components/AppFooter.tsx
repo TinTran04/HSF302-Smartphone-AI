@@ -33,7 +33,6 @@ export function AppFooter() {
             <Link to="/ai?topic=PHONE_CONSULTATION">Tư vấn mua điện thoại</Link>
             <Link to="/compare">So sánh cấu hình</Link>
             <Link to="/ai?topic=SHOP_SUPPORT">Hỏi đáp chính sách</Link>
-            <Link to="/ai?topic=GENERAL_CHAT">Trò chuyện cùng AI</Link>
           </div>
         </div>
         <div className="footer-bottom">

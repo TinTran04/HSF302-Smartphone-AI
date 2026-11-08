@@ -5,11 +5,16 @@ import { api } from '../../shared/api';
 import { OrderStatus } from '../../features/orders/OrderStatus';
 import { EmptyState, ErrorState, PageHeading, Skeleton, Button } from '../../shared/components/Ui';
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
+import { sortOrdersNewestFirst } from '../../features/orders/sortOrders';
 export default function OrderManagementPage() {
-  const query = useQuery({ queryKey: ['orders', 'admin'], queryFn: () => api.orders(true) });
+  const query = useQuery({
+    queryKey: ['orders', 'admin'],
+    queryFn: () => api.orders(true),
+    refetchInterval: 5000,
+  });
   const [status, setStatus] = useState('');
   const [keyword, setKeyword] = useState('');
-  const orders = query.data?.filter(
+  const orders = query.data && sortOrdersNewestFirst(query.data).filter(
     (o) =>
       (!status || o.status === status) &&
       `${o.id} ${o.customerName}`.toLowerCase().includes(keyword.toLowerCase()),

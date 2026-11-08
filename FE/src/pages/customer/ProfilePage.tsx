@@ -5,6 +5,10 @@ import { useAuth } from '../../features/auth/AuthProvider';
 import { Button, ErrorState, PageHeading, useToast } from '../../shared/components/Ui';
 import { http, jsonBody } from '../../shared/api/httpClient';
 import { isDemo } from '../../shared/api';
+import './ProfilePage.css';
+import { LocationPicker } from '../../shared/components/LocationPicker';
+import type { MapLocation } from '../../shared/types/models';
+import { AddressAutocomplete } from '../../shared/components/AddressAutocomplete';
 export default function ProfilePage() {
   const auth = useAuth();
   const user = auth.user!;
@@ -13,13 +17,32 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone);
   const [address, setAddress] = useState(user.address);
+  const [location, setLocation] = useState<MapLocation | null>(user.location ?? null);
+  const [mapSelection, setMapSelection] = useState(0);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const passwordChange = useMutation({ mutationFn: () => http('/users/me/password', { method: 'POST', body: jsonBody({ currentPassword, newPassword }) }), onSuccess: () => { setCurrentPassword(''); setNewPassword(''); notify('Đã đổi mật khẩu.'); } });
+  const passwordChange = useMutation({
+    meta: { toast: { success: false } },
+    mutationFn: () =>
+      http('/users/me/password', {
+        method: 'POST',
+        body: jsonBody({ currentPassword, newPassword }),
+      }),
+    onSuccess: () => {
+      setCurrentPassword('');
+      setNewPassword('');
+      notify('Đã đổi mật khẩu.');
+    },
+  });
   const save = useMutation({
-    mutationFn: () => api.updateProfile({ fullName: fullName.trim(), phone, address }),
+    meta: { toast: { success: false } },
+    mutationFn: () => api.updateProfile({ fullName: fullName.trim(), phone, address, location }),
     onSuccess: (updated) => {
       auth.setUser(updated);
+      setFullName(updated.fullName);
+      setPhone(updated.phone);
+      setAddress(updated.address);
+      setLocation(updated.location ?? null);
       setEditing(false);
       notify('Đã cập nhật thông tin tài khoản.');
     },
@@ -31,10 +54,10 @@ export default function ProfilePage() {
         description="Quản lý thông tin liên hệ và địa chỉ nhận hàng của bạn."
       />
       <form
-        className="card panel"
+        className="card panel profile-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!save.isPending) save.mutate();
+          if (editing && !save.isPending) save.mutate();
         }}
       >
         <div className="form-grid">
@@ -42,7 +65,7 @@ export default function ProfilePage() {
             Họ và tên
             <input
               required
-              readOnly={!editing}
+              disabled={!editing || save.isPending}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               autoComplete="name"
@@ -50,8 +73,16 @@ export default function ProfilePage() {
           </label>
           <label className="form-field">
             Email
-            <input type="email" value={user.email} readOnly />
-            <span className="help-text">Email được quản lý bởi hệ thống tài khoản.</span>
+            <input
+              type="email"
+              aria-label="Email"
+              aria-describedby="profile-email-help"
+              value={user.email ?? ''}
+              disabled
+            />
+            <span id="profile-email-help" className="help-text">
+              Email được quản lý bởi hệ thống tài khoản.
+            </span>
           </label>
           <label className="form-field">
             Số điện thoại
@@ -59,22 +90,36 @@ export default function ProfilePage() {
               type="tel"
               pattern="[+0-9][0-9 -]{8,14}"
               required
-              readOnly={!editing}
+              disabled={!editing || save.isPending}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
             />
           </label>
-          <label className="form-field">
-            Địa chỉ mặc định
-            <input
-              readOnly={!editing}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              autoComplete="street-address"
-            />
-          </label>
+          <AddressAutocomplete
+            label="Địa chỉ mặc định"
+            value={address}
+            maxLength={255}
+            disabled={!editing || save.isPending}
+            onChange={(value) => {
+              setAddress(value);
+              setLocation(null);
+            }}
+            onSelect={(suggestion) => {
+              setAddress(suggestion.label);
+              setLocation(suggestion.location);
+              setMapSelection((value) => value + 1);
+              notify('Đã chọn địa chỉ và cập nhật vị trí trên bản đồ.');
+            }}
+          />
         </div>
+        <LocationPicker
+          value={location}
+          address={address}
+          revealKey={mapSelection}
+          onChange={setLocation}
+          disabled={!editing || save.isPending}
+        />
         {save.error && <ErrorState error={save.error} />}
         <div className="flex justify-end gap-3 mt-7">
           {editing ? (
@@ -86,6 +131,7 @@ export default function ProfilePage() {
                   setFullName(user.fullName);
                   setPhone(user.phone);
                   setAddress(user.address);
+                  setLocation(user.location ?? null);
                   setEditing(false);
                   save.reset();
                 }}
@@ -101,13 +147,42 @@ export default function ProfilePage() {
           )}
         </div>
       </form>
-      {!isDemo && <form className="card panel mt-6" onSubmit={e => { e.preventDefault(); passwordChange.mutate(); }}>
-        <h2>Đổi mật khẩu</h2>
-        <label className="form-field">Mật khẩu hiện tại<input type="password" required autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} /></label>
-        <label className="form-field">Mật khẩu mới<input type="password" required minLength={8} autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label>
-        {passwordChange.error && <ErrorState error={passwordChange.error} />}
-        <Button type="submit" className="mt-5" busy={passwordChange.isPending}>Đổi mật khẩu</Button>
-      </form>}
+      {!isDemo && (
+        <form
+          className="card panel mt-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            passwordChange.mutate();
+          }}
+        >
+          <h2>Đổi mật khẩu</h2>
+          <label className="form-field">
+            Mật khẩu hiện tại
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </label>
+          <label className="form-field">
+            Mật khẩu mới
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </label>
+          {passwordChange.error && <ErrorState error={passwordChange.error} />}
+          <Button type="submit" className="mt-5" busy={passwordChange.isPending}>
+            Đổi mật khẩu
+          </Button>
+        </form>
+      )}
     </>
   );
 }

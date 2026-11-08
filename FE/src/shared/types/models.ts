@@ -1,10 +1,20 @@
 export type Role = 'CUSTOMER' | 'ADMIN';
+export interface MapLocation {
+  latitude: number;
+  longitude: number;
+}
+export interface AddressSuggestion {
+  id: string;
+  label: string;
+  location: MapLocation;
+}
 export interface User {
   id: string;
   fullName: string;
-  email: string;
+  email: string | null;
   phone: string;
   address: string;
+  location?: MapLocation | null;
   role: Role;
 }
 export type ActiveStatus = 'ACTIVE' | 'INACTIVE';
@@ -47,7 +57,12 @@ export interface CartItem extends CartEntry {
   product: Product;
   variant: ProductVariant;
 }
+export interface UnavailableCartItem extends CartEntry {
+  product: Product | null;
+  variant: ProductVariant | null;
+}
 export interface Cart {
+  unavailableItems: UnavailableCartItem[];
   items: CartItem[];
   unavailableVariantIds: string[];
   total: number;
@@ -58,6 +73,7 @@ export interface ShippingInfo {
   phone: string;
   address: string;
   note: string;
+  location?: MapLocation | null;
 }
 export interface Order {
   id: string;
@@ -134,7 +150,10 @@ export interface AiSettings {
   provider: AiProvider;
   model: string;
   maskedKey: string;
+  maskedBackupKey: string;
+  tested: boolean;
   active: boolean;
+  activeModel?: string;
 }
 export interface Dashboard {
   products: number;

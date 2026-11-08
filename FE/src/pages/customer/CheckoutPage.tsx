@@ -14,10 +14,13 @@ import {
   PageHeading,
   ProductImage,
   Skeleton,
+  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import type { OrderPreview, ShippingInfo } from '../../shared/types/models';
 import { formatVnd } from '../../shared/utils/format';
+import { LocationPicker } from '../../shared/components/LocationPicker';
+import { AddressAutocomplete } from '../../shared/components/AddressAutocomplete';
 type OrderAttempt = { previewId: string; shipping: ShippingInfo; paymentMethod: 'COD'; key: string; userId: string };
 const pendingKey = 'smartphone-ai-pending-order';
 function readAttempt(userId?: string): OrderAttempt | null {
@@ -36,6 +39,7 @@ export default function CheckoutPage() {
     try { const saved = JSON.parse(sessionStorage.getItem('smartphone-ai-checkout-items') || 'null'); return Array.isArray(saved) ? saved : []; } catch { return []; }
   });
   const client = useQueryClient();
+  const { notify } = useToast();
   const [savedAttempt] = useState(() => readAttempt(user?.id));
   const attempt = useRef<OrderAttempt | null>(savedAttempt);
   const [uncertain, setUncertain] = useState(!!savedAttempt);
@@ -44,11 +48,14 @@ export default function CheckoutPage() {
     phone: savedAttempt?.shipping.phone ?? user?.phone ?? '',
     address: savedAttempt?.shipping.address ?? user?.address ?? '',
     note: savedAttempt?.shipping.note ?? '',
+    location: savedAttempt ? savedAttempt.shipping.location ?? null : user?.location ?? null,
   });
   const [preview, setPreview] = useState<OrderPreview | null>(null);
   const [priceChanged, setPriceChanged] = useState(false);
+  const [mapSelection, setMapSelection] = useState(0);
   const key = useRef(savedAttempt?.key ?? crypto.randomUUID());
   const submit = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: async () => {
       if (attempt.current) {
         const { key: savedKey, userId: _userId, ...data } = attempt.current;
@@ -63,6 +70,12 @@ export default function CheckoutPage() {
       setPreview(latest);
       if (!preview || changed) {
         setPriceChanged(!!changed);
+        notify(
+          changed
+            ? 'Giá sản phẩm đã thay đổi. Vui lòng kiểm tra lại trước khi đặt hàng.'
+            : 'Đã kiểm tra đơn hàng. Vui lòng xác nhận để đặt hàng.',
+          changed ? 'error' : 'success',
+        );
         return null;
       }
       const data = { previewId: latest.previewId, shipping, paymentMethod: 'COD' as const };
@@ -78,6 +91,7 @@ export default function CheckoutPage() {
         void client.invalidateQueries({ queryKey: ['cart'] });
         void client.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/orders/${order.id}`, { state: { placed: true }, replace: true });
+        notify('Đã đặt hàng thành công.');
       }
     },
     onError: (error) => {
@@ -95,8 +109,9 @@ export default function CheckoutPage() {
       }
     },
   });
-  const update = (field: keyof ShippingInfo, value: string) => {
-    setShipping((s) => ({ ...s, [field]: value }));
+  const update = (patch: Partial<ShippingInfo>) => {
+    if (submit.isPending || uncertain) return;
+    setShipping((s) => ({ ...s, ...patch }));
     setPreview(null);
     key.current = crypto.randomUUID();
   };
@@ -144,7 +159,7 @@ export default function CheckoutPage() {
                     required
                     autoComplete="name"
                     value={shipping.fullName}
-                    onChange={(e) => update('fullName', e.target.value)}
+                    onChange={(e) => update({ fullName: e.target.value })}
                     disabled={submit.isPending || uncertain}
                   />
                 </label>
@@ -156,32 +171,30 @@ export default function CheckoutPage() {
                     pattern="[+0-9][0-9 -]{8,14}"
                     autoComplete="tel"
                     value={shipping.phone}
-                    onChange={(e) => update('phone', e.target.value)}
+                    onChange={(e) => update({ phone: e.target.value })}
                     disabled={submit.isPending || uncertain}
                   />
                 </label>
-                <label className="form-field col-span-full">
-                  Địa chỉ nhận hàng
-                  <textarea
-                    required
-                    minLength={8}
-                    autoComplete="street-address"
-                    rows={3}
-                    value={shipping.address}
-                    onChange={(e) => update('address', e.target.value)}
-                    disabled={submit.isPending || uncertain}
-                  />
-                </label>
+                <AddressAutocomplete label="Địa chỉ nhận hàng" className="col-span-full"
+                  required minLength={8} maxLength={255} multiline value={shipping.address}
+                  disabled={submit.isPending || uncertain}
+                  onChange={(value) => update({ address: value, location: null })}
+                  onSelect={(suggestion) => {
+                    update({ address: suggestion.label, location: suggestion.location });
+                    setMapSelection((value) => value + 1);
+                    notify('Đã chọn địa chỉ và cập nhật vị trí trên bản đồ.');
+                  }} />
                 <label className="form-field col-span-full">
                   Ghi chú (tùy chọn)
                   <textarea
                     rows={2}
                     value={shipping.note}
-                    onChange={(e) => update('note', e.target.value)}
+                    onChange={(e) => update({ note: e.target.value })}
                     disabled={submit.isPending || uncertain}
                   />
                 </label>
               </div>
+              <LocationPicker value={shipping.location} address={shipping.address} revealKey={mapSelection} onChange={(location) => update({ location })} disabled={submit.isPending || uncertain} />
             </div>
             <div className="card panel">
               <h2 className="!text-xl mb-6">2. Phương thức thanh toán</h2>

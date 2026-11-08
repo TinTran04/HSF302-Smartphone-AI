@@ -1,0 +1,21 @@
+.chat-history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-history-row > a {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-history-delete {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.chat-history-delete:hover:not(:disabled) {
+  color: #b42318;
+  background: #fef3f2;
+}

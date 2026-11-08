@@ -1,10 +1,11 @@
 package com.smartphoneai.product;
 
+import com.smartphoneai.service.impl.ProductServiceImpl;
+
 import com.smartphoneai.entity.Product;
 import com.smartphoneai.entity.Brand;
 import com.smartphoneai.entity.ProductVariant;
 import com.smartphoneai.repository.ProductRepository;
-import com.smartphoneai.service.ProductService;
 import com.smartphoneai.exception.InvalidPaginationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +38,7 @@ class ProductCatalogIntegrationTest {
         repository.saveAndFlush(product);
         Long productId = product.getId();
         entityManager.clear();
-        var response = new ProductService(repository).findActive(productId).orElseThrow();
+        var response = new ProductServiceImpl(repository).findActive(productId).orElseThrow();
         assertEquals("Demo", response.brandName());
         assertEquals(12300000L, response.variants().getFirst().price());
         assertEquals("Điện thoại demo", response.description());
@@ -45,20 +46,23 @@ class ProductCatalogIntegrationTest {
         assertEquals("8 GB", response.specifications().get("RAM"));
     }
 
-    @Test void publicCatalogReturnsOnlyActiveProductsMatchingSearch() {
+    @Test void publicCatalogReturnsAvailableAndSoldOutProductsMatchingSearch() {
         save("iPhone 15", true);
         save("iPhone 14", false);
         save("Samsung Galaxy", true);
-        var result = new ProductService(repository).listActive("IPHONE", 1, 10);
-        assertEquals(1, result.totalItems());
+        var result = new ProductServiceImpl(repository).listActive("IPHONE", 1, 10);
+        assertEquals(2, result.totalItems());
         assertEquals("iPhone 15", result.items().getFirst().name());
+        assertEquals("ACTIVE", result.items().getFirst().status());
+        assertEquals("iPhone 14", result.items().get(1).name());
+        assertEquals("INACTIVE", result.items().get(1).status());
         assertEquals(1, result.page());
     }
 
     @Test void catalogUsesOneBasedPagesAndRejectsInvalidLimits() {
         save("First", true);
         save("Second", true);
-        var service = new ProductService(repository);
+        var service = new ProductServiceImpl(repository);
         var result = service.listActive("", 2, 1);
         assertEquals(2, result.totalItems());
         assertEquals(2, result.totalPages());
@@ -82,7 +86,7 @@ class ProductCatalogIntegrationTest {
         variant.setActive(true);
         product.addVariant(variant);
         repository.saveAndFlush(product);
-        var service = new ProductService(repository);
+        var service = new ProductServiceImpl(repository);
         assertEquals(1, service.searchActive("", brand.getId(), 10000000L, 13000000L, "256GB", 1, 10).totalItems());
         assertEquals(0, service.searchActive("", brand.getId(), 10000000L, 11000000L, "256GB", 1, 10).totalItems());
         assertEquals(0, service.searchActive("", brand.getId(), null, null, "128GB", 1, 10).totalItems());

@@ -1,5 +1,7 @@
 package com.smartphoneai.ai;
 
+import com.smartphoneai.service.impl.AiChatServiceImpl;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.config.AccountPrincipal;
 import com.smartphoneai.entity.AiConversation;
@@ -9,9 +11,11 @@ import com.smartphoneai.service.*;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import static org.mockito.Mockito.*;
 
 class TopicSwitchLockOrderTest {
@@ -26,9 +30,10 @@ class TopicSwitchLockOrderTest {
         when(switches.findConversationId(request.getId())).thenReturn(Optional.of(conversation.getId()));
         when(switches.findLocked(request.getId())).thenReturn(Optional.of(request));
         when(conversations.findLocked(conversation.getId())).thenReturn(Optional.of(conversation));
-        var service = new AiChatService(guests, conversations, messages, switches, mock(TopicRouter.class),
+        var service = new AiChatServiceImpl(guests, conversations, messages, switches, mock(TopicRouter.class),
                 mock(ChatResponder.class), new ObjectMapper(), Clock.systemUTC());
-        service.cancel(new UsernamePasswordAuthenticationToken(new AccountPrincipal(user), null), null, request.getId());
+        service.cancel(UsernamePasswordAuthenticationToken.authenticated(new AccountPrincipal(user), null,
+                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))), null, request.getId());
         var order = inOrder(conversations, switches);
         order.verify(conversations).findLocked(conversation.getId());
         order.verify(switches).findLocked(request.getId());

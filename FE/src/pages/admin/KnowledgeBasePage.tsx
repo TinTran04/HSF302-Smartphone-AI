@@ -38,6 +38,7 @@ export default function KnowledgeBasePage() {
     void client.invalidateQueries({ queryKey: ['admin-dashboard'] });
   };
   const upload = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: api.uploadDocument,
     onSuccess: () => {
       refresh();
@@ -50,6 +51,7 @@ export default function KnowledgeBasePage() {
     },
   });
   const action = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () => api.documentAction(selected!.doc.id, selected!.action),
     onSuccess: () => {
       refresh();
@@ -57,7 +59,7 @@ export default function KnowledgeBasePage() {
       notify('Đã cập nhật tài liệu.');
     },
   });
-  const replace = useMutation({ mutationFn: async (file: File) => {
+  const replace = useMutation({ meta: { toast: { success: false } }, mutationFn: async (file: File) => {
     const form = new FormData(); form.append('file', file);
     return http(`/admin/knowledge/documents/${replacementId}/content`, { method: 'PUT', body: form });
   }, onSuccess: () => { setReplacementId(null); refresh(); notify('Đã gửi nội dung mới để lập chỉ mục.'); } });
@@ -65,10 +67,12 @@ export default function KnowledgeBasePage() {
     if (!file || upload.isPending) return;
     if (!/\.(pdf|txt)$/i.test(file.name)) {
       setValidation('Vui lòng chọn tài liệu PDF hoặc TXT.');
+      notify('Vui lòng chọn tài liệu PDF hoặc TXT.', 'error');
       return;
     }
     if (!file.size) {
       setValidation('Tài liệu đang trống. Vui lòng chọn file khác.');
+      notify('Tài liệu đang trống. Vui lòng chọn file khác.', 'error');
       return;
     }
     setValidation('');

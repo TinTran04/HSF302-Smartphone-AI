@@ -1,4 +1,5 @@
 package com.smartphoneai.dto.response;
+import com.smartphoneai.dto.GeoLocation;
 import com.smartphoneai.dto.request.ShippingInfo;
 import com.smartphoneai.entity.OrderRecord;
 import java.time.Instant;
@@ -11,7 +12,8 @@ public record OrderResponse(String id, String userId, String customerName, Insta
         return new OrderResponse(order.getId().toString(), order.getUserId().toString(), order.getFullName(), order.getCreatedAt(),
                 order.getStatus().name(), order.getItems().stream().map(i -> new Item(i.getVariantId().toString(), i.getProductName(),
                         i.getColor(), i.getStorage(), i.getQuantity(), i.getUnitPrice())).toList(),
-                new ShippingInfo(order.getFullName(), order.getPhone(), order.getAddress(), order.getNote()),
+                new ShippingInfo(order.getFullName(), order.getPhone(), order.getAddress(), order.getNote(),
+                        order.getLatitude() == null ? null : new GeoLocation(order.getLatitude(), order.getLongitude())),
                 order.getTotal(), 0, order.getTotal(), "COD",
                 order.getHistory().stream().map(h -> new History(h.getStatus().name(), h.getChangedAt())).toList());
     }

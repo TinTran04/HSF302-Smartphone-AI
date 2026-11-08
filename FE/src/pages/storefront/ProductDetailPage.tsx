@@ -9,11 +9,11 @@ import {
   ErrorState,
   ProductImage,
   Skeleton,
-  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
-import { errorMessage, formatVnd, productPrice } from '../../shared/utils/format';
+import { formatVnd, productPrice } from '../../shared/utils/format';
 import type { Product } from '../../shared/types/models';
+import { catalogVariants, isProductAvailable } from '../../features/products/availability';
 export default function ProductDetailPage() {
   const { id } = useParams();
   const product = useProduct(id);
@@ -42,17 +42,16 @@ function ProductDetails({ product }: { product: Product }) {
   const [tab, setTab] = useState('specs');
   const cart = useCart();
   const comparison = useComparison();
-  const { notify } = useToast();
-  const active = product.variants.filter((v) => v.status === 'ACTIVE');
-  const variant = active.find((v) => v.storage === storage && v.color === color);
+  const available = isProductAvailable(product);
+  const variants = catalogVariants(product);
+  const variant = variants.find((v) => v.storage === storage && v.color === color);
   const lowest = productPrice(product);
   async function add() {
-    if (!variant || cart.pending) return;
+    if (!available || !variant || variant.status !== 'ACTIVE' || cart.pending) return;
     try {
       await cart.add({ variantId: variant.id, quantity });
-      notify(`Đã thêm ${product.name} (${variant.storage}, ${variant.color}) vào giỏ hàng.`);
-    } catch (e) {
-      notify(errorMessage(e), 'error');
+    } catch {
+      /* The mutation notification reports the failure. Preserve the selected variant. */
     }
   }
   return (
@@ -87,6 +86,9 @@ function ProductDetails({ product }: { product: Product }) {
         <div>
           <span className="badge badge-ai">{product.brandName}</span>
           <h1 className="mt-4">{product.name}</h1>
+          {!available && (
+            <p className="mt-4"><span className="badge badge-error">Hết hàng</span></p>
+          )}
           <p className="muted mt-4 text-sm">
             {product.specifications['Chip xử lý']} · {product.specifications['Màn hình']}
           </p>
@@ -102,14 +104,15 @@ function ProductDetails({ product }: { product: Product }) {
           <fieldset className="variant-group">
             <legend>Dung lượng: {storage || 'Chọn dung lượng'}</legend>
             <div className="variant-options">
-              {[...new Set(active.map((v) => v.storage))].map((s) => (
+              {[...new Set(variants.map((v) => v.storage))].map((s) => (
                 <button
                   key={s}
+                  disabled={!available}
                   className={`variant-option ${s === storage ? 'selected' : ''}`}
                   aria-pressed={s === storage}
                   onClick={() => {
                     setStorage(s);
-                    if (color && !active.some((v) => v.storage === s && v.color === color))
+                    if (color && !variants.some((v) => v.storage === s && v.color === color))
                       setColor('');
                   }}
                 >
@@ -121,11 +124,12 @@ function ProductDetails({ product }: { product: Product }) {
           <fieldset className="variant-group">
             <legend>Màu sắc: {color || 'Chọn màu sắc'}</legend>
             <div className="variant-options">
-              {[...new Map(active.map((v) => [v.color, v])).values()].map((v) => (
+              {[...new Map(variants.map((v) => [v.color, v])).values()].map((v) => (
                 <button
                   key={v.color}
                   disabled={
-                    !!storage && !active.some((x) => x.storage === storage && x.color === v.color)
+                    !available ||
+                    (!!storage && !variants.some((x) => x.storage === storage && x.color === v.color))
                   }
                   className={`variant-option ${v.color === color ? 'selected' : ''}`}
                   aria-pressed={v.color === color}
@@ -141,14 +145,18 @@ function ProductDetails({ product }: { product: Product }) {
             <span className="text-sm font-medium">Số lượng</span>
             <div className="quantity">
               <button
-                disabled={quantity <= 1}
+                disabled={!available || quantity <= 1}
                 onClick={() => setQuantity((q) => q - 1)}
                 aria-label="Giảm số lượng"
               >
                 <Icon name="remove" />
               </button>
               <span aria-live="polite">{quantity}</span>
-              <button onClick={() => setQuantity((q) => q + 1)} aria-label="Tăng số lượng">
+              <button
+                disabled={!available}
+                onClick={() => setQuantity((q) => q + 1)}
+                aria-label="Tăng số lượng"
+              >
                 <Icon name="add" />
               </button>
             </div>
@@ -156,13 +164,13 @@ function ProductDetails({ product }: { product: Product }) {
           <Button
             className="w-full"
             busy={cart.pending}
-            disabled={!variant || product.status !== 'ACTIVE'}
+            disabled={!available || !variant}
             onClick={add}
           >
-            <Icon name="shopping_bag" />
-            Thêm vào giỏ hàng
+            <Icon name={available ? 'shopping_bag' : 'remove_shopping_cart'} />
+            {available ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
           </Button>
-          {!variant && (
+          {available && !variant && (
             <p className="help-text mt-3">Vui lòng chọn đầy đủ màu sắc và dung lượng.</p>
           )}
           <div className="flex flex-wrap gap-3 mt-4">

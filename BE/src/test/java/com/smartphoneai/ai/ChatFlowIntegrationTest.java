@@ -11,9 +11,24 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.mock.web.MockHttpSession;
-import java.util.concurrent.atomic.AtomicReference;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
+import com.smartphoneai.entity.UserAccount;
+import com.smartphoneai.entity.AiConversation;
+import com.smartphoneai.entity.AiGuestSession;
+import com.smartphoneai.entity.AiMessage;
+import com.smartphoneai.repository.AiConversationRepository;
+import com.smartphoneai.repository.AiGuestSessionRepository;
+import com.smartphoneai.repository.AiMessageRepository;
+import com.smartphoneai.repository.UserAccountRepository;
+import com.smartphoneai.service.AuthTokenService;
+import java.util.UUID;
 import java.util.Map;
+import java.util.HexFormat;
+import java.util.concurrent.atomic.AtomicReference;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -22,88 +37,119 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:chatflow;DB_CLOSE_DELAY=-1", "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class ChatFlowIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired UserAccountRepository users;
+    @Autowired AuthTokenService tokens;
+    @Autowired AiGuestSessionRepository guests;
+    @Autowired AiConversationRepository conversations;
+    @Autowired AiMessageRepository messages;
     @MockitoBean OtpSender otpSender;
     @MockitoBean TopicRouter router;
     @MockitoBean ChatResponder responder;
 
-    @Test void rejectedSwitchDoesNotProcessQuestionAndOtherGuestCannotReadConversation() throws Exception {
+    @Test void oldTopicLinksCreateUnifiedConsultations() throws Exception {
+        var session = customer();
+        for (String topic : java.util.List.of("PHONE_COMPARISON", "GENERAL_CHAT", "PHONE_CONSULTATION")) {
+            var created = mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("topic", topic))))
+                    .andExpect(status().isCreated()).andReturn();
+            String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+            mvc.perform(get("/api/ai/conversations/" + id).with(session))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.topic").value("PHONE_CONSULTATION"))
+                    .andExpect(jsonPath("$.title").value("Tư vấn mua điện thoại"));
+        }
+    }
+
+    @Test void rejectedSwitchDoesNotProcessQuestionAndOtherCustomerCannotReadConversation() throws Exception {
         when(router.route(anyString(), anyString(), anyList()))
                 .thenReturn(new TopicRouter.Decision("DIFFERENT_TOPIC", "SHOP_SUPPORT"))
                 .thenReturn(new TopicRouter.Decision("UNCERTAIN", null));
-        var first = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        var second = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        String token = mapper.readTree(first.getResponse().getContentAsString()).path("guestSessionToken").asText();
-        String other = mapper.readTree(second.getResponse().getContentAsString()).path("guestSessionToken").asText();
-        var created = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
+        var session = customer();
+        var other = customer();
+        var created = mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"GENERAL_CHAT\"}"))
                 .andExpect(status().isCreated()).andReturn();
         String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
-        mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", other)).andExpect(status().isNotFound());
-        var suggested = mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(get("/api/ai/conversations/" + id).with(other)).andExpect(status().isNotFound());
+        var suggested = mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Bảo hành bao lâu?\"}"))
                 .andExpect(status().isOk()).andReturn();
         String switchId = mapper.readTree(suggested.getResponse().getContentAsString()).path("switchRequestId").asText();
-        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/cancel").header("X-Guest-Session", token).with(csrf()))
+        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/cancel").with(session).with(csrf()))
                 .andExpect(status().isNoContent());
-        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").header("X-Guest-Session", token).with(csrf()))
+        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").with(session).with(csrf()))
                 .andExpect(status().isConflict());
-        mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Mình muốn hỏi thêm\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("CLARIFICATION_REQUIRED"));
         verifyNoInteractions(responder);
     }
 
-    @Test void guestMustConfirmTopicSwitchAndHasTwoMessagesAcrossConversations() throws Exception {
+    @Test void customerMustConfirmTopicSwitchAndCanSendPastTwoMessages() throws Exception {
         when(router.route(eq("PHONE_CONSULTATION"), anyString(), anyList()))
                 .thenReturn(new TopicRouter.Decision("DIFFERENT_TOPIC", "SHOP_SUPPORT"));
         when(router.route(eq("SHOP_SUPPORT"), anyString(), anyList()))
                 .thenReturn(new TopicRouter.Decision("SAME_TOPIC", null));
         when(responder.answer(anyString(), anyString(), anyList(), anyList()))
                 .thenReturn(new ChatResponder.Answer("Tài liệu demo", java.util.List.of()));
-        var guest = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        String token = mapper.readTree(guest.getResponse().getContentAsString()).path("guestSessionToken").asText();
-        var created = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
+        var session = customer();
+        var created = mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
                 .andExpect(status().isCreated()).andReturn();
         String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
-        var empty = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"GENERAL_CHAT\"}"))
-                .andExpect(status().isCreated()).andReturn();
-        String emptyId = mapper.readTree(empty.getResponse().getContentAsString()).path("conversationId").asText();
-        var switchResponse = mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        var switchResponse = mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Shop bảo hành bao lâu?\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("SWITCH_REQUIRED")).andReturn();
         verifyNoInteractions(responder);
         String switchId = mapper.readTree(switchResponse.getResponse().getContentAsString()).path("switchRequestId").asText();
-        var confirmed = mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").header("X-Guest-Session", token).with(csrf()))
+        var confirmed = mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").with(session).with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("ANSWER")).andReturn();
         String newId = mapper.readTree(confirmed.getResponse().getContentAsString()).path("newConversationId").asText();
-        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").header("X-Guest-Session", token).with(csrf()))
+        mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm").with(session).with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.newConversationId").value(newId));
         verify(responder, times(1)).answer(anyString(), anyString(), anyList(), anyList());
-        mvc.perform(post("/api/ai/conversations/" + newId + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/" + newId + "/messages").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Còn đổi trả?\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("ANSWER"));
-        mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Tin thứ ba\"}"))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("GUEST_MESSAGE_LIMIT"));
-        mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", token)).andExpect(status().isOk());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("SWITCH_REQUIRED"));
+        mvc.perform(get("/api/ai/conversations/" + id).with(session)).andExpect(status().isOk());
         mvc.perform(get("/api/ai/conversations/" + id)).andExpect(status().isUnauthorized());
+    }
+
+    @Test void registrationClaimsExistingGuestHistoryAndDropsEmptyGuestChats() throws Exception {
+        String token = "legacy-guest-token-" + UUID.randomUUID();
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+        var now = Instant.now();
+        var guest = guests.saveAndFlush(new AiGuestSession(hash, now));
+        var history = conversations.saveAndFlush(new AiConversation(null, guest.getId(), "GENERAL_CHAT", "[]", now));
+        var empty = conversations.saveAndFlush(new AiConversation(null, guest.getId(), "SHOP_SUPPORT", "[]", now));
+        messages.saveAndFlush(new AiMessage(history.getId(), "user", "Legacy question", "[]", "[]", "[]", now));
         var code = new AtomicReference<String>();
         doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(otpSender).send(anyString(), anyString());
-        var session = new MockHttpSession();
-        var registration = mvc.perform(post("/api/auth/register").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"chat@example.com\",\"password\":\"Password123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
+        var session = new JwtTestClient();
+        var registration = mvc.perform(post("/api/auth/register").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("email", UUID.randomUUID() + "@example.com", "password", "Password123!",
+                        "fullName", "Customer", "phone", "0900000000"))))
                 .andExpect(status().isAccepted()).andReturn();
         String challengeId = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/otp/verify").session(session).header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).header("X-Guest-Session", token).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.mergedConversationIds.length()").value(2));
-        mvc.perform(get("/api/ai/conversations/" + id).session(session)).andExpect(status().isOk());
-        mvc.perform(get("/api/ai/conversations/" + emptyId).session(session)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", token)).andExpect(status().isUnauthorized());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mergedConversationIds[0]").value(history.getId().toString()))
+                .andExpect(jsonPath("$.mergedConversationIds.length()").value(1));
+        mvc.perform(get("/api/ai/conversations/" + history.getId()).with(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.topic").value("PHONE_CONSULTATION")).andExpect(jsonPath("$.messages[0].content").value("Legacy question"));
+        mvc.perform(get("/api/ai/conversations/" + empty.getId()).with(session)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/ai/conversations/" + history.getId()).header("X-Guest-Session", token)).andExpect(status().isUnauthorized());
+    }
+
+    private JwtTestClient customer() {
+        var user = UserAccount.pendingCustomer(UUID.randomUUID() + "@example.com", "Customer", "0900000000", "x");
+        user.activate();
+        return JwtTestClient.authenticated(tokens, users.saveAndFlush(user));
     }
 }

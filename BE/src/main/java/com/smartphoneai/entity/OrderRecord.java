@@ -15,6 +15,8 @@ public class OrderRecord {
     @Column(name="full_name", nullable=false) private String fullName;
     @Column(nullable=false) private String phone;
     @Column(nullable=false) private String address;
+    private Double latitude;
+    private Double longitude;
     @Column(nullable=false) private String note;
     @Column(nullable=false) private long total;
     @Enumerated(EnumType.STRING) @Column(nullable=false) private OrderStatus status;
@@ -26,6 +28,7 @@ public class OrderRecord {
     public OrderRecord(UUID userId, OrderPreview preview, String key, long total, Instant now) {
         id=UUID.randomUUID(); this.userId=userId; previewId=preview.getId(); idempotencyKey=key;
         fullName=preview.getFullName(); phone=preview.getPhone(); address=preview.getAddress(); note=preview.getNote();
+        latitude=preview.getLatitude(); longitude=preview.getLongitude();
         this.total=total; createdAt=now; transition(OrderStatus.PENDING, now);
     }
     public void addItem(OrderLine item) { items.add(item); item.setOrder(this); }
@@ -33,6 +36,7 @@ public class OrderRecord {
     public UUID getId() { return id; } public UUID getUserId() { return userId; }
     public UUID getPreviewId() { return previewId; } public String getFullName() { return fullName; }
     public String getPhone() { return phone; } public String getAddress() { return address; }
+    public Double getLatitude() { return latitude; } public Double getLongitude() { return longitude; }
     public String getNote() { return note; } public long getTotal() { return total; }
     public OrderStatus getStatus() { return status; } public Instant getCreatedAt() { return createdAt; }
     public List<OrderLine> getItems() { return items; } public List<OrderStatusEntry> getHistory() { return history; }

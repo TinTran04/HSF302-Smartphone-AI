@@ -19,7 +19,8 @@ export default function ComparePage() {
   const [picker, setPicker] = useState(false);
   const [diff, setDiff] = useState(false);
   const [keyword, setKeyword] = useState('');
-  const catalog = useProducts(new URLSearchParams({ keyword, size: '100' }));
+  const [page, setPage] = useState(1);
+  const catalog = useProducts(new URLSearchParams({ keyword, size: '5', page: String(page) }));
   return (
     <div className="container page">
       <Breadcrumb items={[{ label: 'So sánh' }]} />
@@ -45,7 +46,7 @@ export default function ComparePage() {
         {products.length >= 2 ? (
           <Link
             className="button button-ai"
-            to={`/ai?topic=PHONE_COMPARISON&productIds=${products.map((p) => p.id).join(',')}`}
+            to={`/ai?topic=PHONE_CONSULTATION&productIds=${products.map((p) => p.id).join(',')}`}
           >
             <Icon name="auto_awesome" />
             So sánh cùng AI
@@ -92,7 +93,7 @@ export default function ComparePage() {
             aria-label="Tìm máy so sánh"
             placeholder="Tìm theo tên máy…"
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
           />
           {catalog.isPending ? (
             <Skeleton count={1} />
@@ -121,6 +122,11 @@ export default function ComparePage() {
                     <Icon name="add_circle" className="ml-auto text-primary" />
                   </button>
                 ))}
+              {catalog.data && catalog.data.totalPages > 1 && <div className="pagination">
+                <Button variant="secondary" disabled={catalog.data.page <= 1} onClick={() => setPage(p => p - 1)}>Trước</Button>
+                <span>Trang {catalog.data.page} / {catalog.data.totalPages}</span>
+                <Button variant="secondary" disabled={catalog.data.page >= catalog.data.totalPages} onClick={() => setPage(p => p + 1)}>Sau</Button>
+              </div>}
               {!catalog.data?.items.filter((p) => !products.some((s) => s.id === p.id)).length && (
                 <p className="muted text-sm p-5">Không có sản phẩm phù hợp.</p>
               )}

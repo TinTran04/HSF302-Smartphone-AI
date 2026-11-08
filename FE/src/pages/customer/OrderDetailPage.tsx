@@ -14,6 +14,7 @@ import {
 } from '../../shared/components/Ui';
 import { formatDate, formatVnd, orderLabels } from '../../shared/utils/format';
 import type { OrderStatus as Status } from '../../shared/types/models';
+import { LocationPicker } from '../../shared/components/LocationPicker';
 export default function OrderDetailPage({ admin = false }: { admin?: boolean }) {
   const { id } = useParams();
   const { user } = useAuth();
@@ -21,8 +22,17 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
   const client = useQueryClient();
   const [action, setAction] = useState<Status | null>(null);
   const key = ['order', admin, user?.id, id];
-  const order = useQuery({ queryKey: key, queryFn: () => api.order(id!, admin), enabled: !!id });
+  const order = useQuery({
+    queryKey: key,
+    queryFn: () => api.order(id!, admin),
+    enabled: !!id,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s && !['COMPLETED', 'CANCELLED'].includes(s) ? 3000 : false;
+    },
+  });
   const update = useMutation({
+    meta: { toast: { success: admin ? 'Đã cập nhật trạng thái đơn hàng.' : 'Đã hủy đơn hàng.' } },
     mutationFn: () => (admin ? api.updateOrderStatus(id!, action!) : api.cancelOrder(id!)),
     onSuccess: (data) => {
       client.setQueryData(key, data);
@@ -50,6 +60,10 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
     );
   if (!order.data) return null;
   const data = order.data;
+  const lifecycleSteps: Status[] =
+    data.status === 'CANCELLED'
+      ? ['PENDING', 'CANCELLED']
+      : ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED'];
   return (
     <>
       <Link className="text-link text-sm" to={admin ? '/admin/orders' : '/orders'}>
@@ -85,14 +99,22 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
         }
       />
       <div className="card panel mb-6">
-        <h2 className="!text-lg">Lịch sử đơn hàng</h2>
+        <h2 className="!text-lg">Tiến độ đơn hàng</h2>
         <div className="timeline">
-          {data.history.map((step, i) => (
-            <div key={`${step.at}-${i}`} className="timeline-item complete">
-              <strong>{orderLabels[step.status]}</strong>
-              <p>{formatDate(step.at)}</p>
-            </div>
-          ))}
+          {lifecycleSteps.map((step) => {
+            const entry = data.history.find((h) => h.status === step);
+            const isComplete = !!entry;
+            const isCancelled = step === 'CANCELLED';
+            return (
+              <div
+                key={step}
+                className={`timeline-item ${isComplete ? (isCancelled ? 'cancelled' : 'complete') : ''}`}
+              >
+                <strong>{orderLabels[step]}</strong>
+                <p>{entry ? formatDate(entry.at) : 'Chờ xử lý'}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="grid xl:grid-cols-[1.5fr_1fr] gap-6">
@@ -122,6 +144,7 @@ export default function OrderDetailPage({ admin = false }: { admin?: boolean }) 
           <h3 className="!text-base">{data.shipping.fullName}</h3>
           <p className="muted mt-3 text-sm">{data.shipping.phone}</p>
           <p className="muted mt-3 text-sm leading-7">{data.shipping.address}</p>
+          {data.shipping.location && <LocationPicker value={data.shipping.location} />}
           {data.shipping.note && <p className="help-text mt-6">Ghi chú: {data.shipping.note}</p>}
         </section>
       </div>

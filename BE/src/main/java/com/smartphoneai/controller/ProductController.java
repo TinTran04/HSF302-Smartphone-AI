@@ -14,6 +14,7 @@ public class ProductController {
     public ProductController(ProductService service) { this.service = service; }
     @GetMapping
     public PageResponse<ProductResponse> list(@RequestParam(defaultValue = "") String q,
+                                               @RequestParam(required = false) String keyword,
                                                @RequestParam(defaultValue = "1") int page,
                                                @RequestParam(defaultValue = "20") int size,
                                                @RequestParam(required = false) Long brandId,
@@ -22,9 +23,10 @@ public class ProductController {
                                                @RequestParam(required = false) String storage,
                                                @RequestParam(required = false) String ram,
                                                @RequestParam(required = false) String sort) {
+        String searchTerm = (q != null && !q.isBlank()) ? q : (keyword != null ? keyword : "");
         if (brandId == null && minPrice == null && maxPrice == null && storage == null && ram == null && sort == null)
-            return service.listActive(q, page, size);
-        return service.searchActive(q, brandId, minPrice, maxPrice, storage, ram, sort, page, size);
+            return service.listActive(searchTerm, page, size);
+        return service.searchActive(searchTerm, brandId, minPrice, maxPrice, storage, ram, sort, page, size);
     }
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> get(@PathVariable Long id) {

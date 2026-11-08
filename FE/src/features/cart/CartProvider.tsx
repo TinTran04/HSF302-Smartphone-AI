@@ -4,6 +4,7 @@ import { api } from '../../shared/api';
 import { useAuth } from '../auth/AuthProvider';
 import { readGuestCart, saveGuestCart } from './guestCart';
 import type { Cart, CartEntry } from '../../shared/types/models';
+import { useToast } from '../../shared/components/Ui';
 interface CartValue {
   cart?: Cart;
   count: number;
@@ -20,6 +21,7 @@ export function CartProvider({ children }: PropsWithChildren) {
   const { user, loading } = useAuth();
   const customer = user?.role === 'CUSTOMER';
   const client = useQueryClient();
+  const { notify } = useToast();
   const [entries, setEntries] = useState(readGuestCart);
   useEffect(() => {
     const sync = () => setEntries(readGuestCart());
@@ -34,9 +36,10 @@ export function CartProvider({ children }: PropsWithChildren) {
   const query = useQuery({
     queryKey: key,
     queryFn: () => (customer ? api.cart() : api.resolveCart(entries)),
-    enabled: !loading,
+    enabled: !loading && user?.role !== 'ADMIN',
   });
   const mutation = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: async (action: {
       kind: 'add' | 'update' | 'remove';
       variantId: string;
@@ -57,6 +60,7 @@ export function CartProvider({ children }: PropsWithChildren) {
           next = current.filter((i) => i.variantId !== action.variantId);
         else {
           const existing = current.find((i) => i.variantId === action.variantId);
+          if (!existing && current.length >= 100) throw new Error('Giỏ hàng chỉ hỗ trợ tối đa 100 phiên bản.');
           const quantity =
             action.kind === 'add' ? (existing?.quantity || 0) + action.quantity! : action.quantity!;
           if (!Number.isSafeInteger(quantity) || quantity < 1)
@@ -68,6 +72,14 @@ export function CartProvider({ children }: PropsWithChildren) {
         saveGuestCart(next);
         setEntries(next);
       }
+    },
+    onSuccess: (_data, action) => {
+      const messages = {
+        add: 'Đã thêm sản phẩm vào giỏ hàng.',
+        update: 'Đã cập nhật số lượng sản phẩm.',
+        remove: 'Đã xóa sản phẩm khỏi giỏ hàng.',
+      };
+      notify(messages[action.kind]);
     },
   });
   const value: CartValue = {

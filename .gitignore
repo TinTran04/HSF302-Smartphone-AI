@@ -1,4 +1,6 @@
 docs/
 BE/hs_err_pid*.log
 BE/replay_pid*.log
+BE/uploads/product-images/
+uploads/product-images/
 node_modules/

@@ -11,13 +11,11 @@ import {
   PageHeading,
   ProductImage,
   Skeleton,
-  useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
-import { errorMessage, formatVnd } from '../../shared/utils/format';
+import { formatVnd } from '../../shared/utils/format';
 export default function CartPage() {
   const cart = useCart();
-  const { notify } = useToast();
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<unknown>();
   const [excluded, setExcluded] = useState<string[]>([]);
@@ -26,8 +24,8 @@ export default function CartPage() {
   async function change(id: string, quantity: number) {
     try {
       await cart.update(id, quantity);
-    } catch (e) {
-      notify(errorMessage(e), 'error');
+    } catch {
+      /* The mutation notification reports the failure. Keep the existing quantity. */
     }
   }
   async function remove() {
@@ -35,7 +33,6 @@ export default function CartPage() {
       await cart.remove(removing!);
       setRemoving(null);
       setError(undefined);
-      notify('Đã xóa sản phẩm khỏi giỏ hàng.');
     } catch (e) {
       setError(e);
     }
@@ -52,10 +49,15 @@ export default function CartPage() {
         <>
           {!!cart.cart?.unavailableVariantIds.length && (
             <div className="notice mb-6">
-              Một số phiên bản không còn khả dụng. Vui lòng xóa để tiếp tục.
-              {cart.cart.unavailableVariantIds.map((id) => (
+              Một số phiên bản đã ngừng bán và không thể đặt hàng.
+              {cart.cart.unavailableItems.map(({ variantId: id, product, variant, quantity }) => (
                 <div className="mt-3" key={id}>
-                  <span className="text-xs mr-4">{id}</span>
+                  <div className="flex items-center gap-3 mb-3">
+                    {product && <ProductImage src={variant?.image || product.images[0]} alt={product.name} className="cart-item-image" />}
+                    <div><strong>{product?.name || 'Sản phẩm không còn tồn tại'}</strong>
+                      <p>{variant ? variant.color + ' · ' + variant.storage : 'Mã phiên bản: ' + id} · Số lượng {quantity}</p>
+                      <span className="badge badge-error">Hết hàng</span></div>
+                  </div>
                   <Button variant="danger" disabled={cart.pending} onClick={() => setRemoving(id)}>
                     Xóa
                   </Button>
@@ -65,7 +67,7 @@ export default function CartPage() {
           )}
           {!cart.cart?.items.length ? (
             <EmptyState
-              title="Giỏ hàng của bạn đang trống"
+              title={cart.cart?.unavailableItems.length ? 'Không có sản phẩm có thể đặt' : 'Giỏ hàng của bạn đang trống'}
               description="Khám phá bộ sưu tập và tìm chiếc điện thoại phù hợp với bạn."
               icon="shopping_bag"
               action={

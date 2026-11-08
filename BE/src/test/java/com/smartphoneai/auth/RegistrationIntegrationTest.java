@@ -10,7 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -21,11 +22,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:registration;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class RegistrationIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @MockitoBean OtpSender sender;
+
+    @Test void missingSmtpReturnsServiceUnavailableWithoutCreatingPendingAccount() throws Exception {
+        var unconfiguredSender = new com.smartphoneai.service.impl.GmailOtpSender(
+                mock(org.springframework.mail.javamail.JavaMailSender.class), "");
+        doAnswer(invocation -> {
+            unconfiguredSender.send(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(sender).send(anyString(), anyString());
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"smtp-missing@example.com\",\"password\":\"TestPassword123!\",\"fullName\":\"Test\",\"phone\":\"0900000000\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("EMAIL_DELIVERY_UNAVAILABLE"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM users WHERE email = ?", Integer.class, "smtp-missing@example.com"));
+    }
 
     @Test void csrfTokenCanBeObtainedBeforeRegistering() throws Exception {
         var result = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
@@ -46,6 +63,41 @@ class RegistrationIntegrationTest {
         mvc.perform(post("/api/auth/otp/resend").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(java.util.Map.of("challengeId", id))))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test void pendingCustomerCanResumeRegistrationAfterLeavingOtpPage() throws Exception {
+        var sent = new AtomicReference<String>();
+        doAnswer(inv -> { sent.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
+        String body = "{\"email\":\"resume@example.com\",\"password\":\"Goodpass123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}";
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted());
+        jdbc.update("UPDATE otp_challenges SET issued_at = ? WHERE email = ?", java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(61)), "resume@example.com");
+        mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"resume@example.com\",\"password\":\"wrongpass\"}"))
+                .andExpect(status().isUnauthorized());
+        var resumed = mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"resume@example.com\",\"password\":\"Goodpass123!\"}"))
+                .andExpect(status().isAccepted()).andReturn();
+        String id = mapper.readTree(resumed.getResponse().getContentAsString()).path("challengeId").asText();
+        mvc.perform(post("/api/auth/otp/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", sent.get()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("resume@example.com"));
+    }
+
+    @Test void unverifiedCustomerCanResetPasswordWithoutActivatingAccount() throws Exception {
+        var code = new AtomicReference<String>();
+        doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
+        mvc.perform(post("/api/auth/register").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"pending-reset@example.com\",\"password\":\"Oldpassword123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
+                .andExpect(status().isAccepted());
+        var reset = mvc.perform(post("/api/auth/password-reset").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"pending-reset@example.com\"}")).andExpect(status().isAccepted()).andReturn();
+        String id=mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
+        mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId",id,"code",code.get(),"newPassword","Newpassword123!"))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
     }
 
     @Test void customerCanResetPasswordWithEmailOtp() throws Exception {
@@ -70,7 +122,7 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"reset@example.com\",\"password\":\"Newpassword123!\"}"))
-                .andExpect(status().isAccepted());
+                .andExpect(status().isOk());
     }
 
     @Test void unknownEmailGetsSameResetResponseWithoutSendingMail() throws Exception {
@@ -87,45 +139,40 @@ class RegistrationIntegrationTest {
     @Test void registrationActivatesOnlyAfterCorrectOtpAndCreatesSession() throws Exception {
         var sent = new AtomicReference<String>();
         doAnswer(inv -> { sent.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
-        var session = new MockHttpSession();
-        var registration = mvc.perform(post("/api/auth/register").session(session).with(csrf())
+        var session = new JwtTestClient();
+        var registration = mvc.perform(post("/api/auth/register").with(session).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"customer@example.com\",\"password\":\"Goodpass123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
                 .andExpect(status().isAccepted()).andReturn();
         String id = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         String wrongCode = sent.get().equals("000000") ? "111111" : "000000";
         String wrongBody = mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", wrongCode));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(wrongBody))
                 .andExpect(status().isConflict());
-        mvc.perform(get("/api/users/me").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/users/me").with(session)).andExpect(status().isUnauthorized());
         String body = mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", sent.get()));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("customer@example.com"));
-        mvc.perform(get("/api/users/me").session(session))
+        mvc.perform(get("/api/users/me").with(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("customer@example.com"));
-        mvc.perform(put("/api/users/me").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/api/users/me").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fullName\":\"An Nguyen\",\"phone\":\"0912345678\",\"address\":\"123 Nguyen Hue\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("An Nguyen"));
-        mvc.perform(get("/api/users/me").session(session))
+        mvc.perform(get("/api/users/me").with(session))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.address").value("123 Nguyen Hue"));
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf())
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict());
 
-        mvc.perform(post("/api/auth/logout").session(session).with(csrf())).andExpect(status().isNoContent());
-        var login = mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/logout").with(session).with(csrf())).andExpect(status().isNoContent());
+        var loginSession = new JwtTestClient();
+        mvc.perform(get("/api/users/me").with(loginSession)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/login").with(loginSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"customer@example.com\",\"password\":\"Goodpass123!\"}"))
-                .andExpect(status().isAccepted()).andReturn();
-        var loginSession = new MockHttpSession();
-        mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isUnauthorized());
-        String loginId = mapper.readTree(login.getResponse().getContentAsString()).path("challengeId").asText();
-        String loginBody = mapper.writeValueAsString(java.util.Map.of("challengeId", loginId, "code", sent.get()));
-        mvc.perform(post("/api/auth/otp/verify").session(loginSession).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(loginBody))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value("customer@example.com"));
-        mvc.perform(get("/api/users/me").session(loginSession)).andExpect(status().isOk());
+        mvc.perform(get("/api/users/me").with(loginSession)).andExpect(status().isOk());
     }
 }
