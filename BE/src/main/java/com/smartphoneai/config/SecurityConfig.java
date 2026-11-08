@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf", "/api/maintenance").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/product-images/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/locations/autocomplete").hasAnyRole("CUSTOMER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/locations/autocomplete", "/api/locations/reverse").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*", "/api/brands").access(not(hasRole("ADMIN")))
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout", "/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/cart/resolve").access(not(hasRole("ADMIN")))
