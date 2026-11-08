@@ -1,10 +1,13 @@
 import type { Api } from './contracts';
-import { ApiError, http, jsonBody } from './httpClient';
-import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview } from '../types/models';
+import { ApiError, http, jsonBody, setAuthAccount } from './httpClient';
+import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview, User } from '../types/models';
+import { guestCartMergeId } from '../utils/guestCartMerge';
 
 type ServerCart = { items: (CartEntry & { product: Product | null; variant: CartItem['variant'] | null; unavailable: boolean; priceAtAdd: number })[]; total: number };
 function mapCart(cart: ServerCart): Cart {
-  return { total: cart.total, unavailableVariantIds: cart.items.filter(i => i.unavailable).map(i => i.variantId),
+  return { total: cart.total,
+    unavailableItems: cart.items.filter(i => i.unavailable).map(({ variantId, quantity, product, variant }) => ({ variantId, quantity, product, variant })),
+    unavailableVariantIds: cart.items.filter(i => i.unavailable).map(i => i.variantId),
     items: cart.items.filter(i => !i.unavailable && i.product && i.variant) as CartItem[] };
 }
 type ServerOrder = Omit<Order, 'items'> & { items: { variantId: string; productName: string; color: string; storage: string; quantity: number; unitPrice: number }[] };
@@ -16,68 +19,68 @@ function mapOrder(order: ServerOrder): Order {
 const post = <T>(path: string, body?: unknown) =>
   http<T>(path, { method: 'POST', body: body === undefined ? undefined : jsonBody(body) });
 const tokenKey = 'smartphone-ai-guest-session';
-let guestSessionRequest: Promise<string> | undefined;
-export function guestToken() { return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(tokenKey); }
-export function clearGuestToken() { sessionStorage.removeItem(tokenKey); }
-async function chatHeaders() {
-  let token = guestToken();
-  if (!token) {
-    guestSessionRequest ??= post<{guestSessionToken:string}>('/ai/guest-sessions').then(result => {
-      sessionStorage.setItem(tokenKey, result.guestSessionToken);
-      return result.guestSessionToken;
-    }).finally(() => { guestSessionRequest = undefined; });
-    token = await guestSessionRequest;
-  }
-  return { 'X-Guest-Session': token };
-}
-function authHeaders(): Record<string, string> { const token = guestToken(); return token ? { 'X-Guest-Session': token } : {}; }
-async function authRequest<T>(path: string, body: unknown): Promise<T> {
-  const token = guestToken();
-  try { return await http<T>(path, { method: 'POST', headers: authHeaders(), body: jsonBody(body) }); }
-  catch (error) {
-    if (!token || !(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error;
-    clearGuestToken();
-    return http<T>(path, { method: 'POST', headers: {}, body: jsonBody(body) });
-  }
-}
-async function chatRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  try { return await http<T>(path, { ...options, headers: await chatHeaders() }); }
-  catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error;
-    clearGuestToken();
-    return http<T>(path, { ...options, headers: await chatHeaders() });
-  }
+export function clearGuestToken() {
+  try { sessionStorage.removeItem(tokenKey); } catch { /* Legacy storage can be unavailable. */ }
 }
 export const realAuth = {
-  verify: (challengeId: string, code: string, guestCart: CartEntry[]) => authRequest<{user: import('../types/models').User}>('/auth/otp/verify', { challengeId, code, guestCart }),
+  verify: async (challengeId: string, code: string, guestCart: CartEntry[]) => {
+    const result = await post<{user: User}>('/auth/otp/verify', { challengeId, code, guestCart, guestCartMergeId: await guestCartMergeId(guestCart) });
+    setAuthAccount(result.user.id);
+    clearGuestToken();
+    return result;
+  },
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
   reset: (email: string) => post<{challengeId:string}>('/auth/password-reset', { email }),
   resetConfirm: (challengeId: string, code: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, code, newPassword }),
-  acceptInvitation: (token: string, password: string) => post('/auth/admin-invitations/accept', { token, password }),
+  acceptInvitation: (token: string, password: string) => post('/auth/account-invitations/accept', { token, password }),
 };
 export const realApi: Api = {
   me: async () => {
     try {
-      return await http('/users/me');
+      const user = await http<User>('/users/me');
+      setAuthAccount(user.id);
+      return user;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return null;
+      if (e instanceof ApiError && e.status === 401 && e.code !== 'AUTH_CONTEXT_CHANGED') {
+        setAuthAccount(null);
+        return null;
+      }
       throw e;
     }
   },
   login: async (data) => {
-    const result = await authRequest<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password });
+    const result = await post<{user?: import('../types/models').User; challengeId?: string; expiresAt?: string; resendAfter?: string}>('/auth/login', { identifier: data.email, password: data.password, guestCart: data.guestCart, guestCartMergeId: await guestCartMergeId(data.guestCart) });
+    if (result.user) {
+      setAuthAccount(result.user.id);
+      clearGuestToken();
+    }
     return result.user ?? { challengeId: result.challengeId!, expiresAt: result.expiresAt, resendAfter: result.resendAfter };
   },
   register: (data) => post('/auth/register', { email: data.email, password: data.password, fullName: data.fullName, phone: data.phone }),
-  logout: () => post('/auth/logout'),
+  logout: async () => {
+    await post('/auth/logout');
+    setAuthAccount(null);
+  },
   updateProfile: (data) => http('/users/me', { method: 'PUT', body: jsonBody(data) }),
-  products: (params = new URLSearchParams(), admin = false) =>
-    http(`/${admin ? 'admin/' : ''}products?${params}`),
+  addressSuggestions: (text, signal) => http(`/locations/autocomplete?${new URLSearchParams({ text: text.trim() })}`, { signal }),
+  reverseLocation: (point, signal) => http(`/locations/reverse?${new URLSearchParams({ latitude: String(point.latitude), longitude: String(point.longitude) })}`, { signal }),
+  products: (params = new URLSearchParams(), admin = false) => {
+    const searchParams = new URLSearchParams(params);
+    if (searchParams.has('keyword') && !searchParams.has('q')) {
+      searchParams.set('q', searchParams.get('keyword')!);
+    }
+    return http(`/${admin ? 'admin/' : ''}products?${searchParams}`);
+  },
   product: (id, admin = false) =>
     http(`/${admin ? 'admin/' : ''}products/${encodeURIComponent(id)}`),
-  brands: () => http('/brands'),
+  brands: (admin = false) => http(`/${admin ? 'admin/' : ''}brands`),
   cart: async () => mapCart(await http<ServerCart>('/cart')),
-  resolveCart: async (entries) => entries.length ? mapCart(await post<ServerCart>('/cart/resolve', { items: entries })) : { items: [], unavailableVariantIds: [], total: 0 },
+  resolveCart: async (entries) => {
+    const batches = [];
+    for (let i = 0; i < entries.length; i += 100) batches.push(entries.slice(i, i + 100));
+    const results = await Promise.all(batches.map(items => post<ServerCart>('/cart/resolve', { items })));
+    return mapCart({ items: results.flatMap(result => result.items), total: results.reduce((sum, result) => sum + result.total, 0) });
+  },
   addCart: async (entry) => mapCart(await post<ServerCart>('/cart/items', entry)),
   updateCart: (id, quantity) =>
     http<ServerCart>(`/cart/items/${encodeURIComponent(id)}`, {
@@ -96,23 +99,37 @@ export const realApi: Api = {
       method: 'PATCH',
       body: jsonBody({ status }),
     }).then(mapOrder),
-  conversations: () => chatRequest('/ai/conversations'),
+  conversations: () => http('/ai/conversations'),
   createConversation: async (topic, context) => {
-    const result = await chatRequest<{ conversationId: string }>('/ai/conversations', { method: 'POST', body: jsonBody({
+    const result = await http<{ conversationId: string }>('/ai/conversations', { method: 'POST', body: jsonBody({
       topic,
       ...context,
     }) });
-    return chatRequest(`/ai/conversations/${encodeURIComponent(result.conversationId)}`);
+    return http(`/ai/conversations/${encodeURIComponent(result.conversationId)}`);
   },
-  conversation: (id) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}`),
-  sendMessage: (id, content) => chatRequest(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }) }),
-  confirmSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST' }),
-  cancelSwitch: (id) => chatRequest(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+  conversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`),
+  deleteConversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  sendMessage: (id, content) => http(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }), signal: AbortSignal.timeout(400000) }),
+  confirmSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST', signal: AbortSignal.timeout(400000) }),
+  cancelSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   dashboard: () => http('/admin/dashboard'),
+  uploadProductImage: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return http('/admin/products/images', { method: 'POST', body });
+  },
+  deleteProduct: (id) => http(`/admin/products/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   saveProduct: (product, creating) =>
     http(`/admin/products${creating ? '' : `/${encodeURIComponent(product.id)}`}`, {
       method: creating ? 'POST' : 'PUT',
-      body: jsonBody({ ...product, variants: product.variants.map(v => ({ ...v, id: /^\d+$/.test(v.id) ? v.id : undefined })) }),
+      body: jsonBody({
+        ...product,
+        brandId: Number(product.brandId),
+        variants: product.variants.map(v => ({
+          ...v,
+          id: /^\d+$/.test(v.id) ? Number(v.id) : undefined,
+        })),
+      }),
     }),
   productStatus: (id, status) =>
     http(`/admin/products/${encodeURIComponent(id)}/status`, {
@@ -136,10 +153,14 @@ export const realApi: Api = {
           }),
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
-    return (['OPENAI', 'GEMINI'] as const).map(provider => configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', active: false });
+    return (['OPENAI', 'GEMINI'] as const).map(provider => {
+      const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
+      const active = configs.find(c => c.provider === provider && c.active);
+      return { ...latest, ...(active ? { activeModel: active.model } : {}) };
+    });
   },
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
-  testAiConnection: (data) => post('/admin/ai-settings/test', data),
+  testAiConnection: (data) => http('/admin/ai-settings/test', { method: 'POST', body: jsonBody(data), signal: AbortSignal.timeout(130000) }),
   activateProvider: async (provider) => {
     await post('/admin/ai-settings/activate', { provider });
     return realApi.aiSettings();

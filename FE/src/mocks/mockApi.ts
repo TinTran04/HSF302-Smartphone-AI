@@ -15,10 +15,13 @@ import type {
   OrderStatus,
   Product,
   TopicSwitchRequired,
+  ShippingInfo,
   User,
 } from '../shared/types/models';
 import { mockBrands, mockProducts } from './products';
-import { topicInfo } from '../features/ai-chat/constants/chatTopics';
+import { normalizeTopic, topicInfo } from '../features/ai-chat/constants/chatTopics';
+import { catalogVariants } from '../features/products/availability';
+import { sortOrdersNewestFirst } from '../features/orders/sortOrders';
 
 // Local fake backend. It never connects to an AI provider or stores credentials.
 // It is loaded only when the explicitly visible demo mode is enabled.
@@ -32,8 +35,10 @@ const read = <T>(key: string, initial: T): T => {
 const write = (key: string, value: unknown) => {
   try {
     sessionStorage.setItem(`smai-demo-${key}`, JSON.stringify(value));
+    return true;
   } catch {
     /* A full browser store must not break the interface. */
+    return false;
   }
 };
 let user = read<User | null>('user', null);
@@ -60,11 +65,15 @@ let documents = read<KnowledgeDocument[]>('documents', [
   },
 ]);
 let settings = read<AiSettings[]>('settings', [
-  { provider: 'OPENAI', model: 'demo-chat-model', maskedKey: '••••••••', active: true },
-  { provider: 'GEMINI', model: 'demo-chat-model', maskedKey: '', active: false },
+  { provider: 'OPENAI', model: 'demo-chat-model', maskedKey: '••••••••', maskedBackupKey: '', tested: true, active: true },
+  { provider: 'GEMINI', model: 'demo-chat-model', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
 ]);
-const previews = new Map<string, OrderPreview & { items: CartItem[] }>();
-const idempotency = new Map<string, Order>();
+const previews = new Map<string, OrderPreview & { items: CartItem[]; shipping: ShippingInfo; userId: string }>();
+const idempotency = new Map<string, { order: Order; previewId: string }>();
+const normalizeShipping = (shipping: ShippingInfo): ShippingInfo => ({
+  fullName: shipping.fullName.trim(), phone: shipping.phone.trim(), address: shipping.address.trim(),
+  note: shipping.note?.trim() ?? '', location: shipping.location ?? null,
+});
 const delay = async <T>(value: T): Promise<T> => {
   await new Promise((resolve) => setTimeout(resolve, 180));
   return structuredClone(value);
@@ -74,6 +83,11 @@ const owner = () => user?.id || 'guest-session';
 const signedIn = () => {
   if (!user) throw new ApiError(401, 'Vui lòng đăng nhập để tiếp tục.');
   return user;
+};
+const customer = () => {
+  const account = signedIn();
+  if (account.role !== 'CUSTOMER') throw new ApiError(403, 'Chỉ khách hàng được sử dụng trợ lý AI.');
+  return account;
 };
 const admin = () => {
   if (signedIn().role !== 'ADMIN')
@@ -95,11 +109,13 @@ const save = () => {
 };
 function resolveCart(entries: CartEntry[]): Cart {
   const unavailableVariantIds: string[] = [];
+  const unavailableItems: Cart['unavailableItems'] = [];
   const items = entries.flatMap((entry) => {
     const product = products.find((p) => p.variants.some((v) => v.id === entry.variantId));
     const variant = product?.variants.find((v) => v.id === entry.variantId);
     if (!product || !variant || product.status !== 'ACTIVE' || variant.status !== 'ACTIVE') {
       unavailableVariantIds.push(entry.variantId);
+      unavailableItems.push({ ...entry, product: product ?? null, variant: variant ?? null });
       return [];
     }
     return [{ ...entry, product, variant }];
@@ -107,6 +123,7 @@ function resolveCart(entries: CartEntry[]): Cart {
   return {
     items,
     unavailableVariantIds,
+    unavailableItems,
     total: items.reduce((sum, i) => sum + i.variant.price * i.quantity, 0),
   };
 }
@@ -115,8 +132,10 @@ function myCart() {
   return (carts[me.id] ||= []);
 }
 function myChat(id: string) {
+  customer();
   const chat = (chats[owner()] || []).find((c) => c.id === id);
   if (!chat) throw new ApiError(404, 'Cuộc hội thoại không tồn tại hoặc đã hết phiên.');
+  chat.topic = normalizeTopic(chat.topic);
   return chat;
 }
 function findOrder(id: string, isAdmin = false) {
@@ -139,14 +158,15 @@ function responseFor(chat: Conversation, question: string): AiAnswer {
   };
   const ids = (chats[owner()] || []).find((c) => c.id === chat.id)?.productIds;
   const compared = ids?.length ? products.filter((p) => ids.includes(p.id)) : products.slice(0, 2);
+  const comparing = chat.topic === 'PHONE_CONSULTATION' && (/so sánh|compare/i.test(question) || (ids?.length ?? 0) >= 2);
   const response: AiAnswer = {
     type: 'ANSWER',
     conversationId: chat.id,
     answer: answers[chat.topic],
-    ...(chat.topic === 'PHONE_CONSULTATION'
+    ...(chat.topic === 'PHONE_CONSULTATION' && !comparing
       ? { recommendedProducts: products.filter((p) => p.status === 'ACTIVE').slice(0, 2) }
       : {}),
-    ...(chat.topic === 'PHONE_COMPARISON' ? { comparedProducts: compared } : {}),
+    ...(comparing ? { comparedProducts: compared } : {}),
     ...(chat.topic === 'SHOP_SUPPORT'
       ? {
           sources: [
@@ -215,23 +235,40 @@ export const mockApi: Api = {
     return delay(user);
   },
   logout: async () => {
-    const previous = owner();
     user = null;
-    delete chats[previous];
-    delete chats['guest-session'];
-    switches = {};
     write('user', null);
     save();
     await delay(undefined);
   },
   updateProfile: (data) => {
-    user = { ...signedIn(), ...data };
+    user = { ...signedIn(), fullName: data.fullName.trim(), phone: data.phone, address: data.address, location: data.location ?? null };
     write('user', user);
     return delay(user);
   },
+  reverseLocation: async (point, signal) => {
+    signedIn();
+    signal?.throwIfAborted();
+    const result = await delay({ label: `Địa chỉ minh họa tại ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}` });
+    signal?.throwIfAborted();
+    return result;
+  },
+  addressSuggestions: async (text, signal) => {
+    signedIn();
+    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const places = [
+      { id: 'demo-nguyen-hue', label: 'Phố đi bộ Nguyễn Huệ, TP. Hồ Chí Minh, Việt Nam', location: { latitude: 10.7739, longitude: 106.7031 } },
+      { id: 'demo-ben-thanh', label: 'Chợ Bến Thành, TP. Hồ Chí Minh, Việt Nam', location: { latitude: 10.7725, longitude: 106.698 } },
+      { id: 'demo-hoan-kiem', label: 'Hồ Hoàn Kiếm, Hà Nội, Việt Nam', location: { latitude: 21.0287, longitude: 105.8524 } },
+    ];
+    const result = normalized.length < 3 ? [] : places.filter((place) =>
+      place.label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(normalized));
+    const suggestions = await delay(result);
+    signal?.throwIfAborted();
+    return suggestions;
+  },
   products: (params = new URLSearchParams(), isAdmin = false) => {
     if (isAdmin) admin();
-    let items = products.filter((p) => isAdmin || p.status === 'ACTIVE');
+    let items = [...products];
     const keyword = (params.get('keyword') || '').toLocaleLowerCase('vi-VN');
     const min = Number(params.get('minPrice') || 0),
       max = Number(params.get('maxPrice') || Infinity);
@@ -240,19 +277,19 @@ export const mockApi: Api = {
         p.name.toLocaleLowerCase('vi-VN').includes(keyword) &&
         (!params.get('brandId') || p.brandId === params.get('brandId')) &&
         (!params.get('ram') || p.specifications.RAM === params.get('ram')) &&
-        p.variants.some(
+        (isAdmin ? p.variants : catalogVariants(p)).some(
           (v) =>
-            (isAdmin || v.status === 'ACTIVE') &&
             v.price >= min &&
             v.price <= max &&
             (!params.get('storage') || v.storage === params.get('storage')),
         ) &&
         (!params.get('status') || p.status === params.get('status')),
     );
-    const minPrice = (p: Product) => Math.min(...p.variants.map((v) => v.price));
+    const minPrice = (p: Product) => Math.min(...catalogVariants(p).map((v) => v.price));
     if (params.get('sort') === 'price,asc') items.sort((a, b) => minPrice(a) - minPrice(b));
     if (params.get('sort') === 'price,desc') items.sort((a, b) => minPrice(b) - minPrice(a));
     if (params.get('sort') === 'name,asc') items.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    if (params.get('sort') === 'name,desc') items.sort((a, b) => b.name.localeCompare(a.name, 'vi'));
     const size = Math.max(1, Math.min(100, Number(params.get('size')) || 6));
     const totalPages = Math.max(1, Math.ceil(items.length / size));
     const page = Math.max(1, Math.min(totalPages, Number(params.get('page')) || 1));
@@ -267,8 +304,6 @@ export const mockApi: Api = {
   product: (id, isAdmin = false) => {
     if (isAdmin) admin();
     const p = productById(id);
-    if (!isAdmin && p.status !== 'ACTIVE')
-      throw new ApiError(404, 'Sản phẩm hiện không được mở bán.');
     return delay(p);
   },
   brands: () => delay(mockBrands),
@@ -300,7 +335,7 @@ export const mockApi: Api = {
     save();
     return delay(resolveCart(myCart()));
   },
-  previewOrder: (_shipping, variantIds) => {
+  previewOrder: (shipping, variantIds) => {
     const cart = resolveCart(myCart());
     const items = variantIds?.length ? cart.items.filter(i => variantIds.includes(i.variantId)) : cart.items;
     if (!items.length || (variantIds?.length && items.length !== variantIds.length))
@@ -310,6 +345,8 @@ export const mockApi: Api = {
       total: items.reduce((sum, i) => sum + i.variant.price * i.quantity, 0),
       items: structuredClone(items),
       priceChanged: false,
+      shipping: structuredClone(normalizeShipping(shipping)),
+      userId: signedIn().id,
     };
     previews.set(preview.previewId, preview);
     return delay(preview);
@@ -317,10 +354,17 @@ export const mockApi: Api = {
   placeOrder: (data, key) => {
     signedIn();
     const prior = idempotency.get(`${owner()}:${key}`);
-    if (prior) return delay(prior);
+    const shipping = normalizeShipping(data.shipping);
+    if (prior) {
+      if (prior.previewId !== data.previewId || JSON.stringify(prior.order.shipping) !== JSON.stringify(shipping))
+        throw new ApiError(409, 'Thông tin giao hàng đã thay đổi. Vui lòng kiểm tra đơn hàng lại.');
+      return delay(prior.order);
+    }
     const preview = previews.get(data.previewId);
     if (!preview)
       throw new ApiError(409, 'Bản xem trước đã hết hạn. Vui lòng kiểm tra đơn hàng lại.');
+    if (preview.userId !== signedIn().id || JSON.stringify(preview.shipping) !== JSON.stringify(shipping))
+      throw new ApiError(409, 'Thông tin giao hàng đã thay đổi. Vui lòng kiểm tra đơn hàng lại.');
     const cart = resolveCart(myCart());
     const chosen = cart.items.filter(i => preview.items.some(item => item.variantId === i.variantId));
     if (
@@ -340,7 +384,7 @@ export const mockApi: Api = {
       customerName: signedIn().fullName,
       createdAt,
       status: 'PENDING',
-      shipping: data.shipping,
+      shipping: structuredClone(preview.shipping),
       items: preview.items,
       total: preview.total,
       paymentMethod: 'COD',
@@ -348,7 +392,7 @@ export const mockApi: Api = {
     };
     allOrders.unshift(order);
     carts[signedIn().id] = myCart().filter(i => !preview.items.some(item => item.variantId === i.variantId));
-    idempotency.set(`${owner()}:${key}`, order);
+    idempotency.set(`${owner()}:${key}`, { order, previewId: data.previewId });
     previews.delete(data.previewId);
     save();
     return delay(order);
@@ -356,7 +400,7 @@ export const mockApi: Api = {
   orders: (isAdmin = false) => {
     if (isAdmin) admin();
     else signedIn();
-    return delay(allOrders.filter((o) => isAdmin || o.userId === user?.id));
+    return delay(sortOrdersNewestFirst(allOrders.filter((o) => isAdmin || o.userId === user?.id)));
   },
   order: (id, isAdmin = false) => delay(findOrder(id, isAdmin)),
   cancelOrder: (id) => {
@@ -383,11 +427,15 @@ export const mockApi: Api = {
     save();
     return delay(o);
   },
-  conversations: () => delay(chats[owner()] || []),
+  conversations: () => {
+    customer();
+    return delay(chats[owner()] || []);
+  },
   createConversation: (topic, context) => {
+    customer();
     const conversation = {
       id: uid('conv'),
-      topic,
+      topic: normalizeTopic(topic),
       title: topicInfo(topic).title,
       messages: [],
       owner: owner(),
@@ -398,6 +446,16 @@ export const mockApi: Api = {
     return delay(conversation);
   },
   conversation: (id) => delay(myChat(id)),
+  deleteConversation: (id) => {
+    myChat(id);
+    chats[owner()] = chats[owner()].filter(chat => chat.id !== id);
+    for (const [switchId, request] of Object.entries(switches)) {
+      if (request.owner === owner() && (request.conversationId === id || request.answer?.newConversationId === id))
+        delete switches[switchId];
+    }
+    save();
+    return delay(undefined);
+  },
   sendMessage: (id, content): Promise<ChatSendResponse> => {
     const chat = myChat(id);
     if (chat.pendingSwitch)
@@ -439,6 +497,7 @@ export const mockApi: Api = {
     return delay(answer);
   },
   confirmSwitch: (switchId) => {
+    customer();
     const pending = switches[switchId];
     if (!pending || pending.owner !== owner())
       throw new ApiError(404, 'Yêu cầu chuyển chủ đề đã hết hạn.');
@@ -464,6 +523,7 @@ export const mockApi: Api = {
     return delay(pending.answer);
   },
   cancelSwitch: async (switchId) => {
+    customer();
     const pending = switches[switchId];
     if (!pending || pending.owner !== owner()) throw new ApiError(404, 'Yêu cầu đã hết hạn.');
     delete myChat(pending.conversationId).pendingSwitch;
@@ -486,9 +546,13 @@ export const mockApi: Api = {
     admin();
     if (creating) {
       if (products.some((x) => x.id === p.id)) throw new ApiError(409, 'Mã sản phẩm đã tồn tại.');
-      products.push(p);
-    } else products = products.map((x) => (x.id === p.id ? p : x));
-    save();
+    }
+    const nextProducts = creating ? [...products, p] : products.map((x) => (x.id === p.id ? p : x));
+    if (!write('products', nextProducts))
+      throw new ApiError(507,
+        'Bộ nhớ demo của trình duyệt đã đầy hoặc không khả dụng. Chưa lưu sản phẩm. Hãy bớt ảnh hoặc thử lại.',
+        'DEMO_STORAGE_UNAVAILABLE');
+    products = nextProducts;
     return delay(p);
   },
   productStatus: (id, status) => {
@@ -497,6 +561,30 @@ export const mockApi: Api = {
     p.status = status;
     save();
     return delay(p);
+  },
+  uploadProductImage: async (file) => {
+    admin();
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
+      throw new ApiError(400, 'Vui lòng chọn ảnh PNG, JPEG hoặc WebP.');
+    if (!file.size || file.size > 5 * 1024 * 1024)
+      throw new ApiError(400, 'Ảnh phải có nội dung và không vượt quá 5 MB.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 32768)
+      binary += String.fromCharCode(...bytes.subarray(index, index + 32768));
+    return delay({ url: `data:${file.type};base64,${btoa(binary)}` });
+  },
+  deleteProduct: async (id) => {
+    admin();
+    const product = productById(id);
+    const variantIds = new Set(product.variants.map((variant) => variant.id));
+    products = products.filter((item) => item.id !== id);
+    for (const accountId of Object.keys(carts))
+      carts[accountId] = carts[accountId].filter((entry) => !variantIds.has(entry.variantId));
+    for (const [previewId, preview] of previews)
+      if (preview.items.some((entry) => variantIds.has(entry.variantId))) previews.delete(previewId);
+    save();
+    await delay(undefined);
   },
   documents: () => {
     admin();
@@ -533,20 +621,30 @@ export const mockApi: Api = {
   saveAiSettings: (data) => {
     admin();
     const current = settings.find((s) => s.provider === data.provider)!;
+    if (current.active) current.activeModel = current.model;
+    current.active = false;
+    current.tested = false;
     current.model = data.model;
     if (data.apiKey) current.maskedKey = '••••••••';
+    if (data.removeBackupKey) current.maskedBackupKey = '';
+    else if (data.backupApiKey) current.maskedBackupKey = '••••••••';
     save();
     return delay(current);
   },
-  testAiConnection: () => {
+  testAiConnection: (data) => {
     admin();
+    settings.find((s) => s.provider === data.provider)!.tested = true;
+    save();
     return delay({ message: 'Chế độ demo: chỉ kiểm tra giao diện, chưa gọi nhà cung cấp AI.' });
   },
   activateProvider: (provider) => {
     admin();
     if (!settings.find((s) => s.provider === provider)?.maskedKey)
       throw new ApiError(400, 'Vui lòng lưu cấu hình trước khi kích hoạt.');
-    settings = settings.map((s) => ({ ...s, active: s.provider === provider }));
+    if (!settings.find((s) => s.provider === provider)?.tested)
+      throw new ApiError(409, 'Vui lòng kiểm tra kết nối trước khi kích hoạt.');
+    settings = settings.map((s) => ({ ...s, active: s.provider === provider,
+      activeModel: s.provider === provider ? s.model : undefined }));
     save();
     return delay(settings);
   },

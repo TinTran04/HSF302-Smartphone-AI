@@ -1,6 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 
-test('real BE: admin login, brand and product creation, guest cart and guest chat session', async ({ page }) => {
+async function resetMaintenance(request: APIRequestContext) {
+  const csrf = await (await request.get('/api/auth/csrf')).json();
+  const response = await request.put('/api/admin/maintenance', {
+    headers: { 'X-XSRF-TOKEN': csrf.token }, data: { enabled: false },
+  });
+  expect(response.ok()).toBe(true);
+}
+
+test.beforeEach(async ({ request }) => {
+  const csrf = await (await request.get('/api/auth/csrf')).json();
+  const login = await request.post('/api/auth/login', {
+    headers: { 'X-XSRF-TOKEN': csrf.token },
+    data: { identifier: 'integration-admin@example.com', password: 'IntegrationPass123!' },
+  });
+  expect(login.ok()).toBe(true);
+  await resetMaintenance(request);
+});
+
+test.afterEach(async ({ request }) => { await resetMaintenance(request); });
+
+test('real BE: admin catalog, guest cart, authenticated chat and profile', async ({ page, request }) => {
+  test.setTimeout(120000);
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 10.7769, longitude: 106.7009 });
   const errors: string[] = [];
   const suffix = Date.now().toString();
   const brandName = `Integration Brand ${suffix}`;
@@ -8,23 +31,42 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   const secondName = `Điện thoại còn lại ${suffix}`;
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Email', exact: true }).fill('integration-admin');
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill('integration-admin@example.com');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Tổng quan quản trị' })).toBeVisible();
-  await page.goto('/admin/admins');
+  await page.goto('/admin/accounts');
   await page.getByLabel('Họ tên').fill('Admin kiểm thử');
   await page.getByLabel('Email').fill(`admin.${suffix}@example.com`);
-  await page.getByRole('button', { name: 'Gửi lời mời', exact: true }).click();
-  await expect(page.getByText(`admin.${suffix}@example.com`)).toBeVisible();
+  await page.getByRole('combobox', { name: 'Vai trò', exact: true }).selectOption('ADMIN');
+  await page.getByRole('button', { name: 'Tạo tài khoản và gửi email', exact: true }).click();
+  await expect(page.getByText(`admin.${suffix}@example.com`)).toBeVisible({ timeout: 45000 });
   await page.reload();
-  await page.getByText(`admin.${suffix}@example.com`).locator('..').getByRole('button', { name: 'Gửi lại lời mời', exact: true }).click();
-  await expect(page.getByText('Đã thực hiện thao tác.', { exact: true })).toBeVisible();
+  await page.getByRole('row').filter({ hasText: `admin.${suffix}@example.com` }).getByRole('button', { name: 'Gửi lại lời mời', exact: true }).click();
+  await expect(page.getByText('Đã gửi lại email đặt mật khẩu.', { exact: true })).toBeVisible();
   await page.goto('/admin/brands');
   await page.getByLabel('Tên thương hiệu').fill(brandName);
   await page.getByRole('button', { name: 'Thêm thương hiệu' }).click();
   await expect(page.getByText(brandName, { exact: true })).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã thêm thương hiệu.' })).toHaveCount(1);
+  const temporaryBrand = `Temporary ${suffix}`;
+  await page.getByLabel('Tên thương hiệu').fill(temporaryBrand);
+  await page.getByRole('button', { name: 'Thêm thương hiệu' }).click();
+  const brandRow = page.locator('.panel > div').filter({ hasText: temporaryBrand });
+  await brandRow.getByRole('button', { name: 'Sửa', exact: true }).click();
+  const editBrand = page.getByRole('dialog', { name: 'Sửa thương hiệu' });
+  await editBrand.getByLabel('Tên thương hiệu mới').fill(`${temporaryBrand} renamed`);
+  await editBrand.getByRole('button', { name: 'Lưu thay đổi' }).click();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã cập nhật thương hiệu.' })).toHaveCount(1);
+  await brandRow.getByRole('button', { name: 'Xóa', exact: true }).click();
+  const deleteBrand = page.getByRole('dialog', { name: 'Xác nhận xóa thương hiệu' });
+  await deleteBrand.getByRole('button', { name: 'Quay lại' }).click();
+  await expect(brandRow).toBeVisible();
+  await brandRow.getByRole('button', { name: 'Xóa', exact: true }).click();
+  await deleteBrand.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(brandRow).toHaveCount(0);
+  await expect(page.locator('.toast').filter({ hasText: 'Đã xóa thương hiệu.' })).toHaveCount(1);
   await page.goto('/admin/ai-settings');
   await expect(page.getByLabel('Chat Model')).toBeVisible();
   await page.goto('/admin/products/new');
@@ -32,6 +74,14 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('combobox', { name: 'Thương hiệu', exact: true }).selectOption({ label: brandName });
   await page.getByLabel('Màu sắc', { exact: true }).fill('Đen');
   await page.getByLabel('Giá (VNĐ)', { exact: true }).fill('10000000');
+  const uploaded = page.waitForResponse(response => response.url().endsWith('/api/admin/products/images') && response.status() === 201);
+  await page.getByLabel('Hình ảnh sản phẩm', { exact: true }).setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
+  const imageUrl = (await (await uploaded).json()).url as string;
+  expect(imageUrl).toMatch(/^\/api\/product-images\/[a-f0-9-]+\.(png|jpg|webp)$/);
+  await expect(page.getByRole('img', { name: 'Hình ảnh sản phẩm 1', exact: true })).toHaveAttribute('src', imageUrl);
+  await page.getByLabel('Ảnh phiên bản 1', { exact: true }).setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
+  await expect(page.getByRole('img', { name: 'Ảnh phiên bản 1 1', exact: true })).toHaveAttribute('src', /^\/api\/product-images\//);
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   await page.getByRole('button', { name: 'Lưu sản phẩm', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/products$/);
   await page.goto('/admin/products/new');
@@ -42,8 +92,15 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('button', { name: 'Lưu sản phẩm', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/products$/);
   await page.goto('/products');
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto('/admin/profile');
+  await expect(page.getByRole('heading', { name: 'Thông tin tài khoản', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+  await page.goto('/products');
   await expect(page.getByText(productName).first()).toBeVisible();
   await page.getByRole('link', { name: `Xem ${productName}`, exact: true }).click();
+  const productId = page.url().split('/').pop()!;
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   await page.getByRole('button', { name: '256GB', exact: true }).click();
   await page.getByRole('button', { name: 'Đen', exact: true }).click();
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
@@ -55,15 +112,12 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await page.getByRole('button', { name: 'Đen', exact: true }).click();
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
   await page.goto('/ai');
-  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
-  await expect(page).toHaveURL(/\/ai\/conversations\//);
-  await page.goto('/admin');
-  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
   await page.goto('/register');
   await page.getByLabel('Họ và tên', { exact: true }).fill('Khách kiểm thử');
   await page.getByLabel('Số điện thoại', { exact: true }).fill('0900000000');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(`customer.${suffix}@example.com`);
-  await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
+  await page.getByLabel('Mật khẩu (tối thiểu 8 ký tự)', { exact: true }).fill('Password123!');
   await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('Password123!');
   await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click();
   await expect(page.getByLabel('Mã OTP')).toBeVisible();
@@ -71,14 +125,60 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   const { otp } = await mailbox.json();
   expect(otp).toMatch(/^\d{6}$/);
   await page.getByLabel('Mã OTP').fill(otp);
-  await page.getByRole('button', { name: 'Xác minh OTP' }).click();
+  await page.getByRole('button', { name: 'Hoàn tất đăng ký' }).click();
   await expect(page).toHaveURL(/\/$/);
+  const liveChatRenewal = page.waitForResponse(response => response.url().endsWith('/api/auth/refresh') && response.status() === 204);
+  await page.context().clearCookies({ name: 'SPAI_ACCESS' });
+  await page.locator('header').getByRole('link', { name: 'Tư vấn AI', exact: true }).click();
+  await expect(page).toHaveURL(/\/ai$/);
+  await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
+  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
+  await liveChatRenewal;
+  await expect(page).toHaveURL(/\/ai\/conversations\//);
+  const conversationUrl = page.url();
+  await page.locator('.chat-history-row').getByRole('button', { name: /Xóa cuộc trò chuyện/ }).click();
+  const deleteChatDialog = page.getByRole('dialog', { name: 'Xóa cuộc trò chuyện' });
+  let failedDelete = false;
+  await page.route(`**/api/ai/conversations/${conversationUrl.split('/').pop()}`, async route => {
+    if (route.request().method() === 'DELETE' && !failedDelete) {
+      failedDelete = true;
+      await route.fulfill({ status: 503, json: { message: 'Chưa thể xóa cuộc trò chuyện kiểm thử.' } });
+    } else await route.continue();
+  });
+  await deleteChatDialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
+  await expect(page.locator('.toast-error').filter({ hasText: 'Chưa thể xóa cuộc trò chuyện kiểm thử.' })).toHaveCount(1);
+  await expect(deleteChatDialog).toBeVisible();
+  await expect(page.locator('.chat-history-row')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/chat-delete-error.png', fullPage: true });
+  await deleteChatDialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
+  await expect(page).toHaveURL(/\/ai$/);
+  await expect(page.locator('.chat-history-row')).toHaveCount(0);
+  expect((await page.request.get(`/api/ai/conversations/${conversationUrl.split('/').pop()}`)).status()).toBe(404);
+  await page.goto('/profile');
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toBeDisabled();
+  await page.screenshot({ path: 'test-results/profile-view.png', fullPage: true });
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin' }).click();
+  await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+  await page.getByLabel('Họ và tên', { exact: true }).fill('Khách đã cập nhật');
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('0912345678');
+  await page.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
+  await page.screenshot({ path: 'test-results/profile-edit.png', fullPage: true });
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toHaveValue('Khách đã cập nhật');
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(`customer.${suffix}@example.com`);
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: productName })).toBeVisible();
   await expect(page.getByRole('heading', { name: secondName })).toBeVisible();
   await page.getByLabel(`Chọn ${secondName}`).uncheck();
   await page.getByRole('link', { name: 'Tiến hành đặt hàng' }).click();
-  await page.getByLabel('Địa chỉ nhận hàng').fill('123 Nguyễn Huệ, Hồ Chí Minh');
+  await page.getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true }).fill('123 Nguyễn Huệ, Hồ Chí Minh');
+  await expect(page.locator('.location-picker')).toContainText('Chưa chọn vị trí trên bản đồ.');
+  await page.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await page.getByRole('button', { name: 'Kiểm tra đơn hàng' }).click();
   await expect(page.getByText('Đã kiểm tra giá với máy chủ. Vui lòng xác nhận đặt hàng.')).toBeVisible();
   let dropped = false;
@@ -95,10 +195,395 @@ test('real BE: admin login, brand and product creation, guest cart and guest cha
   await expect(page.getByRole('button', { name: /Thử lại xác nhận/ })).toBeVisible({ timeout: 3000 });
   await page.getByRole('button', { name: /Thử lại xác nhận/ }).click();
   await expect(page).toHaveURL(/\/orders\//);
+  const placedOrderUrl = page.url();
   await expect(page.getByText(/Đặt hàng thành công!/)).toBeVisible();
+  await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
   await expect(page.getByRole('heading', { name: productName })).toBeVisible();
   await expect(page.getByRole('heading', { name: secondName })).toHaveCount(0);
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: secondName })).toBeVisible();
+  await page.getByLabel('Menu tài khoản').click();
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('header').getByRole('link', { name: 'Đăng nhập', exact: true })).toBeVisible();
+  await page.goto('/products');
+  await page.getByRole('link', { name: `Xem ${secondName}`, exact: true }).click();
+  await page.getByRole('button', { name: '256GB', exact: true }).click();
+  await page.getByRole('button', { name: 'Đen', exact: true }).click();
+  await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
+  await page.goto('/ai');
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill(`customer.${suffix}@example.com`);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
+  let droppedLogin = false;
+  await page.route('**/api/auth/login', async route => {
+    if (!droppedLogin) {
+      droppedLogin = true;
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      await route.abort('connectionreset');
+    } else await route.continue();
+  });
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.getByRole('alert').last()).toBeVisible();
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/ai$/);
+  await expect(page.getByLabel('Mã OTP')).toHaveCount(0);
+  await page.goto('/cart');
+  await expect(page.locator('.cart-item').filter({ hasText: secondName }).locator('.quantity > span[aria-live]')).toHaveText('2');
+  const csrf = await (await request.get('/api/auth/csrf')).json();
+  const deleted = await request.delete(`/api/admin/products/${productId}`, { headers: { 'X-XSRF-TOKEN': csrf.token } });
+  expect(deleted.status()).toBe(204);
+  expect((await page.request.get(`/api/products/${productId}`)).status()).toBe(404);
+  await page.goto(placedOrderUrl);
+  await expect(page.getByRole('heading', { name: productName })).toBeVisible();
+  expect((await page.request.get(imageUrl)).status()).toBe(200);
   expect(errors).toEqual([]);
+});
+
+test('real BE: address autocomplete ignores stale responses and allows manual input on provider errors', async ({ page }) => {
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eef2e8"/></svg>' }));
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto('/admin/profile');
+  const address = page.getByRole('combobox', { name: 'Địa chỉ mặc định', exact: true });
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true }).click();
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('0900000000');
+  const seen: string[] = [];
+  await page.route('**/api/locations/autocomplete?*', async route => {
+    const query = new URL(route.request().url()).searchParams.get('text')!;
+    seen.push(query);
+    expect(route.request().url()).not.toContain('apiKey');
+    if (query === 'Lỗi thử nghiệm') return route.fulfill({ status: 503, json: { message: 'Gợi ý tạm ngưng.' } });
+    if (query === 'Không kết quả') return route.fulfill({ json: [] });
+    if (query === 'Địa chỉ cũ') await new Promise(resolve => setTimeout(resolve, 1200));
+    return route.fulfill({ json: [{ id: query, label: query === 'Địa chỉ cũ' ? 'Kết quả cũ' : 'Địa chỉ mới, Việt Nam', location: { latitude: 21.0287, longitude: 105.8524 } }] });
+  });
+  await address.fill('Lỗi thử nghiệm');
+  await expect(page.getByRole('status').filter({ hasText: 'Gợi ý địa chỉ đang tạm ngưng.' })).toBeVisible();
+  await expect(address).toBeEnabled();
+  await address.fill('Không kết quả');
+  await expect(page.getByText('Chưa tìm thấy địa chỉ phù hợp. Bạn vẫn có thể nhập thủ công.')).toBeVisible();
+  await address.fill('Địa chỉ cũ');
+  await expect.poll(() => seen.includes('Địa chỉ cũ')).toBe(true);
+  await address.fill('Địa chỉ mới');
+  await page.getByRole('option', { name: 'Địa chỉ mới, Việt Nam', exact: true }).click();
+  await expect(address).toHaveValue('Địa chỉ mới, Việt Nam');
+  await expect(page.locator('.location-picker')).toContainText('21.028700, 105.852400');
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(address).toBeDisabled();
+  await expect(page.getByRole('option', { name: 'Kết quả cũ', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(address).toHaveValue('Địa chỉ mới, Việt Nam');
+  await expect(page.locator('.location-picker')).toContainText('21.028700, 105.852400');
+});
+
+test('real BE: manage accounts and activate an emailed CUSTOMER invitation', async ({ page, browser }) => {
+  const email = `invited.${Date.now()}@example.com`;
+  await page.goto('/login');
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto('/admin/admins');
+  await expect(page).toHaveURL(/\/admin\/accounts$/);
+  await expect(page.getByRole('heading', { name: 'Quản lý tài khoản' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Vai trò', exact: true })).toHaveValue('CUSTOMER');
+  await page.getByLabel('Họ tên', { exact: true }).fill('Khách được mời');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByRole('button', { name: 'Tạo tài khoản và gửi email' }).click();
+  const row = page.getByRole('row').filter({ hasText: email });
+  await expect(row.getByText('Chờ đặt mật khẩu', { exact: true })).toBeVisible();
+  await expect(row.getByRole('combobox')).toBeDisabled();
+  const rootRow = page.getByRole('row').filter({ hasText: 'integration-admin@example.com' });
+  await expect(rootRow.getByRole('combobox')).toBeDisabled();
+  await expect(rootRow.getByRole('button', { name: 'Vô hiệu hóa', exact: true })).toBeDisabled();
+  await page.screenshot({ path: 'test-results/accounts-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/accounts-tablet.png', fullPage: true });
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/accounts-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const firstMail = await (await page.request.get('http://127.0.0.1:12526')).json();
+  expect(firstMail.recipient).toBe(email);
+  expect(firstMail.invitationUrl).toContain('/account/invite?token=');
+  await row.getByRole('button', { name: 'Gửi lại lời mời' }).click();
+  await expect(page.getByText('Đã gửi lại email đặt mật khẩu.', { exact: true })).toBeVisible();
+  const mail = await (await page.request.get('http://127.0.0.1:12526')).json();
+  expect(mail.invitationUrl).not.toBe(firstMail.invitationUrl);
+  const context = await browser.newContext();
+  try {
+    const recipient = await context.newPage();
+    const link = new URL(mail.invitationUrl);
+    await recipient.goto(`http://127.0.0.1:15173${link.pathname}${link.search}`);
+    await expect(recipient.getByRole('heading', { name: 'Kích hoạt tài khoản', exact: true })).toBeVisible();
+    await recipient.getByLabel('Mật khẩu mới', { exact: true }).fill('InvitationPass123!');
+    await recipient.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('Mismatch123!');
+    await recipient.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(recipient.locator('.toast-error').filter({ hasText: 'Xác nhận mật khẩu chưa khớp.' })).toHaveCount(1);
+    await recipient.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('InvitationPass123!');
+    await recipient.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(recipient.getByRole('status').filter({ hasText: 'Đã cập nhật mật khẩu.' })).toBeVisible();
+    await page.reload();
+    await expect(row.getByText('Đang hoạt động', { exact: true })).toBeVisible();
+    await row.getByRole('combobox').selectOption('ADMIN');
+    const roleDialog = page.getByRole('dialog', { name: 'Xác nhận đổi vai trò' });
+    await roleDialog.getByRole('button', { name: 'Quay lại' }).click();
+    await expect(row.getByRole('combobox')).toHaveValue('CUSTOMER');
+    await row.getByRole('combobox').selectOption('ADMIN');
+    await roleDialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(page.getByText('Đã cập nhật vai trò tài khoản.', { exact: true })).toBeVisible();
+    await expect(row.getByRole('combobox')).toHaveValue('ADMIN');
+    await recipient.getByRole('status').filter({ hasText: 'Đã cập nhật mật khẩu.' }).getByRole('link', { name: 'Đăng nhập', exact: true }).click();
+    await recipient.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
+    await recipient.getByLabel('Mật khẩu', { exact: true }).fill('InvitationPass123!');
+    await recipient.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(recipient).toHaveURL(/\/admin$/);
+    await recipient.goto('http://127.0.0.1:15173/ADMIN/accounts');
+    await expect(recipient.getByRole('heading', { name: 'Quản lý tài khoản', exact: true })).toBeVisible();
+    await row.getByRole('combobox').selectOption('CUSTOMER');
+    await roleDialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(row.getByRole('combobox')).toHaveValue('CUSTOMER');
+    await recipient.reload();
+    await expect(recipient).toHaveURL(/\/login/);
+    await recipient.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
+    await recipient.getByLabel('Mật khẩu', { exact: true }).fill('InvitationPass123!');
+    await recipient.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(recipient).toHaveURL(/\/$/);
+    await expect(recipient.getByLabel('Mã OTP')).toHaveCount(0);
+    await row.getByRole('button', { name: 'Vô hiệu hóa', exact: true }).click();
+    const statusDialog = page.getByRole('dialog', { name: 'Vô hiệu hóa tài khoản' });
+    await statusDialog.getByRole('button', { name: 'Quay lại' }).click();
+    await expect(row.getByText('Đang hoạt động', { exact: true })).toBeVisible();
+    await row.getByRole('button', { name: 'Vô hiệu hóa', exact: true }).click();
+    const failureMessage = 'Lỗi kiểm thử thao tác. Vui lòng thử lại.';
+    await page.route('**/api/admin/accounts/*/status', async route => {
+      await route.fulfill({ status: 503, json: { message: failureMessage } });
+    }, { times: 1 });
+    await statusDialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    const errorToast = page.locator('.toast-error').filter({ hasText: failureMessage });
+    await expect(errorToast).toHaveCount(1);
+    await expect(statusDialog).toBeVisible();
+    await expect(row.getByText('Đang hoạt động', { exact: true })).toBeVisible();
+    expect(await errorToast.evaluate(element => {
+      const text = element.querySelector('span')!;
+      const rect = text.getBoundingClientRect();
+      const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return top === text || text.contains(top);
+    })).toBe(true);
+    await page.screenshot({ path: 'test-results/account-status-error-toast.png', fullPage: true });
+    await statusDialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(row.getByText('Đã vô hiệu hóa', { exact: true })).toBeVisible();
+    await expect(page.locator('.toast').filter({ hasText: 'Đã vô hiệu hóa tài khoản.' })).toHaveCount(1);
+    await recipient.goto('http://127.0.0.1:15173/profile');
+    await expect(recipient).toHaveURL(/\/login$/);
+    await recipient.getByLabel('Email', { exact: true }).fill(email);
+    await recipient.getByLabel('Mật khẩu', { exact: true }).fill('InvitationPass123!');
+    await recipient.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(recipient.locator('.toast-error')).toContainText('Tài khoản đã bị vô hiệu hóa');
+    await row.getByRole('button', { name: 'Cho hoạt động lại', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Cho tài khoản hoạt động lại' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(row.getByText('Đang hoạt động', { exact: true })).toBeVisible();
+    await expect(page.locator('.toast').filter({ hasText: 'Đã cho tài khoản hoạt động lại.' })).toHaveCount(1);
+    await recipient.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(recipient).toHaveURL(/\/profile$/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('real BE: password change and recovery revoke other sessions', async ({ page, browser }) => {
+  test.setTimeout(90000);
+  const email = `sessions.${Date.now()}@example.com`;
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto('/admin/accounts');
+  await page.getByLabel('Họ tên', { exact: true }).fill('Kiểm thử phiên');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByRole('button', { name: 'Tạo tài khoản và gửi email' }).click();
+  await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible();
+  const { invitationUrl } = await (await page.request.get('http://127.0.0.1:12526')).json();
+  const contexts = await Promise.all([browser.newContext(), browser.newContext(), browser.newContext()]);
+  try {
+    const first = await contexts[0].newPage();
+    const second = await contexts[1].newPage();
+    const recovery = await contexts[2].newPage();
+    const link = new URL(invitationUrl);
+    await first.goto(`http://127.0.0.1:15173${link.pathname}${link.search}`);
+    await first.getByLabel('Mật khẩu mới', { exact: true }).fill('SessionPass123!');
+    await first.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('SessionPass123!');
+    await first.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(first.getByRole('status').filter({ hasText: 'Đã cập nhật mật khẩu.' })).toBeVisible();
+    const login = async (target: typeof page, password: string) => {
+      await target.goto('http://127.0.0.1:15173/login');
+      await target.getByLabel('Email', { exact: true }).fill(email);
+      await target.getByLabel('Mật khẩu', { exact: true }).fill(password);
+      await target.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+      await expect(target).toHaveURL(/\/(?:profile)?$/);
+      await expect(target.getByLabel('Menu tài khoản')).toBeVisible();
+      await expect(target.getByLabel('Mã OTP')).toHaveCount(0);
+    };
+    await login(first, 'SessionPass123!');
+    await login(second, 'SessionPass123!');
+    await first.goto('http://127.0.0.1:15173/profile');
+    await first.getByLabel('Mật khẩu hiện tại', { exact: true }).fill('SessionPass123!');
+    await first.getByLabel('Mật khẩu mới', { exact: true }).fill('ChangedPass123!');
+    await first.getByRole('button', { name: 'Đổi mật khẩu', exact: true }).click();
+    await expect(first.getByText('Đã đổi mật khẩu.', { exact: true })).toBeVisible();
+    await first.reload();
+    await expect(first).toHaveURL(/\/profile$/);
+    await expect(first.getByRole('heading', { name: 'Thông tin tài khoản' })).toBeVisible();
+    await second.goto('http://127.0.0.1:15173/profile');
+    await expect(second).toHaveURL(/\/login$/);
+    await login(second, 'ChangedPass123!');
+    await recovery.goto('http://127.0.0.1:15173/forgot-password');
+    await recovery.getByLabel('Email', { exact: true }).fill(email);
+    await recovery.getByRole('button', { name: 'Gửi mã xác minh', exact: true }).click();
+    await expect(recovery.getByLabel('Mã OTP')).toBeVisible();
+    const { otp } = await (await page.request.get('http://127.0.0.1:12526')).json();
+    await recovery.getByLabel('Mã OTP').fill(otp);
+    await recovery.getByLabel('Mật khẩu mới', { exact: true }).fill('RecoveredPass123!');
+    await recovery.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('RecoveredPass123!');
+    await recovery.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(recovery.getByRole('status').filter({ hasText: 'Đã cập nhật mật khẩu.' })).toBeVisible();
+    await first.reload();
+    await expect(first).toHaveURL(/\/login$/);
+    await second.goto('http://127.0.0.1:15173/profile');
+    await expect(second).toHaveURL(/\/login$/);
+    await login(second, 'RecoveredPass123!');
+  } finally {
+    await Promise.all(contexts.map(context => context.close()));
+  }
+});
+
+test('real BE: maintenance screen, JWT renewal and Admin recovery', async ({ page, browser, request }) => {
+  test.setTimeout(90000);
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  const cookies = await page.context().cookies();
+  const access = cookies.find(cookie => cookie.name === 'SPAI_ACCESS')!;
+  const refresh = cookies.find(cookie => cookie.name === 'SPAI_REFRESH')!;
+  expect(access.value.split('.')).toHaveLength(3);
+  expect(access).toMatchObject({ httpOnly: true, path: '/api', sameSite: 'Strict' });
+  expect(refresh).toMatchObject({ httpOnly: true, path: '/api/auth', sameSite: 'Strict' });
+  expect(await page.evaluate(() => document.cookie)).not.toContain('SPAI_ACCESS');
+  expect(await page.evaluate(() => document.cookie)).not.toContain('SPAI_REFRESH');
+
+  const context = await browser.newContext();
+  try {
+    const guest = await context.newPage();
+    await guest.goto('http://127.0.0.1:15173/products');
+    const customerEmail = `maintenance.${Date.now()}@example.com`;
+    let guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    const registration = await guest.request.post('/api/auth/register', {
+      headers: { 'X-XSRF-TOKEN': guestCsrf },
+      data: { email: customerEmail, password: 'MaintenancePass123!', fullName: 'Khách bảo trì', phone: '0912345678' },
+    });
+    expect(registration.status()).toBe(202);
+    const { challengeId } = await registration.json();
+    const { otp } = await (await guest.request.get('http://127.0.0.1:12526')).json();
+    expect((await guest.request.post('/api/auth/otp/verify', {
+      headers: { 'X-XSRF-TOKEN': guestCsrf }, data: { challengeId, code: otp },
+    })).ok()).toBe(true);
+    guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    expect((await guest.request.post('/api/auth/logout', { headers: { 'X-XSRF-TOKEN': guestCsrf } })).status()).toBe(204);
+    await guest.goto('http://127.0.0.1:15173/products');
+    await expect(guest.getByRole('heading', { name: 'Khám phá điện thoại', exact: true })).toBeVisible();
+    await page.goto('/admin/maintenance');
+    await page.getByRole('button', { name: 'Bật bảo trì', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(page.locator('.toast').filter({ hasText: 'Đã bật bảo trì cửa hàng.' })).toHaveCount(1);
+    await guest.reload();
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì', exact: true })).toBeVisible();
+    await expect(guest.getByRole('heading', { name: 'Khám phá điện thoại', exact: true })).toHaveCount(0);
+    await guest.screenshot({ path: 'test-results/maintenance-desktop.png', fullPage: true });
+    await guest.setViewportSize({ width: 390, height: 844 });
+    expect(await guest.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await guest.screenshot({ path: 'test-results/maintenance-mobile.png', fullPage: true });
+    await expect(guest.getByRole('button', { name: 'Thử lại', exact: true })).toHaveCount(0);
+    await guest.getByRole('link', { name: 'Đăng nhập', exact: true }).click();
+    await expect(guest.getByLabel('Email', { exact: true })).toBeVisible();
+    await guest.getByLabel('Email', { exact: true }).fill(customerEmail);
+    await guest.getByLabel('Mật khẩu', { exact: true }).fill('MaintenancePass123!');
+    await guest.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(guest).toHaveURL(/\/products$/);
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì' })).toBeVisible();
+    await expect(guest.getByRole('link', { name: /Đăng nhập/ })).toHaveCount(0);
+    await guest.screenshot({ path: 'test-results/maintenance-customer.png', fullPage: true });
+    guestCsrf = (await (await guest.request.get('/api/auth/csrf')).json()).token;
+    expect((await guest.request.post('/api/auth/logout', { headers: { 'X-XSRF-TOKEN': guestCsrf } })).status()).toBe(204);
+    await guest.reload();
+    await guest.getByRole('link', { name: 'Đăng nhập', exact: true }).click();
+    await guest.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+    await guest.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+    await guest.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(guest).toHaveURL(/\/admin$/);
+    await guest.getByRole('button', { name: 'Đăng xuất quản trị', exact: true }).click();
+    await guest.goto('http://127.0.0.1:15173/register');
+    await expect(guest.getByLabel('Họ và tên', { exact: true })).toBeVisible();
+    await guest.goto('http://127.0.0.1:15173/products');
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì', exact: true })).toBeVisible();
+
+    const renewed = page.waitForResponse(response => response.url().endsWith('/api/auth/refresh') && response.status() === 204);
+    await page.context().clearCookies({ name: 'SPAI_ACCESS' });
+    await page.reload();
+    await renewed;
+    await expect(page.getByRole('heading', { name: 'Chế độ bảo trì', exact: true })).toBeVisible();
+    const currentCookies = await page.context().cookies();
+    expect(currentCookies.find(cookie => cookie.name === 'SPAI_REFRESH')!.value).not.toBe(refresh.value);
+    const csrf = (await (await page.request.get('/api/auth/csrf')).json()).token;
+    const replay = await request.post('http://127.0.0.1:15173/api/auth/refresh', {
+      headers: { Cookie: `SPAI_REFRESH=${refresh.value}; XSRF-TOKEN=${csrf}`, 'X-XSRF-TOKEN': decodeURIComponent(csrf) },
+    });
+    expect(replay.status()).toBe(401);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Chế độ bảo trì', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Tắt bảo trì', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await expect(page.locator('.toast').filter({ hasText: 'Đã tắt bảo trì cửa hàng.' })).toHaveCount(1);
+    await guest.bringToFront();
+    await expect(guest.getByRole('heading', { name: 'Shop đang bảo trì', exact: true })).toBeVisible();
+    await guest.reload();
+    await expect(guest.getByRole('heading', { name: 'Khám phá điện thoại', exact: true })).toBeVisible();
+
+    const logoutCookies = await page.context().cookies();
+    await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    const staleAccess = await request.get('http://127.0.0.1:15173/api/users/me', {
+      headers: { Cookie: `SPAI_ACCESS=${logoutCookies.find(cookie => cookie.name === 'SPAI_ACCESS')!.value}` },
+    });
+    expect(staleAccess.status()).toBe(401);
+  } finally {
+    await context.close();
+  }
+});
+
+test('real BE: authentication form retains input when maintenance lookup completes', async ({ page }) => {
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/maintenance', async route => {
+    await ready;
+    await route.continue();
+  });
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('integration-admin@example.com');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('IntegrationPass123!');
+  release();
+  await expect(page.getByRole('navigation', { name: 'Điều hướng chính' })).toBeVisible();
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue('integration-admin@example.com');
+  await expect(page.getByLabel('Mật khẩu', { exact: true })).toHaveValue('IntegrationPass123!');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
 });

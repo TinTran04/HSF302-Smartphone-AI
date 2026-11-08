@@ -1,7 +1,12 @@
 package com.smartphoneai.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartphoneai.entity.UserAccount;
+import com.smartphoneai.repository.UserAccountRepository;
+import com.smartphoneai.service.AuthTokenService;
 import com.smartphoneai.service.TopicRouter;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,9 +26,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:expiredswitch;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class ExpiredTopicSwitchIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired UserAccountRepository users;
+    @Autowired AuthTokenService tokens;
     @MockitoBean Clock clock;
     @MockitoBean TopicRouter router;
 
@@ -33,19 +41,20 @@ class ExpiredTopicSwitchIntegrationTest {
         when(router.route(anyString(), anyString(), anyList()))
                 .thenReturn(new TopicRouter.Decision("DIFFERENT_TOPIC", "SHOP_SUPPORT"))
                 .thenReturn(new TopicRouter.Decision("UNCERTAIN", null));
-        var guest = mvc.perform(post("/api/ai/guest-sessions").with(csrf())).andExpect(status().isCreated()).andReturn();
-        String token = mapper.readTree(guest.getResponse().getContentAsString()).path("guestSessionToken").asText();
-        var created = mvc.perform(post("/api/ai/conversations").header("X-Guest-Session", token).with(csrf())
+        var user = UserAccount.pendingCustomer(java.util.UUID.randomUUID() + "@example.com", "Customer", "0900000000", "x");
+        user.activate();
+        var customer = JwtTestClient.authenticated(tokens, users.saveAndFlush(user));
+        var created = mvc.perform(post("/api/ai/conversations").with(customer).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"GENERAL_CHAT\"}"))
                 .andExpect(status().isCreated()).andReturn();
         String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
-        mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(customer).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Question\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("SWITCH_REQUIRED"));
         now.set(now.get().plusSeconds(601));
-        mvc.perform(get("/api/ai/conversations/" + id).header("X-Guest-Session", token))
+        mvc.perform(get("/api/ai/conversations/" + id).with(customer))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.pendingSwitch").doesNotExist());
-        mvc.perform(post("/api/ai/conversations/" + id + "/messages").header("X-Guest-Session", token).with(csrf())
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(customer).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Another question\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("CLARIFICATION_REQUIRED"));
     }

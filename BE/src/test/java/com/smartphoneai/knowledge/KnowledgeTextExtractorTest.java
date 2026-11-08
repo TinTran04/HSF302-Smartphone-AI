@@ -1,7 +1,7 @@
 package com.smartphoneai.knowledge;
 
 import com.smartphoneai.exception.InvalidKnowledgeFileException;
-import com.smartphoneai.service.KnowledgeTextExtractor;
+import com.smartphoneai.service.support.KnowledgeTextExtractor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;

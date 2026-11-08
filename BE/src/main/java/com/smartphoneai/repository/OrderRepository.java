@@ -7,7 +7,8 @@ import java.util.*;
 public interface OrderRepository extends JpaRepository<OrderRecord, UUID> {
     long countByStatus(com.smartphoneai.entity.OrderStatus status);
     Optional<OrderRecord> findByUserIdAndIdempotencyKey(UUID userId, String key);
-    List<OrderRecord> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
+    List<OrderRecord> findAllByUserIdOrderByCreatedAtDescIdDesc(UUID userId);
+    List<OrderRecord> findAllByOrderByCreatedAtDescIdDesc();
     Optional<OrderRecord> findByIdAndUserId(UUID id, UUID userId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from OrderRecord o where o.id = :id")

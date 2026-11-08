@@ -1,6 +1,9 @@
 spring:
+  config:
+    import: "${APP_ENV_FILE:optional:file:./.env[.properties],optional:file:./BE/.env[.properties]}"
   flyway:
     locations: classpath:db/migration,classpath:db/vendor/{vendor}
+    validate-on-migrate: false
   servlet:
     multipart:
       max-file-size: 10MB
@@ -13,6 +16,7 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
+      mail.smtp.localhost: ${SMTP_LOCALHOST:localhost}
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
@@ -25,8 +29,17 @@ spring:
       ddl-auto: validate
     open-in-view: false
 app:
+  product-images:
+    directory: ${PRODUCT_IMAGES_DIRECTORY:./uploads/product-images}
+  maps:
+    geoapify-api-key: ${GEOAPIFY_API_KEY:}
+    geoapify-base-url: ${GEOAPIFY_BASE_URL:https://api.geoapify.com}
   ai:
     encryption-key: ${AI_CONFIG_ENCRYPTION_KEY:}
   root-admin:
-    username: ${ROOT_ADMIN_USERNAME:}
+    email: ${ROOT_ADMIN_EMAIL:}
     password: ${ROOT_ADMIN_PASSWORD:}
+
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}

@@ -1,0 +1,11 @@
+[
+  {
+    "sourceUrl": "https://www.mobiledokan.co/product/apple-iphone-17-air/",
+    "sourceName": "Apple iPhone 17 Air",
+    "resolvedPageUrl": "https://www.mobiledokan.co/product/apple-iphone-air/",
+    "resolvedName": "Apple iPhone Air",
+    "originalPageImageUrl": "https://www.mobiledokan.co/wp-content/uploads/2024/11/Apple-iPhone-Air-Sky-Blue.webp",
+    "verifiedAt": "2026-11-06",
+    "evidence": "The original MobileDokan URL returns HTTP 301 to the resolved page. Its earlier indexed page has the exact original title Apple iPhone 17 Air and links this same image. The current resolved page has the same image, release date 2025-09-19 and model identifiers A3517/A3260/A3518."
+  }
+]

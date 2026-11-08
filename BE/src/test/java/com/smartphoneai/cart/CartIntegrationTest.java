@@ -10,7 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
+import com.smartphoneai.support.JwtTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:carttest;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa", "spring.datasource.password="})
 @AutoConfigureMockMvc
+@Import(JwtTestClient.Configuration.class)
 class CartIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -49,26 +51,26 @@ class CartIntegrationTest {
         var variantId = variant.getId().toString();
         var code = new AtomicReference<String>();
         doAnswer(inv -> { code.set(inv.getArgument(1)); return null; }).when(sender).send(anyString(), anyString());
-        var session = new MockHttpSession();
-        var registration = mvc.perform(post("/api/auth/register").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        var session = new JwtTestClient();
+        var registration = mvc.perform(post("/api/auth/register").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"cart@example.com\",\"password\":\"Password123!\",\"fullName\":\"An\",\"phone\":\"0900000000\"}"))
                 .andExpect(status().isAccepted()).andReturn();
         String challengeId = mapper.readTree(registration.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/otp/verify").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/otp/verify").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get(),
-                        "guestCart", java.util.List.of(Map.of("variantId", variantId, "quantity", 2))))))
+                        "guestCart", java.util.List.of(Map.of("variantId", variantId, "quantity", 2), Map.of("variantId", "999999999", "quantity", 1))))))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/cart").session(session)).andExpect(status().isOk())
+        mvc.perform(get("/api/cart").with(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(2));
         String item = mapper.writeValueAsString(Map.of("variantId", variantId, "quantity", 1));
-        mvc.perform(post("/api/cart/items").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(item))
+        mvc.perform(post("/api/cart/items").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(item))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(3));
-        mvc.perform(post("/api/cart/items").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(item))
+        mvc.perform(post("/api/cart/items").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(item))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].quantity").value(4));
         product.setActive(false); products.saveAndFlush(product);
-        mvc.perform(get("/api/cart").session(session)).andExpect(status().isOk())
+        mvc.perform(get("/api/cart").with(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].unavailable").value(true));
-        mvc.perform(delete("/api/cart/items/" + variantId).session(session).with(csrf()))
+        mvc.perform(delete("/api/cart/items/" + variantId).with(session).with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
     }
 }

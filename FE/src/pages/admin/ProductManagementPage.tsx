@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProducts } from '../../features/products/useProducts';
 import { api } from '../../shared/api';
-import type { Product } from '../../shared/types/models';
+import type { PageResult, Product } from '../../shared/types/models';
 import {
   Button,
   ConfirmDialog,
@@ -16,14 +16,28 @@ import {
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import { formatVnd, productPrice } from '../../shared/utils/format';
+
+export function productParamsAfterDelete(
+  params: URLSearchParams,
+  page: Pick<PageResult<Product>, 'page' | 'items'> | undefined,
+  deletedId: string,
+) {
+  const next = new URLSearchParams(params);
+  if (page && page.page > 1 && page.items.length === 1 && page.items[0].id === deletedId)
+    next.set('page', String(Math.max(1, page.page - 1)));
+  return next;
+}
+
 export default function ProductManagementPage() {
   const [params, setParams] = useSearchParams();
   const [keyword, setKeyword] = useState(params.get('keyword') || '');
   const [changing, setChanging] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState<Product | null>(null);
   const client = useQueryClient();
   const { notify } = useToast();
   const products = useProducts(params, true);
   const status = useMutation({
+    meta: { toast: { success: false } },
     mutationFn: () =>
       api.productStatus(changing!.id, changing!.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'),
     onSuccess: () => {
@@ -32,7 +46,23 @@ export default function ProductManagementPage() {
       void client.invalidateQueries({ queryKey: ['admin-dashboard'] });
       void client.invalidateQueries({ queryKey: ['cart'] });
       setChanging(null);
-      notify('Đã cập nhật trạng thái sản phẩm.');
+      notify(
+        changing?.status === 'ACTIVE' ? 'Đã đánh dấu sản phẩm hết hàng.' : 'Đã mở bán sản phẩm.',
+      );
+    },
+  });
+  const remove = useMutation({
+    meta: { toast: { success: false } },
+    mutationFn: (product: Product) => api.deleteProduct(product.id),
+    onSuccess: (_result, deleted) => {
+      const nextParams = productParamsAfterDelete(params, products.data, deleted.id);
+      if (nextParams.toString() !== params.toString()) setParams(nextParams, { replace: true });
+      void client.invalidateQueries({ queryKey: ['products'] });
+      void client.invalidateQueries({ queryKey: ['product'] });
+      void client.invalidateQueries({ queryKey: ['admin-dashboard'] });
+      void client.invalidateQueries({ queryKey: ['cart'] });
+      setDeleting(null);
+      notify('Đã xóa vĩnh viễn sản phẩm.');
     },
   });
   function update(key: string, value: string) {
@@ -82,7 +112,7 @@ export default function ProductManagementPage() {
           >
             <option value="">Tất cả trạng thái</option>
             <option value="ACTIVE">Đang mở bán</option>
-            <option value="INACTIVE">Tạm ẩn</option>
+            <option value="INACTIVE">Hết hàng</option>
           </select>
         </div>
         {products.isPending ? (
@@ -129,8 +159,10 @@ export default function ProductManagementPage() {
                       </td>
                       <td>{p.variants.length}</td>
                       <td>
-                        <span className={`badge ${p.status === 'ACTIVE' ? 'badge-success' : ''}`}>
-                          {p.status === 'ACTIVE' ? 'Đang mở bán' : 'Tạm ẩn'}
+                        <span
+                          className={`badge ${p.status === 'ACTIVE' ? 'badge-success' : 'badge-error'}`}
+                        >
+                          {p.status === 'ACTIVE' ? 'Đang mở bán' : 'Hết hàng'}
                         </span>
                       </td>
                       <td>
@@ -143,14 +175,28 @@ export default function ProductManagementPage() {
                             <Icon name="edit" className="!text-lg" />
                           </Link>
                           <button
+                            type="button"
                             className="icon-button"
-                            aria-label={`${p.status === 'ACTIVE' ? 'Ẩn' : 'Mở bán'} ${p.name}`}
+                            aria-label={`${p.status === 'ACTIVE' ? 'Đánh dấu hết hàng' : 'Mở bán'} ${p.name}`}
                             onClick={() => setChanging(p)}
+                            disabled={status.isPending || remove.isPending}
                           >
                             <Icon
-                              name={p.status === 'ACTIVE' ? 'visibility_off' : 'visibility'}
+                              name={p.status === 'ACTIVE' ? 'remove_shopping_cart' : 'shopping_bag'}
                               className="!text-lg"
                             />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button text-red-600"
+                            aria-label={`Xóa vĩnh viễn ${p.name}`}
+                            disabled={status.isPending || remove.isPending}
+                            onClick={() => {
+                              remove.reset();
+                              setDeleting(p);
+                            }}
+                          >
+                            <Icon name="delete" className="!text-lg" />
                           </button>
                         </div>
                       </td>
@@ -184,8 +230,13 @@ export default function ProductManagementPage() {
       </section>
       {changing && (
         <ConfirmDialog
-          title={changing.status === 'ACTIVE' ? 'Tạm ẩn sản phẩm?' : 'Mở bán sản phẩm?'}
-          message={`Xác nhận thay đổi trạng thái ${changing.name}.`}
+          title={changing.status === 'ACTIVE' ? 'Đánh dấu sản phẩm hết hàng?' : 'Mở bán sản phẩm?'}
+          message={
+            changing.status === 'ACTIVE'
+              ? `${changing.name} sẽ hiển thị Hết hàng và dừng nhận đơn mua.`
+              : `${changing.name} sẽ mở bán khi có phiên bản đang mở bán.`
+          }
+          label={changing.status === 'ACTIVE' ? 'Đánh dấu hết hàng' : 'Mở bán'}
           onConfirm={() => status.mutate()}
           onClose={() => {
             setChanging(null);
@@ -193,6 +244,22 @@ export default function ProductManagementPage() {
           }}
           busy={status.isPending}
           error={status.error}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Xóa vĩnh viễn sản phẩm?"
+          message={`${deleting.name} sẽ bị xóa vĩnh viễn cùng các phiên bản và bị gỡ khỏi giỏ hàng. Thao tác này không thể hoàn tác. Thông tin trong các đơn hàng đã đặt vẫn được giữ lại.`}
+          label="Xóa vĩnh viễn"
+          onConfirm={() => {
+            if (!remove.isPending) remove.mutate(deleting);
+          }}
+          onClose={() => {
+            setDeleting(null);
+            remove.reset();
+          }}
+          busy={remove.isPending}
+          error={remove.error}
         />
       )}
     </>

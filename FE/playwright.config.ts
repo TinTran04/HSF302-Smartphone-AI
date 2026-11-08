@@ -7,7 +7,7 @@ export default defineConfig({
   expect: { timeout: 10000 },
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: 'http://127.0.0.1:25173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -22,8 +22,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
+    command: 'npm run dev -- --host 127.0.0.1 --port 25173 --strictPort',
+    url: 'http://127.0.0.1:25173',
     reuseExistingServer: false,
     env: { VITE_ENABLE_MOCK_API: 'true' },
     timeout: 30000,

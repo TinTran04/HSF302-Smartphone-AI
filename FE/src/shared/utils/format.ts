@@ -1,3 +1,5 @@
+import type { Role } from '../types/models';
+
 export const formatVnd = (value: number) =>
   new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -17,10 +19,10 @@ export const formatSize = (bytes: number) =>
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Có lỗi xảy ra. Vui lòng thử lại.';
 export const orderLabels = {
-  PENDING: 'Chờ xác nhận',
+  PENDING: 'Chờ duyệt',
   CONFIRMED: 'Đã xác nhận',
   SHIPPING: 'Đang giao',
-  COMPLETED: 'Hoàn thành',
+  COMPLETED: 'Đã giao',
   CANCELLED: 'Đã hủy',
 };
 export const knowledgeLabels = {
@@ -30,14 +32,17 @@ export const knowledgeLabels = {
   DISABLED: 'Đã tắt',
 };
 export const productPrice = (p: { variants: { price: number; status: string }[] }) => {
-  const prices = p.variants.filter((v) => v.status === 'ACTIVE').map((v) => v.price);
+  const active = p.variants.filter((v) => v.status === 'ACTIVE');
+  const prices = (active.length ? active : p.variants).map((v) => v.price);
   return prices.length ? Math.min(...prices) : null;
 };
-export const safeReturnPath = (value: unknown) =>
+export const safeReturnPath = (value: unknown, role?: Role) =>
   typeof value === 'string' &&
   value.startsWith('/') &&
   !value.startsWith('//') &&
   !value.includes('\\') &&
+  !(role === 'CUSTOMER' && /^\/admin(\/|\?|#|$)/i.test(value)) &&
+  !(role === 'ADMIN' && !/^\/admin(\/|\?|#|$)/i.test(value)) &&
   !/^\/(login|register)(\/|\?|$)/.test(value)
     ? value
-    : '/';
+    : role === 'ADMIN' ? '/admin' : '/';

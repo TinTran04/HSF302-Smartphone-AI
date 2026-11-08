@@ -1,0 +1,228 @@
+package com.smartphoneai.service.impl;
+
+import com.smartphoneai.service.AiChatService;
+import com.smartphoneai.service.ChatResponder;
+import com.smartphoneai.service.TopicRouter;
+import com.smartphoneai.service.support.ChatTopics;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartphoneai.config.AccountPrincipal;
+import com.smartphoneai.dto.request.CreateConversationRequest;
+import com.smartphoneai.dto.response.ChatMessageResponse;
+import com.smartphoneai.dto.response.ProductResponse;
+import com.smartphoneai.entity.*;
+import com.smartphoneai.exception.*;
+import com.smartphoneai.repository.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.util.*;
+
+@Service
+public class AiChatServiceImpl implements AiChatService {
+    private static final Set<String> TOPICS=Set.of("PHONE_CONSULTATION","SHOP_SUPPORT");
+    private final AiGuestSessionRepository guests;
+    private final AiConversationRepository conversations;
+    private final AiMessageRepository messages;
+    private final AiTopicSwitchRepository switches;
+    private final TopicRouter router;
+    private final ChatResponder responder;
+    private final ObjectMapper mapper;
+    private final Clock clock;
+    private record Actor(UUID userId) {}
+    public AiChatServiceImpl(AiGuestSessionRepository guests, AiConversationRepository conversations, AiMessageRepository messages,
+                         AiTopicSwitchRepository switches, TopicRouter router, ChatResponder responder, ObjectMapper mapper, Clock clock) {
+        this.guests=guests; this.conversations=conversations; this.messages=messages; this.switches=switches;
+        this.router=router; this.responder=responder; this.mapper=mapper; this.clock=clock;
+    }
+    @Override
+    @Transactional
+    public UUID create(Authentication auth, String token, CreateConversationRequest request) {
+        var actor=actor(auth);
+        var conversation=new AiConversation(actor.userId(), null,
+                ChatTopics.normalize(request.topic()), json(request.productIds()==null ? List.of() : request.productIds()), clock.instant());
+        return conversations.save(conversation).getId();
+    }
+    @Override
+    @Transactional
+    public List<Map<String,Object>> list(Authentication auth, String token) {
+        var actor=actor(auth);
+        var found=conversations.findAllByUserIdOrderByCreatedAtDesc(actor.userId());
+        return found.stream().map(this::conversationView).toList();
+    }
+    @Override
+    @Transactional
+    public Map<String,Object> detail(Authentication auth, String token, UUID id) {
+        var actor=actor(auth); return conversationView(owned(actor,id));
+    }
+    @Override
+    @Transactional
+    public void delete(Authentication auth, UUID id) {
+        var conversation=owned(actor(auth),id);
+        // Switch retries hold the switch row lock. Remove those references before deleting answer messages.
+        switches.deleteConversationReferences(id);
+        messages.deleteConversationMessages(id);
+        conversations.delete(conversation);
+    }
+    @Override
+    @Transactional
+    public Map<String,Object> send(Authentication auth, String token, UUID id, String rawContent) {
+        var actor=actor(auth); var conversation=owned(actor,id);
+        var pending = switches.findFirstByConversationIdAndStatus(id,"PENDING");
+        if (pending.isPresent()) {
+            if (pending.get().canConfirm(clock.instant())) throw new InvalidTopicSwitchException();
+            pending.get().expire();
+        }
+        String content=rawContent.trim();
+        List<ChatMessageResponse> history=messageViews(id);
+        String currentTopic = ChatTopics.normalize(conversation.getTopic());
+        var decision=router.route(currentTopic,content,history);
+        if (decision==null) throw new AiProviderException();
+        String suggestedTopic = decision.suggestedTopic() == null ? null : ChatTopics.normalize(decision.suggestedTopic());
+        if ("DIFFERENT_TOPIC".equals(decision.result()) && decision.suggestedTopic()!=null
+                && TOPICS.contains(suggestedTopic) && !currentTopic.equals(suggestedTopic)) {
+            addMessage(id,"user",content,List.of());
+            var request=switches.save(new AiTopicSwitch(id,suggestedTopic,content,clock.instant()));
+            return switchView(request,currentTopic);
+        }
+        if (!"SAME_TOPIC".equals(decision.result()) && !("DIFFERENT_TOPIC".equals(decision.result()) && currentTopic.equals(suggestedTopic))) {
+            addMessage(id,"user",content,List.of());
+            String clarification="Bạn muốn hỏi về chủ đề nào? Vui lòng nói rõ thêm.";
+            addMessage(id,"assistant",clarification,List.of());
+            return Map.of("type","CLARIFICATION_REQUIRED","message",clarification);
+        }
+        var answer=responder.answer(currentTopic,content,history,productIds(conversation.getProductIds()));
+        validateAnswer(answer);
+        addMessage(id,"user",content,List.of()); addAnswer(id,answer);
+        return answerView(id,null,answer);
+    }
+    @Override
+    @Transactional
+    public Map<String,Object> confirm(Authentication auth, String token, UUID switchId) {
+        var actor=actor(auth);
+        var conversationId=switches.findConversationId(switchId).orElseThrow(InvalidTopicSwitchException::new);
+        owned(actor,conversationId);
+        var request=switches.findLocked(switchId).orElseThrow(InvalidTopicSwitchException::new);
+        if ("CONFIRMED".equals(request.getStatus())) {
+            var id=request.getNewConversationId();
+            var message=messageViews(id).stream().filter(m -> "assistant".equals(m.role())).findFirst().orElseThrow(InvalidTopicSwitchException::new);
+            return answerView(id,id,new ChatResponder.Answer(message.content(),message.sources(),message.recommendedProducts(),message.comparedProducts()));
+        }
+        if (!request.canConfirm(clock.instant())) throw new InvalidTopicSwitchException();
+        var answer=responder.answer(request.getSuggestedTopic(),request.getQuestion(),List.of(),List.of());
+        validateAnswer(answer);
+        var next=conversations.saveAndFlush(new AiConversation(actor.userId(),null,
+                ChatTopics.normalize(request.getSuggestedTopic()),"[]",clock.instant()));
+        addMessage(next.getId(),"user",request.getQuestion(),List.of());
+        addAnswer(next.getId(),answer);
+        request.confirm(next.getId());
+        return answerView(next.getId(),next.getId(),answer);
+    }
+    @Override
+    @Transactional
+    public void cancel(Authentication auth, String token, UUID switchId) {
+        var actor=actor(auth);
+        var conversationId=switches.findConversationId(switchId).orElseThrow(InvalidTopicSwitchException::new);
+        owned(actor,conversationId);
+        var request=switches.findLocked(switchId).orElseThrow(InvalidTopicSwitchException::new);
+        if (!"PENDING".equals(request.getStatus())) throw new InvalidTopicSwitchException();
+        request.cancel();
+    }
+    @Override
+    @Transactional
+    public List<String> claim(UUID userId, String token) {
+        if (token==null || token.isBlank()) return List.of();
+        var guest=guest(token);
+        var claimed=new ArrayList<String>();
+        for (var conversation : conversations.findAllByGuestIdOrderByCreatedAtDesc(guest.getId())) {
+            if (messages.existsByConversationId(conversation.getId())) {
+                conversation.assignTo(userId); claimed.add(conversation.getId().toString());
+            } else conversations.delete(conversation);
+        }
+        guest.revoke();
+        return List.copyOf(claimed);
+    }
+    private Actor actor(Authentication auth) {
+        if (auth==null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof AccountPrincipal principal))
+            throw new ChatUnauthorizedException();
+        if (auth.getAuthorities().stream().noneMatch(a -> "ROLE_CUSTOMER".equals(a.getAuthority()))
+                || auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))
+            throw new AccessDeniedException("Customer account required");
+        return new Actor(principal.id());
+    }
+    private AiGuestSession guest(String token) {
+        if (token==null || token.length()<32 || token.length()>128) throw new ChatUnauthorizedException();
+        var session=guests.findLockedByTokenHash(hash(token)).orElseThrow(ChatUnauthorizedException::new);
+        if (!session.validAt(clock.instant())) throw new ChatUnauthorizedException();
+        return session;
+    }
+    private AiConversation owned(Actor actor, UUID id) {
+        var conversation=conversations.findLocked(id).orElseThrow(ConversationNotFoundException::new);
+        boolean owns=actor.userId().equals(conversation.getUserId());
+        if (!owns) throw new ConversationNotFoundException();
+        return conversation;
+    }
+    private Map<String,Object> conversationView(AiConversation conversation) {
+        var view=new LinkedHashMap<String,Object>();
+        String title = conversation.getTitle();
+        if (Set.of("PHONE_CONSULTATION", "PHONE_COMPARISON", "GENERAL_CHAT", "SHOP_SUPPORT").contains(title))
+            title = ChatTopics.title(conversation.getTopic());
+        view.put("id",conversation.getId().toString()); view.put("topic",ChatTopics.normalize(conversation.getTopic())); view.put("title",title);
+        view.put("messages",messageViews(conversation.getId()));
+        switches.findFirstByConversationIdAndStatus(conversation.getId(),"PENDING")
+                .filter(s -> s.canConfirm(clock.instant()))
+                .ifPresent(s -> view.put("pendingSwitch",switchView(s,conversation.getTopic())));
+        return view;
+    }
+    private List<ChatMessageResponse> messageViews(UUID id) {
+        return messages.findAllByConversationIdOrderByIdAsc(id).stream()
+                .map(m -> new ChatMessageResponse(m.getId().toString(),m.getRole(),m.getContent(),sources(m.getSourcesJson()),
+                        products(m.getRecommendationsJson()),products(m.getComparisonsJson()))).toList();
+    }
+    private void addMessage(UUID id, String role, String text, List<ChatResponder.Source> sources) {
+        messages.save(new AiMessage(id,role,text,json(sources),"[]","[]",clock.instant()));
+    }
+    private void addAnswer(UUID id, ChatResponder.Answer answer) {
+        messages.save(new AiMessage(id,"assistant",answer.text(),json(answer.sources()),
+                json(answer.recommendedProducts()),json(answer.comparedProducts()),clock.instant()));
+    }
+    private Map<String,Object> switchView(AiTopicSwitch request, String currentTopic) {
+        return Map.of("type","SWITCH_REQUIRED","switchRequestId",request.getId().toString(),"currentTopic",ChatTopics.normalize(currentTopic),
+                "suggestedTopic",ChatTopics.normalize(request.getSuggestedTopic()),"message","Bạn có muốn chuyển chủ đề để xử lý câu hỏi này không?");
+    }
+    private Map<String,Object> answerView(UUID id, UUID newId, ChatResponder.Answer answer) {
+        var result=new LinkedHashMap<String,Object>(); result.put("type","ANSWER"); result.put("conversationId",id.toString());
+        if (newId!=null) result.put("newConversationId",newId.toString());
+        result.put("answer",answer.text()); result.put("sources",answer.sources());
+        result.put("recommendedProducts",answer.recommendedProducts()); result.put("comparedProducts",answer.comparedProducts()); return result;
+    }
+    private static void validateAnswer(ChatResponder.Answer answer) {
+        if (answer==null || answer.text()==null || answer.text().isBlank() || answer.sources()==null
+                || answer.recommendedProducts()==null || answer.comparedProducts()==null) throw new AiProviderException();
+    }
+    private String json(Object value) {
+        try { return mapper.writeValueAsString(value); } catch (Exception ex) { throw new AiProviderException(); }
+    }
+    private List<ChatResponder.Source> sources(String value) {
+        try { return mapper.readValue(value,new TypeReference<List<ChatResponder.Source>>(){}); }
+        catch (Exception ex) { throw new AiProviderException(); }
+    }
+    private List<ProductResponse> products(String value) {
+        try { return mapper.readValue(value,new TypeReference<List<ProductResponse>>(){}); }
+        catch (Exception ex) { throw new AiProviderException(); }
+    }
+    private List<String> productIds(String value) {
+        try { return mapper.readValue(value,new TypeReference<List<String>>(){}); }
+        catch (Exception ex) { throw new AiProviderException(); }
+    }
+    private static String hash(String token) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }
+        catch (NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
+    }
+}

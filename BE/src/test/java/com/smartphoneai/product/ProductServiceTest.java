@@ -1,26 +1,28 @@
 package com.smartphoneai.product;
 
+import com.smartphoneai.service.impl.ProductServiceImpl;
+
 import com.smartphoneai.entity.Product;
 import com.smartphoneai.entity.Brand;
 import com.smartphoneai.entity.ProductVariant;
 import com.smartphoneai.repository.ProductRepository;
-import com.smartphoneai.service.ProductService;
 import org.junit.jupiter.api.Test;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ProductServiceTest {
-    @Test void inactiveProductCannotBeViewedByCustomers() {
+    @Test void soldOutProductRemainsVisibleWithInactiveStatus() {
         var repository = mock(ProductRepository.class);
         var product = new Product();
         product.setId(1L);
         product.setName("Demo");
         product.setActive(false);
-        when(repository.findByIdAndActiveTrue(1L)).thenReturn(Optional.empty());
-        var service = new ProductService(repository);
-        assertTrue(service.findActive(1L).isEmpty());
-        verify(repository).findByIdAndActiveTrue(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(product));
+        var service = new ProductServiceImpl(repository);
+        var response = service.findActive(1L);
+        assertTrue(response.isPresent());
+        assertEquals("INACTIVE", response.orElseThrow().status());
     }
 
     @Test void activeProductIsReturnedAsDto() {
@@ -29,8 +31,8 @@ class ProductServiceTest {
         product.setId(1L);
         product.setName("Demo");
         product.setActive(true);
-        when(repository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
-        var result = new ProductService(repository).findActive(1L).orElseThrow();
+        when(repository.findById(1L)).thenReturn(Optional.of(product));
+        var result = new ProductServiceImpl(repository).findActive(1L).orElseThrow();
         assertEquals("1", result.id());
         assertEquals("Demo", result.name());
     }
@@ -52,8 +54,8 @@ class ProductServiceTest {
         variant.setPrice(12000000L);
         variant.setActive(true);
         product.addVariant(variant);
-        when(repository.findByIdAndActiveTrue(7L)).thenReturn(Optional.of(product));
-        var result = new ProductService(repository).findActive(7L).orElseThrow();
+        when(repository.findById(7L)).thenReturn(Optional.of(product));
+        var result = new ProductServiceImpl(repository).findActive(7L).orElseThrow();
         assertEquals("Demo Brand", result.brandName());
         assertEquals("2", result.brandId());
         assertEquals("9", result.variants().getFirst().id());

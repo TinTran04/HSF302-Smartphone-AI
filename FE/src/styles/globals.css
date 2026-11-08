@@ -1088,6 +1088,9 @@
   .timeline-item.complete {
     border-color: var(--success);
   }
+  .timeline-item.cancelled {
+    border-color: var(--error);
+  }
   .timeline-item p {
     font-size: 11px;
     color: var(--text-secondary);
@@ -1419,8 +1422,13 @@
   }
   .toast-region {
     position: fixed;
-    bottom: 28px;
-    right: 28px;
+    inset: auto 28px 28px auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+    color: var(--text-primary);
     z-index: 100;
     display: flex;
     flex-direction: column;

@@ -1,6 +1,6 @@
 package com.smartphoneai.auth;
 
-import com.smartphoneai.service.OtpPolicy;
+import com.smartphoneai.service.support.OtpPolicy;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;

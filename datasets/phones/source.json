@@ -1,0 +1,13 @@
+{
+  "title": "Global Mobile Phone Specifications & Prices",
+  "author": "UTSHO DEY",
+  "url": "https://www.kaggle.com/datasets/utsh0dey/global-mobile-phone-specifications-and-prices",
+  "downloadUrl": "https://www.kaggle.com/api/v1/datasets/download/utsh0dey/global-mobile-phone-specifications-and-prices/1",
+  "version": 1,
+  "license": "MIT",
+  "lastUpdated": "2026-08-23T19:08:13.66Z",
+  "retrievedAt": "2026-11-05",
+  "rows": 6620,
+  "columns": 168,
+  "rawSha256": "f434e63379e0548be91341c517c041d198f9d45ebe21b2e11408e8db754d2312"
+}

@@ -12,6 +12,43 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(InvalidProductImageException.class)
+    public ResponseEntity<ApiError> invalidProductImage(InvalidProductImageException exception) {
+        return ResponseEntity.status(exception.isTooLarge() ? HttpStatus.PAYLOAD_TOO_LARGE : HttpStatus.BAD_REQUEST)
+                .body(new ApiError(exception.isTooLarge() ? "PRODUCT_IMAGE_TOO_LARGE" : "INVALID_PRODUCT_IMAGE",
+                        exception.isTooLarge() ? "Ảnh không được vượt quá 5 MB" : "Ảnh PNG, JPEG hoặc WebP không hợp lệ", Instant.now()));
+    }
+    @ExceptionHandler(ProductImageNotFoundException.class)
+    public ResponseEntity<ApiError> productImageNotFound(ProductImageNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("PRODUCT_IMAGE_NOT_FOUND", "Không tìm thấy ảnh", Instant.now()));
+    }
+    @ExceptionHandler(ProductImageStorageException.class)
+    public ResponseEntity<ApiError> productImageStorage(ProductImageStorageException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError("PRODUCT_IMAGE_STORAGE_UNAVAILABLE", "Chưa thể lưu ảnh. Vui lòng thử lại sau", Instant.now()));
+    }
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> uploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new ApiError("FILE_TOO_LARGE", "Tệp tải lên quá lớn", Instant.now()));
+    }
+    @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class, org.springframework.dao.ConcurrencyFailureException.class})
+    public ResponseEntity<ApiError> concurrentDataChange(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("CATALOG_CONFLICT", "Dữ liệu vừa thay đổi. Vui lòng thử lại", Instant.now()));
+    }
+    @ExceptionHandler(LocationSearchException.class)
+    public ResponseEntity<ApiError> locationSearch(LocationSearchException exception) {
+        return ResponseEntity.status(exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError(exception.isRateLimited() ? "LOCATION_SEARCH_RATE_LIMIT" : "LOCATION_SEARCH_UNAVAILABLE",
+                        "Chưa thể tìm địa chỉ. Vui lòng thử lại sau", Instant.now()));
+    }
+    @ExceptionHandler(InvalidLocationQueryException.class)
+    public ResponseEntity<ApiError> invalidLocationQuery(InvalidLocationQueryException exception) {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", "Dữ liệu yêu cầu không hợp lệ", Instant.now()));
+    }
+    @ExceptionHandler(EmailDeliveryException.class)
+    public ResponseEntity<ApiError> emailDeliveryUnavailable(EmailDeliveryException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError("EMAIL_DELIVERY_UNAVAILABLE", exception.getMessage(), Instant.now()));
+    }
     @ExceptionHandler(KnowledgeNotFoundException.class)
     public ResponseEntity<ApiError> knowledgeNotFound(KnowledgeNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("KNOWLEDGE_NOT_FOUND", "Không tìm thấy tài liệu", Instant.now()));
@@ -42,10 +79,11 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(AiProviderException.class)
     public ResponseEntity<ApiError> aiProviderError(AiProviderException exception) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError("AI_PROVIDER_ERROR", "Không thể kết nối nhà cung cấp AI", Instant.now()));
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError(exception.getCode(), exception.getMessage(), Instant.now()));
     }
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
-            MethodArgumentTypeMismatchException.class, MissingRequestHeaderException.class})
+            MethodArgumentTypeMismatchException.class, MissingRequestHeaderException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class})
     public ResponseEntity<ApiError> invalidRequest(Exception exception) {
         return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", "Dữ liệu yêu cầu không hợp lệ", Instant.now()));
     }
@@ -80,6 +118,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiError> invalidCredentials(InvalidCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError("INVALID_CREDENTIALS", "Thông tin đăng nhập không hợp lệ", Instant.now()));
+    }
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<ApiError> accountDisabled(AccountDisabledException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("ACCOUNT_DISABLED", "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên", Instant.now()));
     }
     @ExceptionHandler(OtpRateLimitException.class)
     public ResponseEntity<ApiError> otpRateLimit(OtpRateLimitException exception) {

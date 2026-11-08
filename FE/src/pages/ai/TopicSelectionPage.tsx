@@ -1,18 +1,22 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api';
-import { chatTopics } from '../../features/ai-chat/constants/chatTopics';
+import { chatTopics, normalizeTopic } from '../../features/ai-chat/constants/chatTopics';
 import { Icon } from '../../shared/components/Icon';
 import { ErrorState } from '../../shared/components/Ui';
 import type { ChatTopic } from '../../shared/types/models';
+import { useAuth } from '../../features/auth/AuthProvider';
 export default function TopicSelectionPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const { user } = useAuth();
   const productIds = [
     ...new Set((params.get('productIds') || '').split(',').filter(Boolean)),
   ].slice(0, 3);
   const create = useMutation({
+    mutationKey: ['chat', user?.id, 'create'],
+    meta: { toast: { success: 'Đã tạo cuộc hội thoại mới.' } },
     mutationFn: (topic: ChatTopic) =>
       api.createConversation(topic, productIds.length ? { productIds } : undefined),
     onSuccess: (chat) => {
@@ -39,7 +43,7 @@ export default function TopicSelectionPage() {
       <div className="topic-grid">
         {chatTopics.map((t) => (
           <button
-            className={`card topic-card ${params.get('topic') === t.id ? '!border-secondary !bg-[#fcfaff]' : ''}`}
+            className={`card topic-card ${normalizeTopic(params.get('topic') as ChatTopic) === t.id ? '!border-secondary !bg-[#fcfaff]' : ''}`}
             key={t.id}
             disabled={create.isPending}
             onClick={() => create.mutate(t.id)}

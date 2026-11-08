@@ -11,15 +11,20 @@ export function ComparisonProvider({ children }: PropsWithChildren) {
   const [products, setProducts] = useState<Product[]>([]);
   const { notify } = useToast();
   function toggle(product: Product) {
-    if (products.some((p) => p.id === product.id))
+    if (products.some((p) => p.id === product.id)) {
       setProducts((current) => current.filter((p) => p.id !== product.id));
-    else if (products.length >= 3) notify('Bạn chỉ có thể so sánh tối đa 3 điện thoại.', 'error');
+      notify(`Đã bỏ ${product.name} khỏi so sánh.`);
+    } else if (products.length >= 3) notify('Bạn chỉ có thể so sánh tối đa 3 điện thoại.', 'error');
     else {
       setProducts((current) => [...current, product]);
       notify(`Đã thêm ${product.name} vào so sánh.`);
     }
   }
-  return <Context value={{ products, toggle, clear: () => setProducts([]) }}>{children}</Context>;
+  function clear() {
+    setProducts([]);
+    notify('Đã xóa danh sách so sánh.');
+  }
+  return <Context value={{ products, toggle, clear }}>{children}</Context>;
 }
 export function useComparison() {
   const value = useContext(Context);
