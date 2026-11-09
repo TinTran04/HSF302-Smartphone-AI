@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface OtpChallengeRepository extends JpaRepository<OtpChallenge, UUID> {
+    @Query("select c.email from OtpChallenge c where c.id = :id and c.purpose = 'PASSWORD_RESET' and c.deliverable = true")
+    Optional<String> findPasswordResetEmail(@Param("id") UUID id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OtpChallenge> findFirstByEmailAndPurposeOrderByIssuedAtDesc(String email, String purpose);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

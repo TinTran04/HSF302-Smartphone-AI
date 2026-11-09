@@ -59,10 +59,22 @@ export default function KnowledgeBasePage() {
       notify('Đã cập nhật tài liệu.');
     },
   });
-  const replace = useMutation({ meta: { toast: { success: false } }, mutationFn: async (file: File) => {
-    const form = new FormData(); form.append('file', file);
-    return http(`/admin/knowledge/documents/${replacementId}/content`, { method: 'PUT', body: form });
-  }, onSuccess: () => { setReplacementId(null); refresh(); notify('Đã gửi nội dung mới để lập chỉ mục.'); } });
+  const replace = useMutation({
+    meta: { toast: { success: false } },
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return http(`/admin/knowledge/documents/${replacementId}/content`, {
+        method: 'PUT',
+        body: form,
+      });
+    },
+    onSuccess: () => {
+      setReplacementId(null);
+      refresh();
+      notify('Đã gửi nội dung mới để lập chỉ mục.');
+    },
+  });
   function handleFile(file?: File) {
     if (!file || upload.isPending) return;
     if (!/\.(pdf|txt)$/i.test(file.name)) {
@@ -81,6 +93,7 @@ export default function KnowledgeBasePage() {
   return (
     <>
       <PageHeading
+        eyebrow="Trợ lý AI"
         title="Kho kiến thức AI"
         description="Tải tài liệu chính thức để cung cấp dữ liệu tham khảo cho AI."
         action={
@@ -142,7 +155,18 @@ export default function KnowledgeBasePage() {
         aria-label="File tài liệu"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
-      <input hidden ref={replacementInput} type="file" accept=".pdf,.txt,application/pdf,text/plain" aria-label="Nội dung tài liệu thay thế" onChange={e => { const file = e.target.files?.[0]; if (file && replacementId) replace.mutate(file); e.target.value = ''; }} />
+      <input
+        hidden
+        ref={replacementInput}
+        type="file"
+        accept=".pdf,.txt,application/pdf,text/plain"
+        aria-label="Nội dung tài liệu thay thế"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && replacementId) replace.mutate(file);
+          e.target.value = '';
+        }}
+      />
       {replace.error && <ErrorState error={replace.error} />}
       {validation && (
         <p className="field-error mt-4" role="alert">
@@ -169,7 +193,7 @@ export default function KnowledgeBasePage() {
           />
         ) : (
           <div className="table-scroll">
-            <table className="admin-table">
+            <table className="admin-table" aria-label="Tài liệu trong hệ thống">
               <thead>
                 <tr>
                   <th>Tài liệu</th>
@@ -202,7 +226,19 @@ export default function KnowledgeBasePage() {
                     </td>
                     <td>
                       <div className="actions">
-                        {!isDemo && <button className="icon-button" title="Thay nội dung" aria-label={`Thay nội dung ${doc.name}`} onClick={() => { setReplacementId(doc.id); replacementInput.current?.click(); }}><Icon name="upload_file" className="!text-lg" /></button>}
+                        {!isDemo && (
+                          <button
+                            className="icon-button"
+                            title="Thay nội dung"
+                            aria-label={`Thay nội dung ${doc.name}`}
+                            onClick={() => {
+                              setReplacementId(doc.id);
+                              replacementInput.current?.click();
+                            }}
+                          >
+                            <Icon name="upload_file" className="!text-lg" />
+                          </button>
+                        )}
                         {doc.status !== 'PROCESSING' && (
                           <button
                             className="icon-button"

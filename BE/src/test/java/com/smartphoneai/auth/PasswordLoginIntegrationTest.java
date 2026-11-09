@@ -350,8 +350,12 @@ class PasswordLoginIntegrationTest {
                         .content(mapper.writeValueAsString(Map.of("email", user.getEmail()))))
                 .andExpect(status().isAccepted()).andReturn();
         var challengeId = mapper.readTree(response.getResponse().getContentAsString()).path("challengeId").asText();
+        var verified = mvc.perform(post("/api/auth/password-reset/verify").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get()))))
+                .andExpect(status().isOk()).andReturn();
+        var resetToken = mapper.readTree(verified.getResponse().getContentAsString()).path("resetToken").asText();
         mvc.perform(post("/api/auth/password-reset/confirm").with(current).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", code.get(), "newPassword", NEW_PASSWORD))))
+                        .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "resetToken", resetToken, "newPassword", NEW_PASSWORD))))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/users/me").with(current)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/users/me").with(other)).andExpect(status().isUnauthorized());

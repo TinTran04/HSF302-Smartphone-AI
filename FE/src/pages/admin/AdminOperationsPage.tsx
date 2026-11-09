@@ -81,7 +81,19 @@ export default function AdminOperationsPage({
   }[section];
   return (
     <>
-      <PageHeading title={title} />
+      <PageHeading
+        eyebrow={
+          section === 'embedding' ? 'Trợ lý AI' : section === 'brands' ? 'Cửa hàng' : 'Hệ thống'
+        }
+        title={title}
+        description={
+          {
+            brands: 'Sắp xếp danh mục thương hiệu để quản lý sản phẩm nhất quán.',
+            maintenance: 'Theo dõi trạng thái cửa hàng và chủ động bật hoặc tắt chế độ bảo trì.',
+            embedding: 'Thiết lập model Gemini để lập chỉ mục và truy xuất tài liệu cho AI.',
+          }[section]
+        }
+      />
       {isDemo ? (
         <p className="notice">Chức năng này cần kết nối backend.</p>
       ) : (
@@ -89,8 +101,9 @@ export default function AdminOperationsPage({
           {query.error && <ErrorState error={query.error} />}
           {mutation.error && <ErrorState error={mutation.error} />}
           {section === 'brands' && (
-            <div className="card panel">
+            <div className="card panel admin-operations-panel">
               <form
+                className="admin-brand-form"
                 onSubmit={(e) => {
                   e.preventDefault();
                   act('/admin/brands', 'POST', { name: name.trim() }, 'Đã thêm thương hiệu.');
@@ -105,7 +118,7 @@ export default function AdminOperationsPage({
                 </Button>
               </form>
               {(query.data as Brand[] | undefined)?.map((brand) => (
-                <div key={brand.id} className="flex gap-4 items-center mt-4">
+                <div key={brand.id} className="admin-brand-row">
                   <span>{brand.name}</span>
                   <Button
                     variant="secondary"
@@ -140,7 +153,7 @@ export default function AdminOperationsPage({
             </div>
           )}
           {section === 'maintenance' && (
-            <div className="card panel">
+            <div className="card panel admin-operations-panel">
               <p>
                 Trạng thái:{' '}
                 {(query.data as { enabled?: boolean } | undefined)?.enabled
@@ -174,7 +187,7 @@ export default function AdminOperationsPage({
           )}
           {section === 'embedding' && (
             <form
-              className="card panel"
+              className="card panel admin-operations-panel admin-embedding-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 act(
@@ -190,9 +203,7 @@ export default function AdminOperationsPage({
                 );
               }}
             >
-              <p>
-                Hiện tại: {geminiEmbedding?.model || 'Chưa cấu hình Gemini'}
-              </p>
+              <p>Hiện tại: {geminiEmbedding?.model || 'Chưa cấu hình Gemini'}</p>
               {embedding?.reindexRequired && (
                 <p className="notice">Một số tài liệu cần được lập chỉ mục lại.</p>
               )}
@@ -244,8 +255,8 @@ export default function AdminOperationsPage({
                 <span className="help-text">Để trống để giữ API key Gemini đã lưu.</span>
               </label>
               <p className="help-text mt-4">
-                Dùng API key Gemini cho embedding. Kiểm tra và lưu sẽ xác thực kết nối.
-                Khi đổi model hoặc số chiều, lập chỉ mục lại tài liệu được đánh dấu.
+                Dùng API key Gemini cho embedding. Kiểm tra và lưu sẽ xác thực kết nối. Khi đổi
+                model hoặc số chiều, lập chỉ mục lại tài liệu được đánh dấu.
               </p>
               <Button
                 type="submit"

@@ -87,7 +87,11 @@ export default function AccountManagementPage() {
 
   return (
     <>
-      <PageHeading title="Quản lý tài khoản" />
+      <PageHeading
+        eyebrow="Tài khoản & phân quyền"
+        title="Quản lý tài khoản"
+        description="Mời thành viên, theo dõi trạng thái kích hoạt và quản lý quyền truy cập."
+      />
       {isDemo ? (
         <p className="notice">Chức năng này cần kết nối backend.</p>
       ) : (
@@ -159,7 +163,7 @@ export default function AccountManagementPage() {
               <EmptyState title="Chưa có tài khoản" icon="manage_accounts" />
             ) : (
               <div className="table-scroll">
-                <table className="admin-table min-w-[760px]">
+                <table className="admin-table min-w-[760px]" aria-label="Danh sách tài khoản">
                   <thead>
                     <tr>
                       <th>Tài khoản</th>

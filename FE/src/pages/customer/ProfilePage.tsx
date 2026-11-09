@@ -10,6 +10,7 @@ import { LocationPicker } from '../../shared/components/LocationPicker';
 import type { MapLocation } from '../../shared/types/models';
 import { AddressAutocomplete } from '../../shared/components/AddressAutocomplete';
 import { useMapAddress } from '../../shared/hooks/useMapAddress';
+import { PasswordField } from '../../shared/components/PasswordField';
 export default function ProfilePage() {
   const auth = useAuth();
   const user = auth.user!;
@@ -133,7 +134,11 @@ export default function ProfilePage() {
           resolvingAddress={mapAddress.resolving}
           disabled={!editing || save.isPending}
         />
-        {mapAddress.resolving && <p className="help-text" role="status">Đang lấy địa chỉ theo vị trí đã chọn…</p>}
+        {mapAddress.resolving && (
+          <p className="help-text" role="status">
+            Đang lấy địa chỉ theo vị trí đã chọn…
+          </p>
+        )}
         {save.error && <ErrorState error={save.error} />}
         <div className="flex justify-end gap-3 mt-7">
           {editing ? (
@@ -171,27 +176,23 @@ export default function ProfilePage() {
           }}
         >
           <h2>Đổi mật khẩu</h2>
-          <label className="form-field">
-            Mật khẩu hiện tại
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </label>
-          <label className="form-field">
-            Mật khẩu mới
-            <input
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </label>
+          <PasswordField
+            id="profile-current-password"
+            label="Mật khẩu hiện tại"
+            value={currentPassword}
+            onChange={setCurrentPassword}
+            autoComplete="current-password"
+            disabled={passwordChange.isPending}
+          />
+          <PasswordField
+            id="profile-new-password"
+            label="Mật khẩu mới"
+            value={newPassword}
+            onChange={setNewPassword}
+            minLength={8}
+            autoComplete="new-password"
+            disabled={passwordChange.isPending}
+          />
           {passwordChange.error && <ErrorState error={passwordChange.error} />}
           <Button type="submit" className="mt-5" busy={passwordChange.isPending}>
             Đổi mật khẩu

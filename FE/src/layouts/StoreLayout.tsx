@@ -79,6 +79,7 @@ export function StoreLayout() {
   const { pathname, search } = useLocation();
   const client = useQueryClient();
   const authRoute = authPaths.has(pathname.replace(/\/+$/, '').toLowerCase());
+  const chatRoute = pathname === '/ai' || pathname.startsWith('/ai/');
   const maintenance = useQuery({
     queryKey: ['maintenance'],
     queryFn: ({ signal }) => http<{ enabled: boolean }>('/maintenance', { signal }),
@@ -122,11 +123,10 @@ export function StoreLayout() {
         </section>
       </main>
     );
-  if (!authRoute && !isDemo && maintenance.data?.enabled)
-    return <MaintenanceScreen />;
+  if (!authRoute && !isDemo && maintenance.data?.enabled) return <MaintenanceScreen />;
   const showChrome = !authRoute || (!loading && (isDemo || maintenance.data?.enabled === false));
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={chatRoute ? 'store-layout-chat' : 'min-h-screen flex flex-col'}>
       {showChrome && (
         <>
           <a href="#main" className="skip-link">
@@ -136,10 +136,13 @@ export function StoreLayout() {
           <DemoBanner />
         </>
       )}
-      <main id="main" className="flex-1 min-w-0">
+      <main
+        id="main"
+        className={chatRoute ? 'flex-1 min-w-0 min-h-0 flex flex-col' : 'flex-1 min-w-0'}
+      >
         <Outlet />
       </main>
-      {showChrome && (
+      {showChrome && !chatRoute && (
         <>
           <AppFooter />
           <CompareTray />
