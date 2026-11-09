@@ -29,7 +29,7 @@ class PostgresVectorIntegrationTest {
         var jdbc = new JdbcTemplate(dataSource);
         var settings = mock(EmbeddingSettingsService.class);
         var factory = mock(EmbeddingModelFactory.class);
-        var config = new EmbeddingSettingsService.Active("test-version", "OPENAI", "test", "unused", 3);
+        var config = new EmbeddingSettingsService.Active("test-version", "GEMINI", "test", "unused", 3);
         when(settings.current()).thenReturn(config);
         EmbeddingModel model = new EmbeddingModel() {
             private float[] vector(String text) { return text.contains("warranty") ? new float[] {1, 0, 0} : new float[] {0, 1, 0}; }

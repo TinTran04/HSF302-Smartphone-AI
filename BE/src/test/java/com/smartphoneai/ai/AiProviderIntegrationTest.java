@@ -36,17 +36,17 @@ class AiProviderIntegrationTest {
         mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"aiadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         mvc.perform(put("/api/admin/ai-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"OPENAI\",\"model\":\"demo-model\",\"apiKey\":\"secret-key-123\"}"))
+                .content("{\"provider\":\"GEMINI\",\"model\":\"demo-model\",\"apiKey\":\"secret-key-123\"}"))
                 .andExpect(status().isOk()).andExpect(content().string(not(containsString("secret-key-123"))));
-        org.junit.jupiter.api.Assertions.assertFalse(configs.findFirstByProviderOrderByIdDesc("OPENAI").orElseThrow().getKeyCipher().contains("secret-key-123"));
+        org.junit.jupiter.api.Assertions.assertFalse(configs.findFirstByProviderOrderByIdDesc("GEMINI").orElseThrow().getKeyCipher().contains("secret-key-123"));
         mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"OPENAI\"}")).andExpect(status().isConflict());
-        when(provider.chat(eq("OPENAI"), eq("demo-model"), eq("secret-key-123"), anyString())).thenReturn("OK");
+                .content("{\"provider\":\"GEMINI\"}")).andExpect(status().isConflict());
+        when(provider.chat(eq("GEMINI"), eq("demo-model"), eq("secret-key-123"), anyString())).thenReturn("OK");
         mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"OPENAI\",\"model\":\"demo-model\"}"))
+                .content("{\"provider\":\"GEMINI\",\"model\":\"demo-model\"}"))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"OPENAI\"}")).andExpect(status().isOk());
+                .content("{\"provider\":\"GEMINI\"}")).andExpect(status().isOk());
         mvc.perform(get("/api/admin/ai-settings").with(session)).andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("secret-key-123"))));
         mvc.perform(put("/api/admin/ai-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
@@ -60,6 +60,24 @@ class AiProviderIntegrationTest {
                 .andExpect(jsonPath("$.message").value(containsString("quá tải")));
         mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"provider\":\"GEMINI\"}")).andExpect(status().isConflict());
-        org.junit.jupiter.api.Assertions.assertEquals("OPENAI", configs.findAllByActiveTrue().getFirst().getProvider());
+        org.junit.jupiter.api.Assertions.assertEquals("GEMINI", configs.findAllByActiveTrue().getFirst().getProvider());
+        org.junit.jupiter.api.Assertions.assertEquals("demo-model", configs.findAllByActiveTrue().getFirst().getModel());
+    }
+    @Test void openAiRequestsAreRejectedAsInvalidInput() throws Exception {
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"aiadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
+                .andExpect(status().isOk());
+        long count = configs.count();
+        String input = "{\"provider\":\"OPENAI\",\"model\":\"old-model\",\"apiKey\":\"old-secret\"}";
+        mvc.perform(put("/api/admin/ai-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(input))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(input))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"OPENAI\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        org.junit.jupiter.api.Assertions.assertEquals(count, configs.count());
+        verifyNoInteractions(provider);
     }
 }

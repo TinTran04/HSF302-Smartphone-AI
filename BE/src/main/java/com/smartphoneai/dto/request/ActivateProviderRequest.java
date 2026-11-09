@@ -1,3 +1,3 @@
 package com.smartphoneai.dto.request;
 import jakarta.validation.constraints.*;
-public record ActivateProviderRequest(@NotNull @Pattern(regexp="OPENAI|GEMINI") String provider) {}
+public record ActivateProviderRequest(@NotNull @Pattern(regexp="GEMINI") String provider) {}

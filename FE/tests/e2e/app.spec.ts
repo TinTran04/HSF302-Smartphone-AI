@@ -318,6 +318,33 @@ test('catalog filters, variant selection, guest cart persistence, login merge an
   await expect(page.getByText('Đã hủy', { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
+test('phone consultation shows a scope reminder for unrelated questions and continues the same chat', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await login(page);
+  await page.goto('/ai');
+  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
+  await expect(page).toHaveURL(/\/ai\/conversations\//);
+  const url = page.url();
+  const input = page.getByLabel('Nhập câu hỏi cho trợ lý AI');
+  await input.fill('Thời tiết hôm nay thế nào?');
+  await input.press('Enter');
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.locator('.message.assistant')).toContainText('Mình chỉ hỗ trợ tư vấn về điện thoại');
+  await expect(page.locator('.message.assistant .product-card')).toHaveCount(0);
+  await expect(page.locator('.message.assistant .source-card')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(input).toBeEnabled();
+  await input.fill('Tư vấn điện thoại pin tốt');
+  await input.press('Enter');
+  await expect(page.locator('.message.user')).toHaveCount(2);
+  await expect(page.locator('.message.assistant')).toHaveCount(2);
+  await expect(page.locator('.message.assistant').last().locator('.product-card').first()).toBeVisible();
+  await expect(page).toHaveURL(url);
+  await page.reload();
+  await expect(page.locator('.message.assistant').first()).toContainText('Mình chỉ hỗ trợ tư vấn về điện thoại');
+  await expect(page.locator('.message.user')).toHaveCount(2);
+});
+
 test('unified AI confirms topic switch without resending the question', async ({ page }) => {
   await login(page);
   await page.goto('/ai');

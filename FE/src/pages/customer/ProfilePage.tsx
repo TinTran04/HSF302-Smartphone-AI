@@ -9,6 +9,7 @@ import './ProfilePage.css';
 import { LocationPicker } from '../../shared/components/LocationPicker';
 import type { MapLocation } from '../../shared/types/models';
 import { AddressAutocomplete } from '../../shared/components/AddressAutocomplete';
+import { useMapAddress } from '../../shared/hooks/useMapAddress';
 export default function ProfilePage() {
   const auth = useAuth();
   const user = auth.user!;
@@ -47,6 +48,15 @@ export default function ProfilePage() {
       notify('Đã cập nhật thông tin tài khoản.');
     },
   });
+  const mapAddress = useMapAddress({
+    address,
+    location,
+    enabled: editing && !save.isPending,
+    onChange: (nextAddress, point) => {
+      setAddress(nextAddress);
+      setLocation(point);
+    },
+  });
   return (
     <>
       <PageHeading
@@ -57,7 +67,7 @@ export default function ProfilePage() {
         className="card panel profile-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (editing && !save.isPending) save.mutate();
+          if (editing && !save.isPending && !mapAddress.resolving) save.mutate();
         }}
       >
         <div className="form-grid">
@@ -102,10 +112,12 @@ export default function ProfilePage() {
             maxLength={255}
             disabled={!editing || save.isPending}
             onChange={(value) => {
+              mapAddress.cancel();
               setAddress(value);
               setLocation(null);
             }}
             onSelect={(suggestion) => {
+              mapAddress.cancel();
               setAddress(suggestion.label);
               setLocation(suggestion.location);
               setMapSelection((value) => value + 1);
@@ -117,9 +129,11 @@ export default function ProfilePage() {
           value={location}
           address={address}
           revealKey={mapSelection}
-          onChange={setLocation}
+          onChange={mapAddress.select}
+          resolvingAddress={mapAddress.resolving}
           disabled={!editing || save.isPending}
         />
+        {mapAddress.resolving && <p className="help-text" role="status">Đang lấy địa chỉ theo vị trí đã chọn…</p>}
         {save.error && <ErrorState error={save.error} />}
         <div className="flex justify-end gap-3 mt-7">
           {editing ? (
@@ -128,6 +142,7 @@ export default function ProfilePage() {
                 variant="secondary"
                 disabled={save.isPending}
                 onClick={() => {
+                  mapAddress.cancel();
                   setFullName(user.fullName);
                   setPhone(user.phone);
                   setAddress(user.address);
@@ -138,7 +153,7 @@ export default function ProfilePage() {
               >
                 Hủy
               </Button>
-              <Button type="submit" busy={save.isPending}>
+              <Button type="submit" busy={save.isPending} disabled={mapAddress.resolving}>
                 Lưu thay đổi
               </Button>
             </>

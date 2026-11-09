@@ -32,17 +32,21 @@ public class EmbeddingSettingsServiceImpl implements EmbeddingSettingsService {
     @Transactional(readOnly=true)
     public Map<String,Object> describe() {
         var current=configs.findByActiveTrue().orElse(null);
-        var response=new LinkedHashMap<String,Object>(); response.put("configured",current!=null);
-        if (current!=null) {
+        boolean configured=current!=null && "GEMINI".equals(current.getProvider());
+        var response=new LinkedHashMap<String,Object>(); response.put("configured",configured);
+        if (configured) {
             response.put("provider",current.getProvider()); response.put("model",current.getModel());
             response.put("dimensions",current.getDimensions()); response.put("maskedKey","••••••••");
         }
-        response.put("reindexRequired",documents.findAll().stream().anyMatch(d -> d.getEmbeddingVersion()==null));
+        var indexedDocuments=documents.findAll();
+        response.put("reindexRequired",(!configured && !indexedDocuments.isEmpty())
+                || indexedDocuments.stream().anyMatch(d -> d.getEmbeddingVersion()==null));
         return response;
     }
     @Override
     @Transactional
     public Map<String,Object> configure(EmbeddingSettingsRequest input) {
+        if (!"GEMINI".equals(input.provider())) throw new InvalidAiConfigurationException();
         var previous=configs.findByActiveTrue().orElse(null);
         String key=input.apiKey();
         boolean reuse=key==null || key.isBlank();
@@ -75,6 +79,7 @@ public class EmbeddingSettingsServiceImpl implements EmbeddingSettingsService {
     @Transactional(readOnly=true)
     public Active current() {
         var config=configs.findByActiveTrue().orElseThrow(AiProviderException::new);
+        if (!"GEMINI".equals(config.getProvider())) throw new InvalidAiConfigurationException();
         return new Active(config.getId().toString(),config.getProvider(),config.getModel(),
                 cipher.decrypt("EMBEDDING:"+config.getProvider(),config.getKeyCipher()),config.getDimensions());
     }

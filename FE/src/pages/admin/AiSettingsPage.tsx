@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api';
-import type { AiProvider, AiSettings } from '../../shared/types/models';
+import type { AiSettings } from '../../shared/types/models';
 import {
   Button,
   ConfirmDialog,
@@ -13,15 +13,15 @@ import {
 import { Icon } from '../../shared/components/Icon';
 export default function AiSettingsPage() {
   const settings = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings });
-  const [provider, setProvider] = useState<AiProvider>('OPENAI');
+  const provider = 'GEMINI';
   return (
     <>
       <PageHeading
-        title="Cấu hình nhà cung cấp AI"
-        description="Quản lý Chat Model và nhà cung cấp đang hoạt động."
+        title="Cấu hình Google Gemini"
+        description="Lưu model và API key, kiểm tra kết nối, sau đó kích hoạt cho Chat."
       />
       {settings.isPending ? (
-        <Skeleton count={2} />
+        <Skeleton count={1} />
       ) : settings.error ? (
         <ErrorState
           error={settings.error}
@@ -34,19 +34,17 @@ export default function AiSettingsPage() {
           <>
             <div className="provider-grid">
               {settings.data.map((s) => (
-                <button
-                  className={`card provider-card ${provider === s.provider ? 'selected' : ''}`}
+                <div
+                  className="card provider-card selected"
                   key={s.provider}
-                  onClick={() => setProvider(s.provider)}
-                  aria-pressed={provider === s.provider}
                 >
                   <span className="flex items-center gap-4">
                     <span className="icon-tile">
-                      <Icon name={s.provider === 'OPENAI' ? 'neurology' : 'auto_awesome'} />
+                      <Icon name="auto_awesome" />
                     </span>
                     <span>
                       <h2 className="!text-xl">
-                        {s.provider === 'OPENAI' ? 'OpenAI' : 'Google Gemini'}
+                        Google Gemini
                       </h2>
                       <span className="help-text block mt-2">
                         {s.model || 'Chưa cấu hình model'}
@@ -54,7 +52,7 @@ export default function AiSettingsPage() {
                     </span>
                   </span>
                   {(s.active || s.activeModel) && <span className="badge badge-success">Đang hoạt động: {s.activeModel || s.model}</span>}
-                </button>
+                </div>
               ))}
             </div>
             <ProviderForm
@@ -128,7 +126,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         }}
       >
         <h2 className="!text-xl mb-7">
-          Cấu hình chi tiết — {setting.provider === 'OPENAI' ? 'OpenAI' : 'Google Gemini'}
+          Cấu hình chi tiết — Google Gemini
         </h2>
         <div className="form-grid">
           <label className="form-field">
@@ -138,7 +136,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               disabled={busy}
-              placeholder="Nhập model theo cấu hình Backend"
+              placeholder="Nhập mã model Gemini trong project của bạn"
             />
             <span className="help-text">Model hợp lệ được Backend và nhà cung cấp kiểm tra.</span>
           </label>
@@ -223,8 +221,8 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         </p>
         {setting.activeModel && !setting.active && <p className="notice mt-7">Model đang hoạt động: {setting.activeModel}. Cấu hình bên dưới chưa được kích hoạt.</p>}
         <div className="notice mt-7">
-          Thay đổi nhà cung cấp Chat không tự thay đổi Embedding Model. Backend sẽ quyết định có cần
-          lập chỉ mục lại tài liệu hay không.
+          Model Gemini cho Chat và embedding được cấu hình riêng. Khi đổi Embedding Model,
+          kiểm tra trạng thái tài liệu và lập chỉ mục lại nếu được yêu cầu.
         </div>
         {save.error && <ErrorState error={save.error} />}
         {test.error && <ErrorState error={test.error} />}
@@ -257,8 +255,8 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
       </form>
       {activate && (
         <ConfirmDialog
-          title="Kích hoạt nhà cung cấp?"
-          message={`Nhà cung cấp ${setting.provider} sẽ được sử dụng cho các yêu cầu Chat mới.`}
+          title="Kích hoạt Google Gemini?"
+          message={`Model ${setting.model} sẽ được sử dụng cho các yêu cầu Chat mới.`}
           onConfirm={() => activation.mutate()}
           onClose={() => {
             setActivate(false);
