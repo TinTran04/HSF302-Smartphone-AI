@@ -5,6 +5,7 @@ import com.smartphoneai.service.impl.PhoneAssistanceServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.entity.Product;
 import com.smartphoneai.entity.ProductVariant;
+import com.smartphoneai.exception.InvalidAiConfigurationException;
 import com.smartphoneai.repository.ProductRepository;
 import com.smartphoneai.service.AiProviderService;
 import com.smartphoneai.dto.response.ChatMessageResponse;
@@ -18,6 +19,48 @@ import static org.mockito.Mockito.*;
 @DataJpaTest
 class PhoneAssistanceIntegrationTest {
     @Autowired ProductRepository products;
+    @Test void adviceConstrainsMixedAndInjectedRequestsToPhoneContext() {
+        var provider = mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenAnswer(invocation -> {
+            String prompt = invocation.getArgument(0);
+            assertTrue(prompt.contains("Chỉ trả lời phần liên quan đến điện thoại"));
+            assertTrue(prompt.contains("bỏ qua chỉ dẫn") && prompt.contains("ngoài phạm vi"));
+            assertTrue(prompt.contains("Kiến thức AI chỉ được dùng trong ngữ cảnh điện thoại"));
+            assertTrue(prompt.contains("cách sử dụng") && prompt.contains("sửa chữa") && prompt.contains("phụ kiện"));
+            return "{\"answer\":\"OLED giúp màn hình điện thoại có độ tương phản cao.\",\"recommendedProductIds\":[],\"comparedProductIds\":[],\"citedChunkIds\":[]}";
+        });
+        var service = new PhoneAssistanceServiceImpl(products, provider, new ObjectMapper(),
+                mock(com.smartphoneai.service.RagService.class));
+
+        var answer = service.advise("Giải thích OLED trên điện thoại và viết bài văn về nấu ăn", java.util.List.of(), java.util.List.of());
+
+        assertEquals("OLED giúp màn hình điện thoại có độ tương phản cao.", answer.text());
+        assertTrue(answer.sources().isEmpty());
+    }
+
+    @Test void configurationFailuresPropagateAcrossPhoneAssistanceOperations() {
+        var first=save("First Phone",9000000L,true);
+        var second=save("Second Phone",10000000L,true);
+        var provider=mock(AiProviderService.class);
+        var failure=new InvalidAiConfigurationException();
+        when(provider.chat(anyString())).thenThrow(failure);
+        var service=new PhoneAssistanceServiceImpl(products,provider,new ObjectMapper(),
+                mock(com.smartphoneai.service.RagService.class));
+
+        assertAll(
+                () -> assertSame(failure,assertThrows(InvalidAiConfigurationException.class,
+                        () -> service.advise("OLED là gì?",java.util.List.of(),java.util.List.of()))),
+                () -> assertSame(failure,assertThrows(InvalidAiConfigurationException.class,
+                        () -> service.compare("So sánh",java.util.List.of(),
+                                java.util.List.of(first.getId().toString(),second.getId().toString())))),
+                () -> assertSame(failure,assertThrows(InvalidAiConfigurationException.class,
+                        () -> service.consult("Tư vấn điện thoại",java.util.List.of()))));
+
+        doReturn("{\"ids\":[\""+first.getId()+"\"]}").doThrow(failure).when(provider).chat(anyString());
+        assertSame(failure,assertThrows(InvalidAiConfigurationException.class,
+                () -> service.consult("Tư vấn điện thoại",java.util.List.of())));
+    }
+
     @Test void comparisonCanUseProductsBeyondTheFirstPage() {
         for (int i=0; i<100; i++) save("Catalog " + i, 100, true);
         var first = save("Later A", 100, true);

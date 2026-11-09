@@ -11,7 +11,7 @@ export const chatTopics: {
     title: 'Tư vấn mua điện thoại',
     icon: 'smartphone',
     description:
-      'Chọn và so sánh điện thoại từ danh mục, tài liệu tham khảo và kiến thức AI về công nghệ.',
+      'Chọn, so sánh và tìm hiểu cách sử dụng điện thoại từ danh mục, tài liệu và kiến thức AI về điện thoại.',
     prompt: 'Tư vấn điện thoại khoảng 25–30 triệu, chụp ảnh đẹp và pin tốt.',
   },
   {

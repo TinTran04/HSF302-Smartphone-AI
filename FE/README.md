@@ -2,6 +2,8 @@
 
 Ứng dụng React + TypeScript + Vite được chuyển từ **14 màn hình HTML Google Stitch**, dựa trên `FE_SPEC.md`. Toàn bộ mã nguồn chạy ứng dụng, ảnh, font, cấu hình và tài liệu đã gom trong thư mục `FE`.
 
+Hướng dẫn thao tác và giải thích code nằm trong [User Guide](../USER_GUIDE.md).
+
 ## Chạy trên máy
 
 Yêu cầu Node.js 22.12 trở lên; đã kiểm tra với Node.js 24.
@@ -31,7 +33,7 @@ Mở **http://localhost:5173**. Nếu cổng 5173 đã được sử dụng, xem
 - Trang chủ, danh mục tìm kiếm/lọc/sắp xếp qua URL, chi tiết chọn màu/dung lượng/số lượng, so sánh tối đa 3 mẫu máy.
 - Đăng nhập/đăng ký, hồ sơ, giỏ Guest, hợp nhất giỏ sau xác thực, checkout COD hai bước kiểm tra giá và xác nhận, lịch sử/chi tiết/hủy đơn PENDING.
 - Một giao diện AI với 2 chủ đề, lịch sử theo tài khoản, gợi ý sản phẩm, bảng so sánh, nguồn RAG, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
-- Admin quản lý dashboard, danh sách/thêm/sửa sản phẩm và biến thể, chuyển Đang mở bán/Hết hàng, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt OpenAI hoặc Gemini.
+- Admin quản lý dashboard, danh sách/thêm/sửa sản phẩm và biến thể, chuyển Đang mở bán/Hết hàng, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt Google Gemini.
 - Bổ sung các màn chưa có bản Stitch riêng: hồ sơ, danh sách/chi tiết đơn và form sản phẩm. File `dang_ki` ban đầu có cả panel đăng nhập lẫn đăng ký; React tách thành `/login` và `/register`.
 - 50 ảnh gốc đã tải về `public/images`. Inter (có tiếng Việt) và Material Symbols nằm trong `public/fonts`; không dùng Tailwind CDN khi chạy ứng dụng.
 
@@ -88,7 +90,7 @@ Khi bật bảo trì, phần shop hiển thị màn hình riêng **Shop đang b�
 
 Thời gian chờ gửi tin nhắn và xác nhận chuyển chủ đề là tối đa 6 phút 40 giây. Kiểm tra kết nối cấu hình AI có thời gian chờ 130 giây. Các giới hạn này bao gồm nhiều bước gọi AI, chuyển key khi HTTP 429 và một lần thử lại khi HTTP 503 trên mỗi key.
 
-Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho từng nhà cung cấp. Thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Để trống trường key giữ key đã lưu. Chọn **Xóa API Key dự phòng khi lưu** để gỡ key trong bản cấu hình mới. Khi Chat nhận HTTP 429, BE thử key dự phòng một lần với cùng model. Giao diện tăng thời gian chờ cho kiểm tra hai key và gửi tin nhắn AI để chờ kết quả chuyển key. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+Trong **Cấu hình AI**, Admin có thể nhập một API key dự phòng cho Gemini. Thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Để trống trường key giữ key đã lưu. Chọn **Xóa API Key dự phòng khi lưu** để gỡ key trong bản cấu hình mới. Khi Chat nhận HTTP 429, BE thử key dự phòng một lần với cùng model. Giao diện tăng thời gian chờ cho kiểm tra hai key và gửi tin nhắn AI để chờ kết quả chuyển key. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 Màn hình AI có hai ô Tư vấn mua điện thoại và Hỗ trợ cửa hàng. Tư vấn gộp chọn máy, so sánh và giải thích công nghệ từ catalog, tài liệu phù hợp và kiến thức AI tham khảo. Hỗ trợ cửa hàng dùng tài liệu chính sách. Admin cấu hình chat model, embedding model và tải PDF/TXT đến READY để kiểm thử phần truy xuất tài liệu. FE gọi BE để nhận câu trả lời.
 
@@ -109,6 +111,8 @@ Vị trí tùy chọn có dạng `location: { latitude, longitude }`, hoặc `nu
 Mặc định dùng tiles HTTPS OpenStreetMap, giữ attribution và cache của trình duyệt. `VITE_MAP_TILE_URL` và `VITE_MAP_ATTRIBUTION` trong `.env.example` cho phép chọn nguồn tiles cùng attribution tương ứng. Kiểm thử trình duyệt giả lập tiles và GPS. [Quy định sử dụng tiles](https://operations.osmfoundation.org/policies/tiles/).
 
 Khi khách cung cấp mức tiền mua máy, AI ưu tiên máy đúng ngân sách. Các gợi ý cao hơn tối đa 10% hiển thị thông báo giá, số tiền và tỷ lệ vượt do BE tính. Mức tiền được giữ cho câu hỏi tiếp theo trong hội thoại.
+
+Chọn điểm trên bản đồ hoặc dùng Vị trí hiện tại ở hồ sơ/checkout gọi `GET /api/locations/reverse` để điền địa chỉ theo tọa độ. Điểm khách chọn được giữ nguyên, nút lưu/đặt hàng chờ tra cứu xong. Sửa địa chỉ, chọn điểm mới, hủy form hoặc rời trang hủy kết quả cũ. Tra cứu quá 10 giây hoặc thất bại cho phép nhập tay. Checkout thay đổi điểm/địa chỉ sẽ yêu cầu kiểm tra lại đơn.
 
 ## Ảnh và xóa sản phẩm
 
@@ -155,3 +159,5 @@ node scripts/download-fonts.mjs
 ```
 
 Lệnh import cần thư mục Stitch gốc ở vị trí ban đầu. Nó chỉ tạo lại `src/design/stitch`, theme, dữ liệu ánh xạ ảnh và hero; không ghi đè các trang nghiệp vụ React đã refactor.
+
+Chat hiển thị tin nhắn gửi ngay trong khung hội thoại, ba chấm chuyển động khi chờ và câu trả lời mới hiện dần sau khi nhận JSON từ BE. Tin nhắn lỗi có thao tác thử lại. Cấu hình Chat và Embedding sử dụng Google Gemini.

@@ -13,6 +13,66 @@ beforeEach(async () => {
   backend = (await import('./mockApi')).mockApi;
 });
 describe('Fake backend business contracts', () => {
+  it('keeps unrelated demo questions inside the phone scope and then accepts another phone question', async () => {
+    await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
+    const conversation = await backend.createConversation('PHONE_CONSULTATION');
+    const result = await backend.sendMessage(conversation.id, 'Thời tiết hôm nay thế nào?');
+    expect(result).toMatchObject({ type: 'ANSWER', answer: expect.stringContaining('Mình chỉ hỗ trợ tư vấn về điện thoại') });
+    if (result.type !== 'ANSWER') throw new Error('Expected scope reminder');
+    expect(result.sources ?? []).toEqual([]);
+    expect(result.recommendedProducts ?? []).toEqual([]);
+    expect(result.comparedProducts ?? []).toEqual([]);
+    const stored = await backend.conversation(conversation.id);
+    expect(stored.messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(stored.messages[1].content).toBe(result.answer);
+    expect(stored.pendingSwitch).toBeUndefined();
+    const next = await backend.sendMessage(conversation.id, 'Tư vấn điện thoại pin tốt');
+    expect(next.type).toBe('ANSWER');
+    if (next.type === 'ANSWER') expect(next.recommendedProducts?.length).toBeGreaterThan(0);
+  });
+  it('starts demo mode with a single Gemini provider and preserves backup key workflow', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    expect(await backend.aiSettings()).toEqual([
+      expect.objectContaining({ provider: 'GEMINI', active: true }),
+    ]);
+    const saved = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', apiKey: 'demo-primary', backupApiKey: 'demo-backup' });
+    expect(saved).toMatchObject({ active: false, tested: false, maskedKey: '••••••••', maskedBackupKey: '••••••••' });
+    await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 409 });
+    await backend.testAiConnection({ provider: 'GEMINI', model: 'demo-gemini' });
+    expect(await backend.activateProvider('GEMINI')).toEqual([
+      expect.objectContaining({ provider: 'GEMINI', active: true, model: 'demo-gemini' }),
+    ]);
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-primary');
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-backup');
+    expect(await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', removeBackupKey: true }))
+      .toMatchObject({ maskedBackupKey: '', tested: false, active: false });
+  });
+
+  it('discards persisted OpenAI configuration without reusing its model or keys', async () => {
+    sessionStorage.setItem('smai-demo-settings', JSON.stringify([
+      { provider: 'OPENAI', model: 'legacy-model', maskedKey: 'legacy-key', maskedBackupKey: 'legacy-backup', tested: true, active: true, activeModel: 'legacy-model' },
+    ]));
+    vi.resetModules();
+    backend = (await import('./mockApi')).mockApi;
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(backend.aiSettings()).resolves.toEqual([
+      { provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+    ]);
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('legacy');
+    await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('preserves existing Gemini settings when removing a legacy provider', async () => {
+    const gemini = { provider: 'GEMINI', model: 'saved-gemini', maskedKey: 'masked-primary', maskedBackupKey: 'masked-backup', tested: true, active: true };
+    sessionStorage.setItem('smai-demo-settings', JSON.stringify([
+      { provider: 'OPENAI', model: 'legacy', maskedKey: 'legacy', active: false }, gemini,
+    ]));
+    vi.resetModules();
+    backend = (await import('./mockApi')).mockApi;
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(backend.aiSettings()).resolves.toEqual([gemini]);
+  });
+
   it('reverse lookup requires login, supports cancellation and returns a clearly marked demo address', async () => {
     await expect(backend.reverseLocation({ latitude: 10.8, longitude: 106.6 })).rejects.toMatchObject({ status: 401 });
     await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });

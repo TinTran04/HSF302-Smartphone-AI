@@ -21,6 +21,7 @@ import type { OrderPreview, ShippingInfo } from '../../shared/types/models';
 import { formatVnd } from '../../shared/utils/format';
 import { LocationPicker } from '../../shared/components/LocationPicker';
 import { AddressAutocomplete } from '../../shared/components/AddressAutocomplete';
+import { useMapAddress } from '../../shared/hooks/useMapAddress';
 type OrderAttempt = { previewId: string; shipping: ShippingInfo; paymentMethod: 'COD'; key: string; userId: string };
 const pendingKey = 'smartphone-ai-pending-order';
 function readAttempt(userId?: string): OrderAttempt | null {
@@ -115,6 +116,12 @@ export default function CheckoutPage() {
     setPreview(null);
     key.current = crypto.randomUUID();
   };
+  const mapAddress = useMapAddress({
+    address: shipping.address,
+    location: shipping.location,
+    enabled: !submit.isPending && !uncertain,
+    onChange: (address, point) => update({ address, location: point }),
+  });
   return (
     <div className="container page">
       <Breadcrumb items={[{ label: 'Giỏ hàng', to: '/cart' }, { label: 'Đặt hàng COD' }]} />
@@ -146,7 +153,7 @@ export default function CheckoutPage() {
           className="split-layout"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!submit.isPending) submit.mutate();
+            if (!submit.isPending && !mapAddress.resolving) submit.mutate();
           }}
         >
           <section className="space-y-6">
@@ -178,8 +185,12 @@ export default function CheckoutPage() {
                 <AddressAutocomplete label="Địa chỉ nhận hàng" className="col-span-full"
                   required minLength={8} maxLength={255} multiline value={shipping.address}
                   disabled={submit.isPending || uncertain}
-                  onChange={(value) => update({ address: value, location: null })}
+                  onChange={(value) => {
+                    mapAddress.cancel();
+                    update({ address: value, location: null });
+                  }}
                   onSelect={(suggestion) => {
+                    mapAddress.cancel();
                     update({ address: suggestion.label, location: suggestion.location });
                     setMapSelection((value) => value + 1);
                     notify('Đã chọn địa chỉ và cập nhật vị trí trên bản đồ.');
@@ -194,7 +205,8 @@ export default function CheckoutPage() {
                   />
                 </label>
               </div>
-              <LocationPicker value={shipping.location} address={shipping.address} revealKey={mapSelection} onChange={(location) => update({ location })} disabled={submit.isPending || uncertain} />
+              <LocationPicker value={shipping.location} address={shipping.address} revealKey={mapSelection} onChange={mapAddress.select} resolvingAddress={mapAddress.resolving} disabled={submit.isPending || uncertain} />
+              {mapAddress.resolving && <p className="help-text" role="status">Đang lấy địa chỉ theo vị trí đã chọn…</p>}
             </div>
             <div className="card panel">
               <h2 className="!text-xl mb-6">2. Phương thức thanh toán</h2>
@@ -244,7 +256,7 @@ export default function CheckoutPage() {
               </p>
             )}
             {submit.error && <ErrorState error={submit.error} />}
-            <Button type="submit" busy={submit.isPending} className="w-full">
+            <Button type="submit" busy={submit.isPending} disabled={mapAddress.resolving} className="w-full">
               <Icon name="verified_user" />
               {uncertain ? 'Thử lại xác nhận' : preview ? 'Xác nhận đặt hàng' : 'Kiểm tra đơn hàng'}
             </Button>

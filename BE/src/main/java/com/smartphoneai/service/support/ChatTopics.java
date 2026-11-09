@@ -1,6 +1,9 @@
 package com.smartphoneai.service.support;
 
 public final class ChatTopics {
+    public static final String PHONE_SCOPE_REMINDER = "Mình chỉ hỗ trợ tư vấn về điện thoại, như chọn mua, so sánh, cấu hình và cách sử dụng. Bạn muốn tìm hiểu điện thoại nào?";
+    public static final String SHOP_SCOPE_REMINDER = "Mình chỉ hỗ trợ thông tin của cửa hàng, như chính sách, bảo hành, đổi trả và giao hàng. Bạn cần hỗ trợ nội dung nào?";
+
     private ChatTopics() {}
 
     public static String normalize(String topic) {

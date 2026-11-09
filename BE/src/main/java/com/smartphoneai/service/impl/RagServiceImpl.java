@@ -8,6 +8,8 @@ import com.smartphoneai.service.RagService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.entity.KnowledgeChunk;
 import com.smartphoneai.entity.KnowledgeDocument;
+import com.smartphoneai.exception.AiProviderException;
+import com.smartphoneai.exception.InvalidAiConfigurationException;
 import com.smartphoneai.repository.KnowledgeChunkRepository;
 import com.smartphoneai.repository.KnowledgeDocumentRepository;
 import org.springframework.stereotype.Service;
@@ -91,7 +93,7 @@ public class RagServiceImpl implements RagService {
             if (cited.isEmpty()) return insufficient();
             var references=cited.stream().map(id -> byId.get(id).source()).toList();
             return new ChatResponder.Answer(text,references);
-        } catch (com.smartphoneai.exception.AiProviderException ex) { throw ex; }
+        } catch (AiProviderException | InvalidAiConfigurationException ex) { throw ex; }
         catch (Exception ex) { return insufficient(); }
     }
     private static ChatResponder.Answer insufficient() {

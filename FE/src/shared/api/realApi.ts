@@ -153,7 +153,7 @@ export const realApi: Api = {
           }),
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
-    return (['OPENAI', 'GEMINI'] as const).map(provider => {
+    return (['GEMINI'] as const).map(provider => {
       const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
       const active = configs.find(c => c.provider === provider && c.active);
       return { ...latest, ...(active ? { activeModel: active.model } : {}) };

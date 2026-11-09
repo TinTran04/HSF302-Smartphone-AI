@@ -32,15 +32,27 @@ class EmbeddingSettingsIntegrationTest {
     @MockitoBean EmbeddingModelFactory factory;
     @Test void verifiesEmbeddingAndKeepsSecretsEncrypted() throws Exception {
         var model=mock(EmbeddingModel.class);
-        when(factory.create(eq("OPENAI"),eq("embed-model"),eq("embedding-secret"),eq(3),eq(false))).thenReturn(model);
+        when(factory.create(eq("GEMINI"),eq("embed-model"),eq("embedding-secret"),eq(3),eq(false))).thenReturn(model);
         when(model.embed(anyString())).thenReturn(new float[]{0.1f,0.2f,0.3f});
         var session=new JwtTestClient();
         mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"embedadmin@example.com\",\"password\":\"TestRootPassword123!\"}")).andExpect(status().isOk());
         mvc.perform(put("/api/admin/embedding-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"provider\":\"OPENAI\",\"model\":\"embed-model\",\"apiKey\":\"embedding-secret\",\"dimensions\":3}"))
+                .content("{\"provider\":\"GEMINI\",\"model\":\"embed-model\",\"apiKey\":\"embedding-secret\",\"dimensions\":3}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
                 .andExpect(content().string(not(containsString("embedding-secret"))));
         org.junit.jupiter.api.Assertions.assertFalse(configs.findByActiveTrue().orElseThrow().getKeyCipher().contains("embedding-secret"));
+    }
+    @Test void openAiEmbeddingRequestIsRejectedBeforeCallingProvider() throws Exception {
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"embedadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
+                .andExpect(status().isOk());
+        long count = configs.count();
+        mvc.perform(put("/api/admin/embedding-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"OPENAI\",\"model\":\"embed-model\",\"apiKey\":\"old-secret\",\"dimensions\":3}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        org.junit.jupiter.api.Assertions.assertEquals(count, configs.count());
+        verifyNoInteractions(factory);
     }
 }

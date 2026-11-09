@@ -38,10 +38,17 @@ public class AiProviderServiceImpl implements AiProviderService {
     }
     @Override
     @Transactional(readOnly=true)
-    public List<AiSettingsResponse> list() { return configs.findAllByOrderByIdDesc().stream().map(AiSettingsResponse::from).toList(); }
+    public List<AiSettingsResponse> list() {
+        var configured = configs.findAllByOrderByIdDesc().stream()
+                .filter(config -> "GEMINI".equals(config.getProvider()))
+                .map(AiSettingsResponse::from).toList();
+        return configured.isEmpty()
+                ? List.of(new AiSettingsResponse("GEMINI", "", "", "", false, false)) : configured;
+    }
     @Override
     @Transactional
     public AiSettingsResponse save(AiSettingsRequest input) {
+        requireGemini(input.provider());
         var old = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElse(null);
         String key = input.apiKey();
         if (key == null || key.isBlank()) {
@@ -68,6 +75,7 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Override
     @Transactional
     public void test(AiSettingsRequest input) {
+        requireGemini(input.provider());
         var config = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElseThrow(InvalidAiConfigurationException::new);
         if (!config.getModel().equals(input.model().trim())) throw new InvalidAiConfigurationException();
         String key = cipher.decrypt(config.getProvider(), config.getKeyCipher());
@@ -90,6 +98,7 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Override
     @Transactional
     public List<AiSettingsResponse> activate(String provider) {
+        requireGemini(provider);
         settings.findLockedSingleton().orElseThrow();
         var selected = configs.findFirstByProviderOrderByIdDesc(provider).orElseThrow(InvalidAiConfigurationException::new);
         if (!selected.isTested()) throw new InvalidAiConfigurationException();
@@ -104,6 +113,7 @@ public class AiProviderServiceImpl implements AiProviderService {
         var active = configs.findAllByActiveTrue();
         if (active.size() != 1) throw new AiProviderException();
         var config = active.getFirst();
+        requireGemini(config.getProvider());
         try {
             return call(config, cipher.decrypt(config.getProvider(), config.getKeyCipher()), prompt);
         } catch (AiProviderException exception) {
@@ -117,6 +127,10 @@ public class AiProviderServiceImpl implements AiProviderService {
                 client.chat(config.getProvider(), config.getModel(), key, prompt));
         if (result == null || result.isBlank()) throw new AiProviderException();
         return result;
+    }
+
+    private void requireGemini(String provider) {
+        if (!"GEMINI".equals(provider)) throw new InvalidAiConfigurationException();
     }
 
     private String decryptBackupKey(AiProviderConfig config) {

@@ -145,7 +145,7 @@ export interface KnowledgeDocument {
   status: KnowledgeStatus;
   error?: string;
 }
-export type AiProvider = 'OPENAI' | 'GEMINI';
+export type AiProvider = 'GEMINI';
 export interface AiSettings {
   provider: AiProvider;
   model: string;

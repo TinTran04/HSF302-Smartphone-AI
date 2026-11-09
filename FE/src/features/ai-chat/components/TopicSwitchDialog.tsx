@@ -2,18 +2,21 @@ import type { TopicSwitchRequired } from '../../../shared/types/models';
 import { topicInfo } from '../constants/chatTopics';
 import { Button, ErrorState, Modal } from '../../../shared/components/Ui';
 import { Icon } from '../../../shared/components/Icon';
+import { PendingAssistant } from './PendingAssistant';
 export function TopicSwitchDialog({
   request,
   onConfirm,
   onCancel,
   busy,
   error,
+  waiting,
 }: {
   request: TopicSwitchRequired;
   onConfirm: () => void;
   onCancel: () => void;
   busy: boolean;
   error?: unknown;
+  waiting?: boolean;
 }) {
   return (
     <Modal title="Bạn có muốn chuyển chủ đề trò chuyện?" onClose={onCancel} busy={busy}>
@@ -29,6 +32,7 @@ export function TopicSwitchDialog({
         Câu hỏi đang chờ sẽ được xử lý trong cuộc hội thoại mới. Lịch sử cũ vẫn được giữ riêng.
       </p>
       {!!error && <ErrorState error={error} />}
+      {waiting && <PendingAssistant />}
       <div className="flex flex-col gap-3 mt-6">
         <Button variant="ai" busy={busy} onClick={onConfirm}>
           Chuyển sang {topicInfo(request.suggestedTopic).title}

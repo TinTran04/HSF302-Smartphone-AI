@@ -2,6 +2,8 @@
 
 Backend Spring Boot cho catalog điện thoại, tài khoản và OTP, giỏ hàng, đơn COD, quản trị và trợ lý AI. Hợp đồng và nghiệp vụ được mô tả tại [API specification](../docs/API_SPECIFICATION.md) và [Business specification](../docs/BUSINESS_SPECIFICATION.md).
 
+Đọc [User Guide](../USER_GUIDE.md) để setup từ đầu và trình bày luồng Gemini/RAG khi demo.
+
 ## Cấu trúc backend
 
 ```text
@@ -132,7 +134,7 @@ Tư vấn dựa trên mức tiền khách cung cấp, giữ mức tiền ở cá
 
 Mỗi lần gọi Chat được thử tối đa hai lần khi nhà cung cấp trả HTTP 503, cách nhau 750 ms. Sau lần thử cuối, lỗi vẫn được trả về nếu provider tiếp tục quá tải. HTTP 429 sử dụng quy tắc key dự phòng đã cấu hình. Bộ đọc JSON AI chấp nhận JSON thuần và JSON trong khối Markdown cho phân loại chủ đề, chọn sản phẩm và câu trả lời RAG.
 
-Trong trang quản trị, lưu cấu hình chat model, kiểm tra và kích hoạt OpenAI hoặc Gemini. Cấu hình embedding được quản lý riêng; nhập model, số chiều và API key phù hợp. Tải PDF/TXT từ **Kho kiến thức AI**; PDF ảnh không được OCR.
+Trong trang quản trị, lưu cấu hình chat model, kiểm tra và kích hoạt Google Gemini. Cấu hình embedding được quản lý riêng; nhập model, số chiều và API key phù hợp. Tải PDF/TXT từ **Kho kiến thức AI**; PDF ảnh không được OCR.
 
 Cấu hình Chat có thêm `backupApiKey` tùy chọn và `removeBackupKey` để xóa key dự phòng. Bỏ trống key giữ giá trị trước đó của cùng provider. Cả hai key được mã hóa và chỉ trả về `maskedKey`/`maskedBackupKey`. Bước kiểm tra gọi thử cả hai key. Nếu key chính trả HTTP 429, bước kiểm tra có thể thành công khi key dự phòng hoạt động. Lưu và kiểm tra thành công mới cho kích hoạt bản cấu hình mới.
 
@@ -141,3 +143,5 @@ Mỗi lần gọi Chat ưu tiên key chính, gặp HTTP 429 thì thử key dự 
 Tải tài liệu trả về `PROCESSING`; quá trình tạo embedding chạy nền và có thể chuyển sang `READY`, `FAILED` hoặc `DISABLED`. Các tài liệu còn `PROCESSING` được lên lịch lại khi ứng dụng khởi động. Chủ đề **Hỗ trợ cửa hàng** dùng tài liệu `READY` cho RAG; tư vấn và so sánh lấy dữ liệu sản phẩm. Xem `../docs/RAG_RULES.md` nếu tài liệu có trên máy.
 
 Các kiểm thử H2/mock không thay thế kiểm thử Gmail, PostgreSQL/pgvector và nhà cung cấp AI thực tế. Cần kiểm thử các thành phần ngoài và tích hợp FE trên môi trường dự án trước khi coi luồng đầu-cuối là hoàn tất. Thư mục `docs/` đang bị Git bỏ qua.
+
+Cấu hình Chat và Embedding hiện chỉ nhận `GEMINI`. Cấu hình provider cũ cần được thay bằng Gemini đã kiểm tra, sau đó kích hoạt Chat và lập chỉ mục lại tài liệu nếu cấu hình embedding thay đổi.
