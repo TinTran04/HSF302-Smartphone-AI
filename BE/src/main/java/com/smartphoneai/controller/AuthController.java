@@ -48,10 +48,18 @@ public class AuthController {
                 "expiresAt", challenge.getIssuedAt().plusSeconds(300), "resendAfter", challenge.getIssuedAt().plusSeconds(60)));
     }
 
+    @PostMapping("/password-reset/verify")
+    public ResponseEntity<?> verifyPasswordReset(@Valid @RequestBody VerifyOtpRequest input) {
+        var verified = passwordReset.verify(input.challengeId(), input.code());
+        if (verified.isEmpty())
+            return ResponseEntity.status(409).body(Map.of("code", "INVALID_OTP", "message", "Mã không hợp lệ hoặc đã hết hạn"));
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(verified.get());
+    }
+
     @PostMapping("/password-reset/confirm")
     public ResponseEntity<?> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest input) {
-        if (!passwordReset.confirm(input.challengeId(), input.code(), input.newPassword()))
-            return ResponseEntity.status(409).body(Map.of("code", "INVALID_OTP", "message", "Mã không hợp lệ hoặc đã hết hạn"));
+        if (!passwordReset.confirm(input.challengeId(), input.resetToken(), input.newPassword()))
+            return ResponseEntity.status(409).body(Map.of("code", "INVALID_PASSWORD_RESET", "message", "Quyền đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu mã xác minh mới."));
         return ResponseEntity.noContent().build();
     }
 

@@ -17,6 +17,7 @@ export default function AiSettingsPage() {
   return (
     <>
       <PageHeading
+        eyebrow="Trợ lý AI"
         title="Cấu hình Google Gemini"
         description="Lưu model và API key, kiểm tra kết nối, sau đó kích hoạt cho Chat."
       />
@@ -34,24 +35,23 @@ export default function AiSettingsPage() {
           <>
             <div className="provider-grid">
               {settings.data.map((s) => (
-                <div
-                  className="card provider-card selected"
-                  key={s.provider}
-                >
+                <div className="card provider-card selected" key={s.provider}>
                   <span className="flex items-center gap-4">
                     <span className="icon-tile">
                       <Icon name="auto_awesome" />
                     </span>
                     <span>
-                      <h2 className="!text-xl">
-                        Google Gemini
-                      </h2>
+                      <h2 className="!text-xl">Google Gemini</h2>
                       <span className="help-text block mt-2">
                         {s.model || 'Chưa cấu hình model'}
                       </span>
                     </span>
                   </span>
-                  {(s.active || s.activeModel) && <span className="badge badge-success">Đang hoạt động: {s.activeModel || s.model}</span>}
+                  {(s.active || s.activeModel) && (
+                    <span className="badge badge-success">
+                      Đang hoạt động: {s.activeModel || s.model}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -89,10 +89,16 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
       setApiKey('');
       setBackupApiKey('');
       setRemoveBackupKey(false);
-      client.setQueryData<AiSettings[]>(['ai-settings'], (previous) => previous?.map((current) =>
-        current.provider === saved.provider
-          ? { ...saved, activeModel: current.activeModel || (current.active ? current.model : undefined) }
-          : current));
+      client.setQueryData<AiSettings[]>(['ai-settings'], (previous) =>
+        previous?.map((current) =>
+          current.provider === saved.provider
+            ? {
+                ...saved,
+                activeModel: current.activeModel || (current.active ? current.model : undefined),
+              }
+            : current,
+        ),
+      );
       void client.invalidateQueries({ queryKey: ['ai-settings'] });
       notify('Đã lưu cấu hình AI.');
     },
@@ -115,7 +121,8 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     },
   });
   const busy = save.isPending || test.isPending || activation.isPending;
-  const dirty = model.trim() !== setting.model || !!apiKey.trim() || !!backupApiKey.trim() || removeBackupKey;
+  const dirty =
+    model.trim() !== setting.model || !!apiKey.trim() || !!backupApiKey.trim() || removeBackupKey;
   return (
     <>
       <form
@@ -125,9 +132,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           if (!busy) save.mutate();
         }}
       >
-        <h2 className="!text-xl mb-7">
-          Cấu hình chi tiết — Google Gemini
-        </h2>
+        <h2 className="!text-xl mb-7">Cấu hình chi tiết — Google Gemini</h2>
         <div className="form-grid">
           <label className="form-field">
             Chat Model
@@ -209,20 +214,28 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
                 type="checkbox"
                 checked={removeBackupKey}
                 disabled={busy}
-                onChange={(e) => { setRemoveBackupKey(e.target.checked); setBackupApiKey(''); }}
+                onChange={(e) => {
+                  setRemoveBackupKey(e.target.checked);
+                  setBackupApiKey('');
+                }}
               />
               Xóa API Key dự phòng khi lưu
             </label>
           )}
         </div>
         <p className="help-text mt-4">
-          Mỗi yêu cầu ưu tiên key chính. Khi nhà cung cấp trả lỗi 429 do quota hoặc giới hạn sử dụng,
-          hệ thống thử key dự phòng một lần với cùng model. Các key Gemini cùng project dùng chung quota.
+          Mỗi yêu cầu ưu tiên key chính. Khi nhà cung cấp trả lỗi 429 do quota hoặc giới hạn sử
+          dụng, hệ thống thử key dự phòng một lần với cùng model. Các key Gemini cùng project dùng
+          chung quota.
         </p>
-        {setting.activeModel && !setting.active && <p className="notice mt-7">Model đang hoạt động: {setting.activeModel}. Cấu hình bên dưới chưa được kích hoạt.</p>}
+        {setting.activeModel && !setting.active && (
+          <p className="notice mt-7">
+            Model đang hoạt động: {setting.activeModel}. Cấu hình bên dưới chưa được kích hoạt.
+          </p>
+        )}
         <div className="notice mt-7">
-          Model Gemini cho Chat và embedding được cấu hình riêng. Khi đổi Embedding Model,
-          kiểm tra trạng thái tài liệu và lập chỉ mục lại nếu được yêu cầu.
+          Model Gemini cho Chat và embedding được cấu hình riêng. Khi đổi Embedding Model, kiểm tra
+          trạng thái tài liệu và lập chỉ mục lại nếu được yêu cầu.
         </div>
         {save.error && <ErrorState error={save.error} />}
         {test.error && <ErrorState error={test.error} />}
@@ -249,7 +262,9 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         </div>
         {(dirty || !setting.tested) && (
           <p className="help-text text-right mt-4">
-            {dirty ? 'Lưu thay đổi trước khi kiểm tra và kích hoạt.' : 'Kiểm tra kết nối các key đã lưu trước khi kích hoạt.'}
+            {dirty
+              ? 'Lưu thay đổi trước khi kiểm tra và kích hoạt.'
+              : 'Kiểm tra kết nối các key đã lưu trước khi kích hoạt.'}
           </p>
         )}
       </form>

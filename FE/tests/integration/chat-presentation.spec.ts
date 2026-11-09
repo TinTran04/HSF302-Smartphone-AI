@@ -28,11 +28,18 @@ async function chatFixture(
     reducedMotion?: boolean;
     lostSwitch?: boolean;
     unknownFirstFailure?: boolean;
+    longHistory?: boolean;
   } = {},
 ) {
   const responseGate = gate();
   let requests = 0;
-  const messages: Message[] = [];
+  const messages: Message[] = options.longHistory
+    ? Array.from({ length: 30 }, (_, index) => ({
+        id: `history-${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: index % 2 === 0 ? `Câu hỏi ${index + 1} về điện thoại` : answer,
+      }))
+    : [];
   let pendingSwitch: object | undefined;
   await page
     .context()
@@ -102,6 +109,63 @@ async function chatFixture(
   await page.goto(`/ai/conversations/${conversationId}`);
   await expect(page.getByLabel('Nhập câu hỏi cho trợ lý AI')).toBeEnabled();
   return { release: responseGate.release, requests: () => requests };
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+  { width: 390, height: 640 },
+  { width: 844, height: 390 },
+]) {
+  test(`chat keeps its frame and composer in the viewport at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await chatFixture(page, { longHistory: true });
+    const stream = page.getByRole('log', { name: 'Tin nhắn cuộc hội thoại' });
+    const composer = page.locator('.chat-composer');
+    const toolbar = page.locator('.chat-toolbar');
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          vertical: document.documentElement.scrollHeight - window.innerHeight,
+          horizontal: document.documentElement.scrollWidth - window.innerWidth,
+        })),
+      )
+      .toEqual({ vertical: 0, horizontal: 0 });
+    const composerBefore = await composer.boundingBox();
+    const toolbarBefore = await toolbar.boundingBox();
+    expect(composerBefore).not.toBeNull();
+    expect(composerBefore!.y + composerBefore!.height).toBeLessThanOrEqual(viewport.height);
+    await expect.poll(() => stream.evaluate((element) => element.clientHeight)).toBeGreaterThan(0);
+    expect(await stream.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
+      await stream.evaluate((element) => element.clientHeight),
+    );
+    await stream.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await stream.hover();
+    await page.mouse.wheel(0, 600);
+    await expect.poll(() => stream.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    expect(await composer.boundingBox()).toEqual(composerBefore);
+    expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await expect(page.locator('.store-footer')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('chat-layout.png') });
+    await page.getByRole('link', { name: 'Đổi chủ đề' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Xin chào! Mình có thể giúp gì cho bạn hôm nay?' }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+    ).toBe(0);
+    await page.getByRole('link', { name: 'SmartPhone AI — Trang chủ', exact: true }).click();
+    await expect(page.locator('.store-footer')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
+      viewport.height,
+    );
+  });
 }
 
 test('chat sends immediately, waits with three wave dots and reveals only a newly received answer', async ({

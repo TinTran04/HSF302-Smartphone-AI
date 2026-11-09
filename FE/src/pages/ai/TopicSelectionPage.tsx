@@ -26,11 +26,11 @@ export default function TopicSelectionPage() {
   });
   return (
     <div className="topic-welcome">
-      <div className="text-center">
-        <span className="icon-tile !w-16 !h-16 !rounded-2xl">
+      <div className="text-center topic-welcome-heading">
+        <span className="icon-tile topic-welcome-icon">
           <Icon name="auto_awesome" className="!text-3xl" />
         </span>
-        <p className="eyebrow mt-6">SmartPhone AI Assistant</p>
+        <p className="eyebrow">SmartPhone AI Assistant</p>
         <h1>Xin chào! Mình có thể giúp gì cho bạn hôm nay?</h1>
         <p className="muted text-sm">Chọn một chủ đề để bắt đầu cuộc trò chuyện mới.</p>
       </div>
@@ -63,7 +63,7 @@ export default function TopicSelectionPage() {
           </button>
         ))}
       </div>
-      <p className="help-text text-center mt-8">
+      <p className="help-text text-center topic-disclaimer">
         AI có thể mắc lỗi. Vui lòng kiểm tra lại thông tin trước khi quyết định.
       </p>
     </div>

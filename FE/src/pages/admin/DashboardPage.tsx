@@ -93,7 +93,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div className="table-scroll">
-              <table className="admin-table">
+              <table className="admin-table" aria-label="Đơn hàng COD gần đây">
                 <thead>
                   <tr>
                     <th>Mã đơn</th>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
-        <aside className="card panel self-start">
+        <aside className="card panel self-start admin-ai-panel">
           <span className="icon-tile mb-5">
             <Icon name="dataset" />
           </span>
@@ -165,7 +165,11 @@ export default function DashboardPage() {
             description: 'Quản lý Chat Model và kích hoạt nhà cung cấp.',
           },
         ].map((x) => (
-          <Link className="card panel flex items-center gap-5" to={x.to} key={x.to}>
+          <Link
+            className="card panel flex items-center gap-5 admin-quick-link"
+            to={x.to}
+            key={x.to}
+          >
             <span className="icon-tile">
               <Icon name={x.icon} />
             </span>

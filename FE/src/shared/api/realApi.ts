@@ -31,7 +31,8 @@ export const realAuth = {
   },
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
   reset: (email: string) => post<{challengeId:string}>('/auth/password-reset', { email }),
-  resetConfirm: (challengeId: string, code: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, code, newPassword }),
+  resetVerify: (challengeId: string, code: string) => post<{resetToken: string; expiresAt: string}>('/auth/password-reset/verify', { challengeId, code }),
+  resetConfirm: (challengeId: string, resetToken: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, resetToken, newPassword }),
   acceptInvitation: (token: string, password: string) => post('/auth/account-invitations/accept', { token, password }),
 };
 export const realApi: Api = {

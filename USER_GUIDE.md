@@ -203,6 +203,8 @@ Thông tin công nghệ của Gemini cần được đối chiếu khi quyết �
 
 Trong hồ sơ, bấm **Chỉnh sửa thông tin** để sửa họ tên, số điện thoại và địa chỉ. Email được khóa. Hủy khôi phục dữ liệu đã lưu. Đổi mật khẩu đăng xuất các thiết bị khác, đặt lại mật khẩu qua OTP thu hồi các phiên cũ.
 
+Quên mật khẩu gồm ba bước. Nhập email để nhận mã, nhập OTP và bấm **Xác thực OTP**, sau đó đặt mật khẩu mới và nhập xác nhận. Hai ô mật khẩu có nút ẩn/hiện riêng, yêu cầu tối thiểu 8 ký tự. Quyền đặt lại mật khẩu dùng một lần và hết hạn sau 5 phút kể từ khi xác thực OTP. Khi hết hạn, bấm **Yêu cầu mã xác minh mới** để bắt đầu lại. Tại bước OTP, bấm **Đổi email** nếu cần sửa địa chỉ nhận mã.
+
 ### 5.2. Admin
 
 | Mục | Thao tác |

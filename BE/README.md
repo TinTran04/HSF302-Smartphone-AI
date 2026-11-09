@@ -98,6 +98,8 @@ Admin dùng portal và hồ sơ cá nhân `/admin/profile`. API catalog công kh
 
 Migration V22 thêm `credential_version` mặc định 0 cho tài khoản cũ. JWT và thiết bị lưu phiên bản lúc xác thực, được kiểm tra với DB ở mỗi request. Đổi mật khẩu làm mất hiệu lực các thiết bị khác và cấp lại cookie sau khi transaction thành công. Quên mật khẩu thu hồi toàn bộ thông tin xác thực cũ.
 
+Quên mật khẩu dùng ba API theo thứ tự. `POST /api/auth/password-reset` nhận email và cấp `challengeId`. `POST /api/auth/password-reset/verify` nhận `challengeId` và `code`, xác thực OTP rồi trả `resetToken` cùng `expiresAt`. `POST /api/auth/password-reset/confirm` nhận `challengeId`, `resetToken` và `newPassword`. Migration V28 lưu hash của quyền đặt lại mật khẩu, thời hạn 5 phút và phiên bản xác thực của tài khoản. Quyền này dùng một lần, bị thu hồi khi yêu cầu mã mới hoặc thông tin xác thực thay đổi. FE chỉ giữ token trong bộ nhớ của trang.
+
 Nếu khách đóng trang trước khi xác minh đăng ký, khách có thể đăng nhập lại bằng email và mật khẩu đã nhập để nhận OTP đăng ký mới (áp dụng thời gian chờ gửi lại 60 giây). Phiên chat Guest cũ còn được hỗ trợ chuyển lịch sử khi đăng nhập bằng client cũ và được dọn khi hết hạn. Hệ thống hiện yêu cầu CUSTOMER đăng nhập để tạo và sử dụng chat.
 
 `DELETE /api/ai/conversations/{id}` xóa hội thoại của chính CUSTOMER, trả 204. ID không tồn tại hoặc thuộc người khác trả 404. Trong một transaction, BE xóa tham chiếu chuyển chủ đề, tin nhắn rồi hội thoại. Hồ sơ chỉ cho cập nhật họ tên, số điện thoại và địa chỉ, email được giữ nguyên.
