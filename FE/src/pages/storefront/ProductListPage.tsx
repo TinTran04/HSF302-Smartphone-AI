@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ProductCard } from '../../features/products/ProductCard';
 import { ProductFilters } from '../../features/products/ProductFilters';
 import { useProducts } from '../../features/products/useProducts';
@@ -51,13 +51,18 @@ export default function ProductListPage() {
     setParams(next);
   }
   return (
-    <div className="container page">
+    <div className="container page storefront-catalog">
       <Breadcrumb items={[{ label: 'Điện thoại' }]} />
       <PageHeading
         title="Khám phá điện thoại"
         description="Tìm thiết bị dành cho bạn. Lựa chọn thông minh hơn cùng AI."
+        action={
+          <Link to="/ai?topic=PHONE_CONSULTATION" className="button storefront-ai-button">
+            <Icon name="auto_awesome" /> Nhờ AI tư vấn
+          </Link>
+        }
       />
-      <div className="catalog-layout">
+      <div className="catalog-layout storefront-catalog-layout">
         <ProductFilters
           params={params}
           update={update}
@@ -66,43 +71,51 @@ export default function ProductListPage() {
             setParams({});
           }}
         />
-        <section className="min-w-0">
+        <section className="storefront-catalog-results" aria-label="Danh sách điện thoại">
           <form
-            className="search-field"
+            className="storefront-search"
             role="search"
             onSubmit={(e) => {
               e.preventDefault();
               update('keyword', keyword);
             }}
           >
-            <Icon name="search" />
-            <input
-              aria-label="Tìm kiếm điện thoại"
-              placeholder="Tìm theo tên điện thoại…"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-            <Button className="!absolute right-1 top-1 !min-h-[38px] !py-2" type="submit">
-              Tìm kiếm
-            </Button>
+            <label htmlFor="catalog-search">Tìm kiếm điện thoại</label>
+            <div className="storefront-search-controls">
+              <div className="storefront-search-input">
+                <Icon name="search" />
+                <input
+                  id="catalog-search"
+                  type="search"
+                  aria-label="Tìm kiếm điện thoại"
+                  placeholder="Tìm theo tên điện thoại…"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+              </div>
+              <Button type="submit">Tìm kiếm</Button>
+            </div>
           </form>
-          <div className="catalog-toolbar">
-            <p className="muted">
+          <div className="catalog-toolbar storefront-catalog-toolbar">
+            <p className="muted" role="status">
               {products.data
                 ? `${products.data.totalItems} điện thoại phù hợp`
                 : 'Đang tải sản phẩm…'}
             </p>
-            <select
-              aria-label="Sắp xếp sản phẩm"
-              value={params.get('sort') || ''}
-              onChange={(e) => update('sort', e.target.value)}
-            >
-              <option value="">Sắp xếp mặc định</option>
-              <option value="price,asc">Giá: Thấp đến cao</option>
-              <option value="price,desc">Giá: Cao đến thấp</option>
-              <option value="name,asc">Tên: A–Z</option>
-              <option value="name,desc">Tên: Z–A</option>
-            </select>
+            <label className="storefront-sort">
+              <span>Sắp xếp</span>
+              <select
+                aria-label="Sắp xếp sản phẩm"
+                value={params.get('sort') || ''}
+                onChange={(e) => update('sort', e.target.value)}
+              >
+                <option value="">Sắp xếp mặc định</option>
+                <option value="price,asc">Giá: Thấp đến cao</option>
+                <option value="price,desc">Giá: Cao đến thấp</option>
+                <option value="name,asc">Tên: A–Z</option>
+                <option value="name,desc">Tên: Z–A</option>
+              </select>
+            </label>
           </div>
           {products.isPending ? (
             <Skeleton count={6} />
@@ -125,7 +138,7 @@ export default function ProductListPage() {
             />
           ) : (
             <>
-              <div className="product-grid">
+              <div className="product-grid storefront-products">
                 {products.data.items.map((p) => (
                   <ProductCard product={p} key={p.id} />
                 ))}

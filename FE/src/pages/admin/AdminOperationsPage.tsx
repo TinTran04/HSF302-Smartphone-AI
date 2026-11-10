@@ -17,6 +17,13 @@ const write = <T,>(url: string, method: string, body?: unknown) =>
   http<T>(url, { method, ...(body === undefined ? {} : { body: jsonBody(body) }) });
 type Operation = { url: string; method: string; body?: unknown; message: string };
 type Confirmation = { title: string; message: string; operation: Operation };
+type EmbeddingSettings = {
+  provider?: string;
+  model?: string;
+  dimensions?: number;
+  maskedKey?: string;
+  reindexRequired?: boolean;
+};
 
 export default function AdminOperationsPage({
   section,
@@ -29,10 +36,9 @@ export default function AdminOperationsPage({
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [editName, setEditName] = useState('');
   const [name, setName] = useState('');
-  const [provider, setProvider] = useState('OPENAI');
-  const [model, setModel] = useState('');
+  const [model, setModel] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [dimensions, setDimensions] = useState(1536);
+  const [dimensions, setDimensions] = useState<number | null>(null);
   const endpoint = {
     brands: '/admin/brands',
     maintenance: '/maintenance',
@@ -43,6 +49,10 @@ export default function AdminOperationsPage({
     queryFn: () => http<unknown>(endpoint),
     enabled: !isDemo,
   });
+  const embedding = query.data as EmbeddingSettings | undefined;
+  const geminiEmbedding = embedding?.provider === 'GEMINI' ? embedding : undefined;
+  const embeddingModel = model ?? geminiEmbedding?.model ?? '';
+  const embeddingDimensions = dimensions ?? geminiEmbedding?.dimensions ?? 768;
   const mutation = useMutation({
     meta: { toast: false },
     mutationFn: (request: Operation) => write<unknown>(request.url, request.method, request.body),
@@ -52,6 +62,8 @@ export default function AdminOperationsPage({
       notify(request.message);
       setName('');
       setApiKey('');
+      setModel(null);
+      setDimensions(null);
       void client.invalidateQueries({ queryKey: ['admin-ops', section] });
     },
     onError: (error) => notify(errorMessage(error), 'error'),
@@ -69,7 +81,19 @@ export default function AdminOperationsPage({
   }[section];
   return (
     <>
-      <PageHeading title={title} />
+      <PageHeading
+        eyebrow={
+          section === 'embedding' ? 'Trợ lý AI' : section === 'brands' ? 'Cửa hàng' : 'Hệ thống'
+        }
+        title={title}
+        description={
+          {
+            brands: 'Sắp xếp danh mục thương hiệu để quản lý sản phẩm nhất quán.',
+            maintenance: 'Theo dõi trạng thái cửa hàng và chủ động bật hoặc tắt chế độ bảo trì.',
+            embedding: 'Thiết lập model Gemini để lập chỉ mục và truy xuất tài liệu cho AI.',
+          }[section]
+        }
+      />
       {isDemo ? (
         <p className="notice">Chức năng này cần kết nối backend.</p>
       ) : (
@@ -77,8 +101,9 @@ export default function AdminOperationsPage({
           {query.error && <ErrorState error={query.error} />}
           {mutation.error && <ErrorState error={mutation.error} />}
           {section === 'brands' && (
-            <div className="card panel">
+            <div className="card panel admin-operations-panel">
               <form
+                className="admin-brand-form"
                 onSubmit={(e) => {
                   e.preventDefault();
                   act('/admin/brands', 'POST', { name: name.trim() }, 'Đã thêm thương hiệu.');
@@ -93,7 +118,7 @@ export default function AdminOperationsPage({
                 </Button>
               </form>
               {(query.data as Brand[] | undefined)?.map((brand) => (
-                <div key={brand.id} className="flex gap-4 items-center mt-4">
+                <div key={brand.id} className="admin-brand-row">
                   <span>{brand.name}</span>
                   <Button
                     variant="secondary"
@@ -128,7 +153,7 @@ export default function AdminOperationsPage({
             </div>
           )}
           {section === 'maintenance' && (
-            <div className="card panel">
+            <div className="card panel admin-operations-panel">
               <p>
                 Trạng thái:{' '}
                 {(query.data as { enabled?: boolean } | undefined)?.enabled
@@ -162,38 +187,39 @@ export default function AdminOperationsPage({
           )}
           {section === 'embedding' && (
             <form
-              className="card panel"
+              className="card panel admin-operations-panel admin-embedding-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 act(
                   '/admin/embedding-settings',
                   'PUT',
                   {
-                    provider,
-                    model: model.trim(),
-                    dimensions,
+                    provider: 'GEMINI',
+                    model: embeddingModel.trim(),
+                    dimensions: embeddingDimensions,
                     ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
                   },
                   'Đã kiểm tra và lưu cấu hình embedding.',
                 );
               }}
             >
-              <p>
-                Hiện tại: {(query.data as { model?: string } | undefined)?.model || 'Chưa cấu hình'}
-              </p>
-              {(query.data as { reindexRequired?: boolean } | undefined)?.reindexRequired && (
+              <p>Hiện tại: {geminiEmbedding?.model || 'Chưa cấu hình Gemini'}</p>
+              {embedding?.reindexRequired && (
                 <p className="notice">Một số tài liệu cần được lập chỉ mục lại.</p>
               )}
               <label className="form-field">
                 Nhà cung cấp
-                <select value={provider} onChange={(e) => setProvider(e.target.value)}>
-                  <option>OPENAI</option>
-                  <option>GEMINI</option>
-                </select>
+                <input value="Google Gemini" readOnly />
               </label>
               <label className="form-field">
                 Model
-                <input required value={model} onChange={(e) => setModel(e.target.value)} />
+                <input
+                  required
+                  value={embeddingModel}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Ví dụ gemini-embedding-001"
+                  disabled={query.isPending || mutation.isPending}
+                />
               </label>
               <label className="form-field">
                 Số chiều
@@ -202,8 +228,18 @@ export default function AdminOperationsPage({
                   type="number"
                   min={1}
                   max={4096}
-                  value={dimensions}
+                  value={embeddingDimensions}
                   onChange={(e) => setDimensions(Number(e.target.value))}
+                  disabled={query.isPending || mutation.isPending}
+                />
+              </label>
+              <label className="form-field">
+                API key đã lưu
+                <input
+                  type="password"
+                  value={geminiEmbedding?.maskedKey || ''}
+                  readOnly
+                  placeholder="Chưa lưu API key Gemini"
                 />
               </label>
               <label className="form-field">
@@ -213,9 +249,20 @@ export default function AdminOperationsPage({
                   autoComplete="off"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
+                  disabled={query.isPending || mutation.isPending}
+                  required={!geminiEmbedding?.maskedKey}
                 />
+                <span className="help-text">Để trống để giữ API key Gemini đã lưu.</span>
               </label>
-              <Button type="submit" busy={mutation.isPending}>
+              <p className="help-text mt-4">
+                Dùng API key Gemini cho embedding. Kiểm tra và lưu sẽ xác thực kết nối. Khi đổi
+                model hoặc số chiều, lập chỉ mục lại tài liệu được đánh dấu.
+              </p>
+              <Button
+                type="submit"
+                busy={mutation.isPending}
+                disabled={query.isPending || !!query.error || !embeddingModel.trim()}
+              >
                 Kiểm tra và lưu
               </Button>
             </form>

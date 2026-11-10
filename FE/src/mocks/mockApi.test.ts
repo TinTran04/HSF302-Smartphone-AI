@@ -13,6 +13,143 @@ beforeEach(async () => {
   backend = (await import('./mockApi')).mockApi;
 });
 describe('Fake backend business contracts', () => {
+  it('rejects ambiguous legacy removal or replacement of a multi-key pool', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const saved = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-model', apiKey: 'primary-private',
+      backupKeys: [{ name: 'Project A', apiKey: 'private-backup-A' }, { name: 'Project B', apiKey: 'private-backup-B' }] });
+    await expect(async () => backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-model', removeBackupKey: true }))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(async () => backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-model', backupApiKey: 'legacy-replacement' }))
+      .rejects.toMatchObject({ status: 409 });
+    expect((await backend.aiSettings())[0]).toMatchObject({ id: saved.id, backupKeys: [
+      expect.objectContaining({ name: 'Project A' }), expect.objectContaining({ name: 'Project B' }),
+    ] });
+  });
+  it.each(['ADMIN', 'CUSTOMER'] as const)('validates optional admin phone numbers for %s profiles', async (role) => {
+    await backend.login({ email: role === 'ADMIN' ? 'admin@demo.vn' : 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
+    const profile = { fullName: 'Updated name', phone: '', address: '' };
+    if (role === 'ADMIN') {
+      expect(await backend.updateProfile(profile)).toMatchObject({ phone: '' });
+    } else {
+      await expect(async () => backend.updateProfile(profile)).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(async () => backend.updateProfile({ ...profile, phone: 'invalid' })).rejects.toMatchObject({ status: 400 });
+    expect(await backend.updateProfile({ ...profile, phone: '0901234567' })).toMatchObject({ phone: '0901234567' });
+  });
+  it('keeps unrelated demo questions inside the phone scope and then accepts another phone question', async () => {
+    await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
+    const conversation = await backend.createConversation('PHONE_CONSULTATION');
+    const result = await backend.sendMessage(conversation.id, 'Thời tiết hôm nay thế nào?');
+    expect(result).toMatchObject({ type: 'ANSWER', answer: expect.stringContaining('Mình chỉ hỗ trợ tư vấn về điện thoại') });
+    if (result.type !== 'ANSWER') throw new Error('Expected scope reminder');
+    expect(result.sources ?? []).toEqual([]);
+    expect(result.recommendedProducts ?? []).toEqual([]);
+    expect(result.comparedProducts ?? []).toEqual([]);
+    const stored = await backend.conversation(conversation.id);
+    expect(stored.messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(stored.messages[1].content).toBe(result.answer);
+    expect(stored.pendingSwitch).toBeUndefined();
+    const next = await backend.sendMessage(conversation.id, 'Tư vấn điện thoại pin tốt');
+    expect(next.type).toBe('ANSWER');
+    if (next.type === 'ANSWER') expect(next.recommendedProducts?.length).toBeGreaterThan(0);
+  });
+  it('starts demo mode with a single Gemini provider and preserves backup key workflow', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    expect(await backend.aiSettings()).toEqual([
+      expect.objectContaining({ provider: 'GEMINI', active: true }),
+    ]);
+    const saved = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', apiKey: 'demo-primary', backupApiKey: 'demo-backup' });
+    expect(saved).toMatchObject({ active: false, tested: false, maskedKey: '••••••••', maskedBackupKey: '••••••••' });
+    await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 409 });
+    await backend.testAiConnection({ provider: 'GEMINI', model: 'demo-gemini' });
+    expect(await backend.activateProvider('GEMINI')).toEqual([
+      expect.objectContaining({ provider: 'GEMINI', active: true, model: 'demo-gemini' }),
+    ]);
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-primary');
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-backup');
+    expect(await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', removeBackupKey: true }))
+      .toMatchObject({ maskedBackupKey: '', tested: false, active: false });
+  });
+
+  it('keeps named backup ordering, removes one row and never stores secrets', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const first = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', backupKeys: [
+      { name: 'Project A', apiKey: 'secret-project-a' }, { name: 'Project B', apiKey: 'secret-project-b' },
+    ] });
+    expect(first.backupKeys).toEqual([
+      expect.objectContaining({ name: 'Project A', priority: 1, lastStatus: 'UNKNOWN' }),
+      expect.objectContaining({ name: 'Project B', priority: 2, lastStatus: 'UNKNOWN' }),
+    ]);
+    await backend.testBackupKey(first.id, first.backupKeys[1].id);
+    expect((await backend.aiSettings())[0].backupKeys[1].lastStatus).toBe('WORKING');
+    const reordered = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', configId: first.id,
+      backupKeys: [{ id: first.backupKeys[1].id, name: 'Project B' }, { id: first.backupKeys[0].id, name: 'Project A' }] });
+    expect(reordered.id).not.toBe(first.id);
+    expect(reordered.backupKeys.map(key => key.name)).toEqual(['Project B', 'Project A']);
+    const removed = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', configId: reordered.id,
+      backupKeys: [{ id: reordered.backupKeys[0].id, name: 'Project B' }] });
+    expect(removed.backupKeys.map(key => key.name)).toEqual(['Project B']);
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('secret-project');
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('apiKey');
+  });
+
+  it('rejects activation from a stale configuration while preserving the active version', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const original = (await backend.aiSettings())[0];
+    const newer = await backend.saveAiSettings({ provider: 'GEMINI', configId: original.id, model: 'newer-model', backupKeys: [] });
+    await backend.testAiConnection({ provider: 'GEMINI', configId: newer.id, model: newer.model });
+    await expect(async () => backend.activateProvider('GEMINI', original.id)).rejects.toMatchObject({ status: 409 });
+    expect((await backend.aiSettings())[0].active).toBe(false);
+    expect((await backend.activateProvider('GEMINI', newer.id))[0]).toMatchObject({ id: newer.id, active: true });
+  });
+
+  it('persists notification read state and resolved history while restricting customers', async () => {
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({ id: 'alert-1', model: 'demo-gemini',
+      status: 'USING_BACKUP', reason: 'AI_PROVIDER_AUTH_ERROR', backupFailureReason: null, detectedAt: '2026-11-09T12:00:00Z' }));
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    expect(await backend.aiNotifications()).toMatchObject({ unreadCount: 1, latestId: 'alert-1', items: [{ read: false, resolved: false }] });
+    await backend.markAiNotificationsRead('alert-1');
+    sessionStorage.setItem('smai-demo-ai-key-alert', 'null');
+    vi.resetModules();
+    backend = (await import('./mockApi')).mockApi;
+    expect(await backend.aiNotifications()).toMatchObject({ unreadCount: 0, items: [{ read: true, resolved: true }] });
+    await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(async () => backend.aiNotifications()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('retains primary recovery in notification history while clearing the active warning', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({ id: 'recovery-1', model: 'demo-gemini',
+      status: 'PRIMARY', reason: null, backupFailureReason: null, detectedAt: '2026-11-09T12:00:00Z' }));
+    expect(await backend.aiKeyAlert()).toBeNull();
+    expect(await backend.aiNotifications()).toMatchObject({ unreadCount: 1, items: [{ status: 'PRIMARY', resolved: true, read: false }] });
+  });
+
+  it('discards persisted OpenAI configuration without reusing its model or keys', async () => {
+    sessionStorage.setItem('smai-demo-settings', JSON.stringify([
+      { provider: 'OPENAI', model: 'legacy-model', maskedKey: 'legacy-key', maskedBackupKey: 'legacy-backup', tested: true, active: true, activeModel: 'legacy-model' },
+    ]));
+    vi.resetModules();
+    backend = (await import('./mockApi')).mockApi;
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(backend.aiSettings()).resolves.toEqual([
+      { id: 'demo-config', backupKeys: [], provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+    ]);
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('legacy');
+    await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('preserves existing Gemini settings when removing a legacy provider', async () => {
+    const gemini = { provider: 'GEMINI', model: 'saved-gemini', maskedKey: 'masked-primary', maskedBackupKey: 'masked-backup', tested: true, active: true };
+    sessionStorage.setItem('smai-demo-settings', JSON.stringify([
+      { provider: 'OPENAI', model: 'legacy', maskedKey: 'legacy', active: false }, gemini,
+    ]));
+    vi.resetModules();
+    backend = (await import('./mockApi')).mockApi;
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(backend.aiSettings()).resolves.toEqual([expect.objectContaining({ ...gemini, backupKeys: [expect.objectContaining({ name: 'Key dự phòng 1', maskedKey: 'masked-backup' })] })]);
+  });
+
   it('reverse lookup requires login, supports cancellation and returns a clearly marked demo address', async () => {
     await expect(backend.reverseLocation({ latitude: 10.8, longitude: 106.6 })).rejects.toMatchObject({ status: 401 });
     await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });

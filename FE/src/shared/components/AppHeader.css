@@ -1,0 +1,93 @@
+.store-header .header-inner {
+  gap: 24px;
+}
+
+.store-header .store-nav {
+  flex: 1;
+  justify-content: center;
+}
+
+.store-header .header-actions {
+  gap: 8px;
+}
+
+.store-header .header-actions > .icon-button {
+  border-radius: 12px;
+}
+
+.store-header .store-nav a {
+  min-height: 52px;
+}
+
+.store-header .account-menu summary {
+  padding: 4px 6px;
+  border-radius: 12px;
+}
+
+.store-header .account-menu summary:hover {
+  background: var(--bg-subtle);
+}
+
+@media (max-width: 1100px) {
+  .store-header .account-name {
+    display: none;
+  }
+
+  .store-header .header-inner {
+    flex-wrap: wrap;
+    gap: 0;
+    padding-top: 10px;
+  }
+
+  .store-header .header-actions {
+    margin-left: auto;
+  }
+
+  .store-header .store-nav {
+    flex: none;
+    order: 3;
+    width: 100%;
+    gap: 28px;
+  }
+
+  .store-header .store-nav a {
+    padding: 12px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .store-header .brand {
+    font-size: 20px;
+    gap: 7px;
+  }
+
+  .store-header .brand > .material-symbols-outlined {
+    font-size: 28px;
+  }
+
+  .store-header .header-actions {
+    gap: 2px;
+  }
+
+  .store-header .account-menu summary {
+    gap: 2px;
+    padding: 4px 0;
+  }
+
+  .store-header .store-nav {
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+  }
+}
+
+@media (max-height: 600px) and (max-width: 1100px) {
+  .store-layout-chat .store-header .store-nav {
+    display: none;
+  }
+
+  .store-layout-chat .store-header .header-inner {
+    min-height: 60px;
+    padding-top: 0;
+  }
+}

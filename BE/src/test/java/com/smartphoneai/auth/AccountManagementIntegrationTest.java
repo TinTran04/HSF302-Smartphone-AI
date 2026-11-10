@@ -57,8 +57,8 @@ class AccountManagementIntegrationTest {
                 .andExpect(status().isAccepted()).andReturn();
         verifyNoInteractions(otpSender);
         String challengeId = mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", "123456", "newPassword", "ResetPass123!"))))
+        mvc.perform(post("/api/auth/password-reset/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("challengeId", challengeId, "code", "123456"))))
                 .andExpect(status().isConflict());
         String oldToken = token.get();
         assertFalse(jdbc.queryForObject("select token_hash from admin_invitations where id = ?",

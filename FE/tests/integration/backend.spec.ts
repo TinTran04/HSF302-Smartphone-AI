@@ -451,9 +451,10 @@ test('real BE: password change and recovery revoke other sessions', async ({ pag
     await expect(recovery.getByLabel('Mã OTP')).toBeVisible();
     const { otp } = await (await page.request.get('http://127.0.0.1:12526')).json();
     await recovery.getByLabel('Mã OTP').fill(otp);
+    await recovery.getByRole('button', { name: 'Xác thực OTP', exact: true }).click();
     await recovery.getByLabel('Mật khẩu mới', { exact: true }).fill('RecoveredPass123!');
     await recovery.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('RecoveredPass123!');
-    await recovery.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await recovery.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
     await expect(recovery.getByRole('status').filter({ hasText: 'Đã cập nhật mật khẩu.' })).toBeVisible();
     await first.reload();
     await expect(first).toHaveURL(/\/login$/);

@@ -11,12 +11,14 @@ export function LocationPicker({
   disabled = false,
   address,
   revealKey = 0,
+  resolvingAddress = false,
 }: {
   value?: MapLocation | null;
   onChange?: (value: MapLocation | null) => void;
   disabled?: boolean;
   address?: string;
   revealKey?: number;
+  resolvingAddress?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [ready, setReady] = useState(false);
@@ -207,7 +209,7 @@ export function LocationPicker({
           {expanded ? 'Đóng bản đồ' : point ? 'Xem vị trí trên bản đồ' : 'Chọn vị trí trên bản đồ'}
         </Button>
         {onChange && (
-          <Button variant="ghost" disabled={disabled} busy={locating} onClick={locate}>
+          <Button variant="ghost" disabled={disabled || resolvingAddress} busy={locating} onClick={locate}>
             Vị trí hiện tại
           </Button>
         )}

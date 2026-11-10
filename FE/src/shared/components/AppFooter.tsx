@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Brand } from './AppHeader';
+import { useBrands } from '../../features/products/useProducts';
 export function AppFooter() {
+  const brands = useBrands();
   return (
     <footer className="store-footer">
       <div className="container">
@@ -15,11 +17,12 @@ export function AppFooter() {
           </div>
           <div>
             <h3>Khám phá</h3>
-            {['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'vivo'].map((b) => (
-              <Link key={b} to={`/products?brandId=${b.toLowerCase()}`}>
-                {b}
+            {brands.data?.slice(0, 5).map((brand) => (
+              <Link key={brand.id} to={`/products?brandId=${encodeURIComponent(brand.id)}`}>
+                {brand.name}
               </Link>
             ))}
+            <Link to="/products">Tất cả điện thoại</Link>
           </div>
           <div>
             <h3>Tài khoản & đơn hàng</h3>

@@ -1,5 +1,7 @@
+import { useId, useState } from 'react';
 import { useBrands } from './useProducts';
 import { Button } from '../../shared/components/Ui';
+import { Icon } from '../../shared/components/Icon';
 export function ProductFilters({
   params,
   update,
@@ -10,15 +12,31 @@ export function ProductFilters({
   reset: () => void;
 }) {
   const brands = useBrands();
+  const [expanded, setExpanded] = useState(false);
+  const filterContentId = useId();
   return (
-    <aside className="card filters">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="!text-sm">Bộ lọc tìm kiếm</h2>
-        <Button variant="ghost" className="!text-xs !p-0 !min-h-0" onClick={reset}>
+    <aside
+      className="card filters storefront-filters"
+      aria-label="Bộ lọc tìm kiếm"
+      data-expanded={expanded}
+    >
+      <div className="storefront-filter-heading">
+        <h2>Bộ lọc tìm kiếm</h2>
+        <button
+          type="button"
+          className="icon-button storefront-filter-toggle"
+          aria-label={expanded ? 'Ẩn bộ lọc tìm kiếm' : 'Hiện bộ lọc tìm kiếm'}
+          aria-expanded={expanded}
+          aria-controls={filterContentId}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <Icon name={expanded ? 'expand_less' : 'expand_more'} />
+        </button>
+        <Button variant="ghost" className="storefront-filter-reset" onClick={reset}>
           Đặt lại
         </Button>
       </div>
-      <div className="filter-content">
+      <div className="filter-content" id={filterContentId}>
         <fieldset className="filter-group">
           <legend>Thương hiệu</legend>
           <label className="check-label">

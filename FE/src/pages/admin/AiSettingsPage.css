@@ -1,0 +1,30 @@
+.ai-backup-list {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+}
+.ai-backup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.ai-backup-summary {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-backup-summary .badge {
+  justify-self: start;
+}
+.ai-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

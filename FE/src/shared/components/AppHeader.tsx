@@ -5,6 +5,7 @@ import { useCart } from '../../features/cart/CartProvider';
 import { Icon } from './Icon';
 import { useToast } from './Ui';
 import { errorMessage } from '../utils/format';
+import './AppHeader.css';
 export function Brand({ to = '/' }: { to?: string }) {
   return (
     <Link className="brand" to={to} aria-label="SmartPhone AI — Trang chủ">

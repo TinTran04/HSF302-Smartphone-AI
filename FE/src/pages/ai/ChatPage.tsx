@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useChat } from '../../features/ai-chat/hooks/useChat';
 import { ChatMessage } from '../../features/ai-chat/components/ChatMessage';
@@ -7,26 +7,31 @@ import { topicInfo } from '../../features/ai-chat/constants/chatTopics';
 import { Button, EmptyState, ErrorState, Skeleton } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
 import { isDemo } from '../../shared/api';
+import { useAuth } from '../../features/auth/AuthProvider';
+import { PendingAssistant } from '../../features/ai-chat/components/PendingAssistant';
 export default function ChatPage() {
   const { id } = useParams();
-  return <ChatWorkspace key={id} id={id!} />;
+  const { user } = useAuth();
+  return <ChatWorkspace key={`${user?.id}:${id}`} id={id!} />;
 }
 function ChatWorkspace({ id }: { id: string }) {
   const chat = useChat(id);
   const [draft, setDraft] = useState('');
   const stream = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
   const data = chat.conversation.data;
+  const followAnswer = useCallback(() => {
+    if (following.current && stream.current) stream.current.scrollTop = stream.current.scrollHeight;
+  }, []);
   useEffect(() => {
-    stream.current?.scrollTo({ top: stream.current.scrollHeight, behavior: 'smooth' });
-  }, [data?.messages.length, chat.busy]);
-  async function send() {
+    followAnswer();
+  }, [chat.messages.length, chat.waiting, followAnswer]);
+  function send() {
     const text = draft.trim();
-    if (!text || chat.busy || chat.pending) return;
-    try {
-      await chat.send.mutateAsync(text);
+    if (!text || chat.busy || chat.pending || chat.failure) return;
+    following.current = true;
+    if (chat.sendMessage(text)) {
       setDraft('');
-    } catch {
-      /* Keep the original draft visible for a controlled retry. */
     }
   }
   if (chat.conversation.isPending)
@@ -35,7 +40,7 @@ function ChatWorkspace({ id }: { id: string }) {
         <Skeleton count={1} />
       </div>
     );
-  if (chat.conversation.error)
+  if (chat.conversation.error && !data)
     return (
       <div className="p-8">
         <ErrorState
@@ -62,36 +67,71 @@ function ChatWorkspace({ id }: { id: string }) {
           <Icon name="swap_horiz" className="!text-base" />
         </Link>
       </header>
-      <div className="chat-stream" ref={stream} aria-live="polite" aria-relevant="additions text">
-        {!data.messages.length && (
+      <div
+        className="chat-stream"
+        ref={stream}
+        role="log"
+        aria-label="Tin nhắn cuộc hội thoại"
+        aria-live="polite"
+        aria-relevant="additions"
+        onScroll={() => {
+          const element = stream.current;
+          if (element)
+            following.current =
+              element.scrollHeight - element.scrollTop - element.clientHeight < 96;
+        }}
+      >
+        {!chat.messages.length && (
           <EmptyState
             icon={topicInfo(data.topic).icon}
             title={topicInfo(data.topic).title}
             description="Bạn muốn tìm hiểu điều gì? Hãy bắt đầu bằng một câu hỏi bên dưới."
           />
         )}
-        {data.messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+        {chat.messages.map((message) => (
+          <ChatMessage
+            key={message.id}
+            message={message}
+            animate={message.id === chat.animatedMessageId}
+            onProgress={followAnswer}
+          />
         ))}
-        {chat.send.isPending && (
-          <p className="text-sm text-secondary flex items-center gap-3" role="status">
-            <Icon name="progress_activity" className="spin" />
-            Trợ lý đang xử lý câu hỏi…
-          </p>
+        {chat.waiting && <PendingAssistant />}
+        {!!chat.failure && (
+          <div className="chat-send-failure" data-testid="chat-send-failure">
+            <ErrorState error={chat.failure} />
+            <Button
+              variant="secondary"
+              data-testid="chat-send-retry"
+              busy={chat.checking}
+              onClick={() => {
+                void chat.retrySend();
+              }}
+            >
+              Kiểm tra và thử lại
+            </Button>
+            {chat.retryNotice && (
+              <p className="text-sm text-secondary" role="status">
+                {chat.retryNotice}
+              </p>
+            )}
+            <Link className="text-link" to="/ai">
+              Tạo cuộc hội thoại mới
+            </Link>
+          </div>
         )}
-        {chat.send.error && <ErrorState error={chat.send.error} />}
       </div>
       <div className="chat-composer">
         <div className="prompt-chips">
           <button
-            disabled={chat.busy || !!chat.pending}
+            disabled={chat.busy || !!chat.pending || !!chat.failure}
             onClick={() => setDraft(topicInfo(data.topic).prompt)}
           >
             {topicInfo(data.topic).prompt}
           </button>
           {isDemo && data.topic !== 'SHOP_SUPPORT' && (
             <button
-              disabled={chat.busy || !!chat.pending}
+              disabled={chat.busy || !!chat.pending || !!chat.failure}
               onClick={() => setDraft('Shop có cho đổi trả trong 7 ngày không?')}
             >
               Thử xác nhận chuyển chủ đề
@@ -112,7 +152,7 @@ function ChatWorkspace({ id }: { id: string }) {
             rows={2}
             value={draft}
             maxLength={5000}
-            disabled={chat.busy || !!chat.pending}
+            disabled={chat.busy || !!chat.pending || !!chat.failure}
             placeholder="Nhập câu hỏi của bạn…"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -131,7 +171,7 @@ function ChatWorkspace({ id }: { id: string }) {
             type="submit"
             variant="ai"
             busy={chat.send.isPending}
-            disabled={!draft.trim() || chat.busy || !!chat.pending}
+            disabled={!draft.trim() || chat.busy || !!chat.pending || !!chat.failure}
             aria-label="Gửi tin nhắn"
           >
             <Icon name="send" />
@@ -145,6 +185,7 @@ function ChatWorkspace({ id }: { id: string }) {
           onConfirm={() => chat.confirm.mutate()}
           onCancel={() => chat.cancel.mutate()}
           busy={chat.confirm.isPending || chat.cancel.isPending}
+          waiting={chat.confirm.isPending}
           error={chat.confirm.error || chat.cancel.error}
         />
       )}
