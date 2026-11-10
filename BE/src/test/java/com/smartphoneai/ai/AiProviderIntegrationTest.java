@@ -53,6 +53,15 @@ class AiProviderIntegrationTest {
     @MockitoBean ChatProviderClient provider;
     @BeforeEach void clearConfigurations() { configs.deleteAll(); }
 
+    @Test void geminiCallDoesNotRunInsideADatabaseTransaction() throws Exception {
+        configureKeys(false);
+        when(provider.chat(anyString(),anyString(),anyString(),anyString())).thenAnswer(invocation -> {
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return "OK";
+        });
+        assertEquals("OK",ai.chat("question"));
+    }
+
     @Test void concurrentChatsReturnWithoutReservingAnotherDatabaseConnectionForAlerts() throws Exception {
         assertNotSame(context.getBean("applicationTaskExecutor"), context.getBean("aiKeyAlertExecutor"));
         configureKeys(true);

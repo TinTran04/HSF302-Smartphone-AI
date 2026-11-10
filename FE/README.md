@@ -32,7 +32,7 @@ Mở **http://localhost:5173**. Nếu cổng 5173 đã được sử dụng, xem
 - Ứng dụng chính refactor theo `layouts / pages / features / shared`, với header, footer, sidebar, thẻ sản phẩm, bảng so sánh, hộp thoại và thông báo dùng chung.
 - Trang chủ, danh mục tìm kiếm/lọc/sắp xếp qua URL, chi tiết chọn màu/dung lượng/số lượng, so sánh tối đa 3 mẫu máy.
 - Đăng nhập/đăng ký, hồ sơ, giỏ Guest, hợp nhất giỏ sau xác thực, checkout COD hai bước kiểm tra giá và xác nhận, lịch sử/chi tiết/hủy đơn PENDING.
-- Một giao diện AI với 2 chủ đề, lịch sử theo tài khoản, gợi ý sản phẩm, bảng so sánh, nguồn RAG, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
+- Một giao diện AI với 2 chủ đề, lịch sử theo tài khoản, gợi ý sản phẩm, bảng so sánh, xác nhận/hủy chuyển chủ đề. Xác nhận chuyển gọi endpoint riêng và không gửi lại câu hỏi.
 - Admin quản lý dashboard, danh sách/thêm/sửa sản phẩm và biến thể, chuyển Đang mở bán/Hết hàng, xử lý đơn COD, tải PDF/TXT, thao tác tài liệu, cấu hình/test/kích hoạt Google Gemini.
 - Bổ sung các màn chưa có bản Stitch riêng: hồ sơ, danh sách/chi tiết đơn và form sản phẩm. File `dang_ki` ban đầu có cả panel đăng nhập lẫn đăng ký; React tách thành `/login` và `/register`.
 - 50 ảnh gốc đã tải về `public/images`. Inter (có tiếng Việt) và Material Symbols nằm trong `public/fonts`; không dùng Tailwind CDN khi chạy ứng dụng.
@@ -70,7 +70,7 @@ Các thao tác nghiệp vụ hiển thị toast thành công hoặc lỗi, gồm
 
 CUSTOMER và ADMIN đăng nhập bằng email/mật khẩu. OTP phục vụ đăng ký và quên mật khẩu. Form OTP xuất hiện khi cần hoàn tất đăng ký đang dang dở. Admin đi vào portal, hồ sơ và đổi mật khẩu tại `/admin/profile`. Đường dẫn shop của người đang đăng nhập ADMIN chuyển tới `/admin`.
 
-Màn hình AI có hai ô **Tư vấn mua điện thoại** và **Hỗ trợ cửa hàng**. Tư vấn hiển thị gợi ý, bảng so sánh và nguồn tài liệu cùng câu trả lời khi BE cung cấp. Các link và lịch sử mang topic so sánh hoặc trò chuyện cũ được ánh xạ về tư vấn.
+Màn hình AI có hai ô **Tư vấn mua điện thoại** và **Hỗ trợ cửa hàng**. Tư vấn hiển thị gợi ý, bảng so sánh và nội dung trả lời. Nguồn tài liệu được xử lý nội bộ ở BE, giao diện Customer ẩn thẻ nguồn trong cả tin nhắn mới và lịch sử cũ. Các link và lịch sử mang topic so sánh hoặc trò chuyện cũ được ánh xạ về tư vấn.
 
 Sao chép `.env.example` thành `.env` hoặc dùng file `.env` đã được chia sẻ. Vite tự đọc các giá trị này khi khởi động.
 

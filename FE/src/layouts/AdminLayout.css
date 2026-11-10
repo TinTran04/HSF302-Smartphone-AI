@@ -346,6 +346,13 @@
 
 .admin-filter-toolbar .search-field input {
   min-height: 46px;
+  padding-left: 48px;
+}
+
+.admin-filter-toolbar .search-field > .material-symbols-outlined {
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .admin-filter-toolbar select {

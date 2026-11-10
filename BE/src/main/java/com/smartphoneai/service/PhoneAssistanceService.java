@@ -6,6 +6,8 @@ import java.util.*;
 
 public interface PhoneAssistanceService {
     ChatResponder.Answer advise(String question, List<ChatMessageResponse> history, List<String> productIds);
+    default ChatResponder.Answer advise(String question, List<ChatMessageResponse> history, List<String> productIds,
+                                        TopicRouter.Decision decision) { return advise(question, history, productIds); }
 
     public record Recommendation(String text, List<ProductResponse> recommendedProducts) {}
 

@@ -9,18 +9,21 @@ const message = {
   id: 'answer',
   role: 'assistant' as const,
   content: 'This answer is already saved.',
-  sources: [{ documentId: 'policy', documentName: 'Shop policy' }],
+  sources: [{ documentId: 'policy-private-id', documentName: 'Shop policy', excerpt: 'Private excerpt', pageNumber: 7 }],
 };
 
 describe('chat message rendering', () => {
-  it('renders old history and its sources in full immediately', () => {
+  it('renders saved history without exposing document sources', () => {
     const html = renderToStaticMarkup(<ChatMessage message={message} />);
     expect(html).toContain('This answer is already saved.');
-    expect(html).toContain('Shop policy');
+    expect(html).not.toContain('Shop policy');
+    expect(html).not.toContain('Private excerpt');
+    expect(html).not.toContain('policy-private-id');
+    expect(html).not.toContain('source-card');
     expect(html).not.toContain('data-revealing');
     expect(html).not.toContain('Hiển thị toàn bộ câu trả lời');
   });
-  it('starts a newly received answer empty and defers source cards until the reveal completes', () => {
+  it('starts a newly received answer empty without document sources', () => {
     const html = renderToStaticMarkup(<ChatMessage message={message} animate />);
     expect(html).toContain('data-revealing="true"');
     expect(html).toContain('data-testid="chat-reveal"></p>');

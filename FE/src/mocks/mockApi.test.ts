@@ -13,6 +13,15 @@ beforeEach(async () => {
   backend = (await import('./mockApi')).mockApi;
 });
 describe('Fake backend business contracts', () => {
+  it('replays the same chat request without saving a duplicate message', async () => {
+    await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
+    const conversation = await backend.createConversation('PHONE_CONSULTATION');
+    const id = '123e4567-e89b-42d3-a456-426614174000';
+    const first = await backend.sendMessage(conversation.id, 'Tư vấn điện thoại', id);
+    expect(await backend.sendMessage(conversation.id, 'Tư vấn điện thoại', id)).toEqual(first);
+    expect((await backend.conversation(conversation.id)).messages).toHaveLength(2);
+    await expect(backend.sendMessage(conversation.id, 'Câu khác', id)).rejects.toMatchObject({ status: 409 });
+  });
   it('rejects ambiguous legacy removal or replacement of a multi-key pool', async () => {
     await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
     const saved = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-model', apiKey: 'primary-private',

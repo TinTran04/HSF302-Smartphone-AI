@@ -72,7 +72,7 @@ export function useChat(id: string) {
     meta: { toast: { success: 'Đã gửi tin nhắn.' } },
     retry: false,
     mutationFn: ({ turn: attempt }: { turn: ChatTurn; owner: ChatRequestOwner }) =>
-      api.sendMessage(id, attempt.user.content),
+      api.sendMessage(id, attempt.user.content, attempt.user.id.slice('local-'.length)),
     onSuccess: async (result, attempt) => {
       if (!isCurrent(attempt.owner)) return;
       const received: ChatTurn = {

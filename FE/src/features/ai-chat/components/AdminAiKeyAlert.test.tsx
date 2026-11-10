@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '../../auth/AuthProvider';
 import type { AiKeyAlert } from '../../../shared/types/models';
-import { AdminAiKeyAlert } from './AdminAiKeyAlert';
+import { AdminAiKeyAlert, reasonMessage, notificationTitle } from './AdminAiKeyAlert';
 import { AdminAiNotifications } from './AdminAiNotifications';
 
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: vi.fn() }));
@@ -42,6 +42,26 @@ function renderAlert(alert: AiKeyAlert | null) {
 }
 
 describe('Admin AI key warning', () => {
+  it('describes proactive quota switching in both the alert and notification title', () => {
+    const html = renderAlert({
+      id: 'quota',
+      status: 'USING_BACKUP',
+      model: 'gemini-model',
+      reason: 'AI_QUOTA_NEAR_LIMIT',
+      backupFailureReason: null,
+      detectedAt: '2026-11-09T12:00:00Z',
+    });
+    expect(html).toContain('Chủ động chuyển key theo quota');
+    expect(html).toContain('80%');
+    expect(reasonMessage('AI_QUOTA_NEAR_LIMIT')).toContain('ước tính');
+    expect(notificationTitle('USING_BACKUP', 'AI_QUOTA_NEAR_LIMIT')).toBe(
+      'Chủ động chuyển key theo quota',
+    );
+    expect(notificationTitle('PRIMARY', null)).toBe('API key AI chính đã phục hồi');
+    expect(notificationTitle('BACKUP_FAILED', 'AI_PROVIDER_AUTH_ERROR')).toBe(
+      'API key AI chính gặp lỗi',
+    );
+  });
   it.each([
     ['USING_BACKUP', 'Đã dùng key dự phòng'],
     ['BACKUP_FAILED', 'Key dự phòng cũng gặp lỗi'],

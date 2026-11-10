@@ -15,6 +15,8 @@ export const outcomes = {
 
 export function reasonMessage(reason: string | null) {
   switch (reason) {
+    case 'AI_QUOTA_NEAR_LIMIT':
+      return 'Mức sử dụng input token ước tính của project đã đạt ngưỡng 80% TPM. Hệ thống chủ động chuyển key.';
     case 'AI_PROVIDER_AUTH_ERROR':
       return 'Key hết hiệu lực hoặc không có quyền truy cập.';
     case 'AI_PROVIDER_RATE_LIMIT':
@@ -26,6 +28,12 @@ export function reasonMessage(reason: string | null) {
     default:
       return 'Chưa thể kết nối dịch vụ AI.';
   }
+}
+
+export function notificationTitle(status: string, reason: string | null) {
+  if (status === 'PRIMARY') return 'API key AI chính đã phục hồi';
+  if (reason === 'AI_QUOTA_NEAR_LIMIT') return 'Chủ động chuyển key theo quota';
+  return 'API key AI chính gặp lỗi';
 }
 
 export function AdminAiKeyAlert() {
@@ -45,7 +53,11 @@ export function AdminAiKeyAlert() {
     <section className="admin-ai-key-alert" aria-label="Cảnh báo API key AI" aria-live="polite">
       <Icon name="warning" />
       <div>
-        <h2>API key AI chính cần kiểm tra</h2>
+        <h2>
+          {alert.reason === 'AI_QUOTA_NEAR_LIMIT'
+            ? notificationTitle(alert.status, alert.reason)
+            : 'API key AI chính cần kiểm tra'}
+        </h2>
         <p>
           {reasonMessage(alert.reason)} {outcomes[alert.status]}
         </p>
@@ -55,7 +67,11 @@ export function AdminAiKeyAlert() {
         <p className="help-text">
           Model {alert.model} · Phát hiện lúc {formatDate(alert.detectedAt)}
         </p>
-        <p>Hãy kiểm tra và bổ sung API key, kiểm tra kết nối rồi kích hoạt cấu hình.</p>
+        <p>
+          {alert.reason === 'AI_QUOTA_NEAR_LIMIT'
+            ? 'Theo dõi mức sử dụng và quota của từng project trong cấu hình Gemini.'
+            : 'Hãy kiểm tra và bổ sung API key, kiểm tra kết nối rồi kích hoạt cấu hình.'}
+        </p>
         <Link to="/admin/ai-settings">
           Cập nhật API key <Icon name="arrow_forward" />
         </Link>

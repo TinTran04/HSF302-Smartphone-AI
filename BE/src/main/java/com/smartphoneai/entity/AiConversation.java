@@ -12,6 +12,8 @@ public class AiConversation {
     @Column(name="created_at", nullable=false) private Instant createdAt;
     @Column(name="product_ids", nullable=false, columnDefinition="text") private String productIds;
     @Version private long version;
+    @Column(name="processing_token") private UUID processingToken;
+    @Column(name="processing_until") private Instant processingUntil;
     protected AiConversation() {}
     public AiConversation(UUID userId, UUID guestId, String topic, String productIds, Instant now) {
         id=UUID.randomUUID(); this.userId=userId; this.guestId=guestId; this.topic=topic;
@@ -20,4 +22,8 @@ public class AiConversation {
     public UUID getId() { return id; } public UUID getUserId() { return userId; } public UUID getGuestId() { return guestId; }
     public String getTopic() { return topic; } public String getTitle() { return title; } public String getProductIds() { return productIds; }
     public void assignTo(UUID userId) { this.userId=userId; this.guestId=null; }
+    public boolean processingAt(Instant now) { return processingToken != null && processingUntil != null && now.isBefore(processingUntil); }
+    public void beginProcessing(UUID token, Instant now) { processingToken=token; processingUntil=now.plusSeconds(600); }
+    public boolean ownsProcessing(UUID token, Instant now) { return token.equals(processingToken) && processingAt(now); }
+    public void endProcessing(UUID token) { if (token.equals(processingToken)) { processingToken=null; processingUntil=null; } }
 }
