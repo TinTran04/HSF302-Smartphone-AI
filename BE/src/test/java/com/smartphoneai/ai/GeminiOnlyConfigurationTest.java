@@ -34,7 +34,7 @@ class GeminiOnlyConfigurationTest {
     private final ConfigSecretCipher cipher = mock(ConfigSecretCipher.class);
     private final ChatProviderClient client = mock(ChatProviderClient.class);
     private final EmbeddingModelFactory factory = mock(EmbeddingModelFactory.class);
-    private final AiProviderServiceImpl chat = new AiProviderServiceImpl(chatConfigs, settings, cipher, client, Clock.systemUTC());
+    private final AiProviderServiceImpl chat = new AiProviderServiceImpl(chatConfigs, settings, cipher, client, Clock.systemUTC(), mock(com.smartphoneai.service.AiKeyAlertService.class), mock(com.smartphoneai.repository.AiBackupKeyRepository.class));
     private final EmbeddingSettingsServiceImpl embedding = new EmbeddingSettingsServiceImpl(embeddingConfigs, documents, settings, cipher, factory);
 
     @Test void directServiceCallsRejectUnsupportedProviderBeforeReadingOrWritingConfiguration() {

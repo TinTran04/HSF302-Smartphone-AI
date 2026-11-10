@@ -1,6 +1,8 @@
 import type {
   AddressSuggestion,
   AiProvider,
+  AiKeyAlert,
+  AiNotifications,
   AiSettings,
   Brand,
   Cart,
@@ -63,7 +65,13 @@ export interface Api {
   uploadDocument(file: File): Promise<KnowledgeDocument>;
   documentAction(id: string, action: 'reindex' | 'enable' | 'disable' | 'delete'): Promise<void>;
   aiSettings(): Promise<AiSettings[]>;
+  aiKeyAlert(): Promise<AiKeyAlert | null>;
+  aiNotifications(): Promise<AiNotifications>;
+  markAiNotificationsRead(throughId: string): Promise<void>;
+  testBackupKey(configId: string, keyId: string): Promise<{ message: string }>;
   saveAiSettings(data: {
+    configId?: string;
+    backupKeys?: { id?: string; name: string; apiKey?: string }[];
     provider: AiProvider;
     model: string;
     apiKey?: string;
@@ -71,11 +79,12 @@ export interface Api {
     removeBackupKey?: boolean;
   }): Promise<AiSettings>;
   testAiConnection(data: {
+    configId?: string;
     provider: AiProvider;
     model: string;
     apiKey?: string;
     backupApiKey?: string;
     removeBackupKey?: boolean;
   }): Promise<{ message: string }>;
-  activateProvider(provider: AiProvider): Promise<AiSettings[]>;
+  activateProvider(provider: AiProvider, configId?: string): Promise<AiSettings[]>;
 }

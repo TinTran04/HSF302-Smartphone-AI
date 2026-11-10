@@ -1,0 +1,36 @@
+.admin-ai-key-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid #f4ce83;
+  border-radius: 16px;
+  background: #fff9eb;
+  color: #764810;
+  overflow-wrap: anywhere;
+}
+
+.admin-ai-key-alert > .material-symbols-outlined {
+  flex-shrink: 0;
+}
+
+.admin-ai-key-alert h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #764810;
+}
+
+.admin-ai-key-alert p {
+  margin-top: 6px;
+}
+
+.admin-ai-key-alert a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 8px;
+  font-weight: 600;
+  text-decoration: underline;
+}

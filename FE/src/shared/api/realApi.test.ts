@@ -130,7 +130,7 @@ describe('real backend contract', () => {
     async ({ configs }) => {
       vi.mocked(http).mockResolvedValueOnce(configs);
       await expect(realApi.aiSettings()).resolves.toEqual([
-        { provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+        { id: '', backupKeys: [], provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
       ]);
     },
   );

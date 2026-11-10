@@ -10,8 +10,10 @@ public interface AiProviderService {
     AiSettingsResponse save(AiSettingsRequest input);
 
     void test(AiSettingsRequest input);
+    void testBackupKey(Long configId, Long keyId);
 
     List<AiSettingsResponse> activate(String provider);
+    List<AiSettingsResponse> activate(String provider, Long configId);
 
     String chat(String prompt);
 }

@@ -26,6 +26,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -381,6 +383,26 @@ class PasswordLoginIntegrationTest {
         user.changeRole(UserAccount.Role.CUSTOMER);
         users.saveAndFlush(user);
         mvc.perform(get("/api/users/me").with(stale)).andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ADMIN, '', 200", "CUSTOMER, '', 400", "ADMIN, invalid, 400",
+            "CUSTOMER, invalid, 400", "ADMIN, 0901234567, 200", "CUSTOMER, 0901234567, 200"})
+    void profilePhoneIsOptionalOnlyForAdmin(UserAccount.Role role, String phone, int expectedStatus) throws Exception {
+        var user = customer();
+        user.changeRole(role);
+        user = users.saveAndFlush(user);
+        var response = mvc.perform(put("/api/users/me").with(session(user)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(
+                                Map.of("fullName", "Updated name", "phone", phone, "address", ""))))
+                .andExpect(status().is(expectedStatus));
+        if (expectedStatus == 200) {
+            response.andExpect(jsonPath("$.phone").value(phone));
+            assertEquals(phone, users.findById(user.getId()).orElseThrow().getPhone());
+        } else {
+            response.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+            assertEquals("0900000000", users.findById(user.getId()).orElseThrow().getPhone());
+        }
     }
 
     private UserAccount customer() {

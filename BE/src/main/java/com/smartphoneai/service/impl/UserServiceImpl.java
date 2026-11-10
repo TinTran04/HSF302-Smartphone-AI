@@ -7,6 +7,8 @@ import com.smartphoneai.dto.request.UpdateProfileRequest;
 import com.smartphoneai.repository.UserAccountRepository;
 import com.smartphoneai.exception.InvalidCredentialsException;
 import com.smartphoneai.exception.InvalidPasswordException;
+import com.smartphoneai.exception.InvalidProfileException;
+import com.smartphoneai.entity.UserAccount;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,9 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateProfile(String id, UpdateProfileRequest input) {
         var user = users.findLockedById(UUID.fromString(id)).filter(u -> u.isActive() && !u.isDisabled() && !u.isDeleted())
                 .orElseThrow(InvalidCredentialsException::new);
+        if (user.getRole() == UserAccount.Role.CUSTOMER && input.phone().isBlank()) {
+            throw new InvalidProfileException();
+        }
         var location = input.location();
         user.updateProfile(input.fullName(), input.phone(), input.address(),
                 location == null ? null : location.latitude(), location == null ? null : location.longitude());

@@ -23,6 +23,7 @@ public class UserAccount {
     @Column(nullable = false) private boolean disabled;
     @Column(name = "root_key", unique = true) private String rootKey;
     @Column(name = "credential_version", nullable = false) private long credentialVersion;
+    @Column(name = "ai_notifications_read_through_id", nullable = false) private long aiNotificationsReadThroughId;
     @Version private long version;
 
     protected UserAccount() {}
@@ -110,6 +111,10 @@ public class UserAccount {
     public Double getLongitude() { return longitude; }
     public String getPasswordHash() { return passwordHash; }
     public long getCredentialVersion() { return credentialVersion; }
+    public long getAiNotificationsReadThroughId() { return aiNotificationsReadThroughId; }
+    public void markAiNotificationsReadThrough(long alertId) {
+        aiNotificationsReadThroughId = Math.max(aiNotificationsReadThroughId, alertId);
+    }
     public Role getRole() { return role; }
     public boolean isActive() { return active; }
     public boolean isPendingInvitation() { return !active && "!".equals(passwordHash); }

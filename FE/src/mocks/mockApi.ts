@@ -2,6 +2,9 @@ import type { Api } from '../shared/api/contracts';
 import { ApiError } from '../shared/api/httpClient';
 import type {
   AiAnswer,
+  AiKeyAlert,
+  AiBackupKey,
+  AiNotifications,
   AiSettings,
   Cart,
   CartEntry,
@@ -65,13 +68,69 @@ let documents = read<KnowledgeDocument[]>('documents', [
   },
 ]);
 const storedSettings = read<AiSettings[]>('settings', [
-  { provider: 'GEMINI', model: 'demo-chat-model', maskedKey: '••••••••', maskedBackupKey: '', tested: true, active: true },
+  {
+    id: 'demo-config',
+    backupKeys: [],
+    provider: 'GEMINI',
+    model: 'demo-chat-model',
+    maskedKey: '••••••••',
+    maskedBackupKey: '',
+    tested: true,
+    active: true,
+  },
 ]);
+const storedGemini =
+  Array.isArray(storedSettings) && storedSettings.find((setting) => setting?.provider === 'GEMINI');
 let settings: AiSettings[] = [
-  (Array.isArray(storedSettings) && storedSettings.find((setting) => setting?.provider === 'GEMINI')) ||
-  { provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+  {
+    id: (storedGemini && storedGemini.id) || 'demo-config',
+    provider: 'GEMINI',
+    model: (storedGemini && storedGemini.model) || '',
+    maskedKey: (storedGemini && storedGemini.maskedKey) || '',
+    maskedBackupKey: (storedGemini && storedGemini.maskedBackupKey) || '',
+    tested: !!(storedGemini && storedGemini.tested),
+    active: !!(storedGemini && storedGemini.active),
+    ...(storedGemini && storedGemini.activeModel ? { activeModel: storedGemini.activeModel } : {}),
+    backupKeys:
+      storedGemini && Array.isArray(storedGemini.backupKeys)
+        ? storedGemini.backupKeys.map((key, priority) => ({
+            id: key.id,
+            name: key.name,
+            maskedKey: key.maskedKey,
+            priority: priority + 1,
+            lastStatus: key.lastStatus || 'UNKNOWN',
+            lastFailureReason: key.lastFailureReason || null,
+            lastCheckedAt: key.lastCheckedAt || null,
+          }))
+        : storedGemini && storedGemini.maskedBackupKey
+          ? [
+              {
+                id: 'demo-legacy-backup',
+                name: 'Key dự phòng 1',
+                maskedKey: storedGemini.maskedBackupKey,
+                priority: 1,
+                lastStatus: 'UNKNOWN',
+                lastFailureReason: null,
+                lastCheckedAt: null,
+              },
+            ]
+          : [],
+  },
 ];
 write('settings', settings);
+function notifications(): AiNotifications {
+  const current = read<AiKeyAlert | null>('ai-key-alert', null);
+  const items = read<AiNotifications['items']>('ai-notifications-' + user?.id, []);
+  if (current && !items.some((item) => item.id === current.id))
+    items.unshift({ ...current, read: false, resolved: false });
+  for (const item of items) item.resolved = current?.status === 'PRIMARY' || item.id !== current?.id;
+  write('ai-notifications-' + user?.id, items);
+  return {
+    items,
+    unreadCount: items.filter((item) => !item.read).length,
+    latestId: items[0]?.id || null,
+  };
+}
 const previews = new Map<string, OrderPreview & { items: CartItem[]; shipping: ShippingInfo; userId: string }>();
 const idempotency = new Map<string, { order: Order; previewId: string }>();
 const normalizeShipping = (shipping: ShippingInfo): ShippingInfo => ({
@@ -245,7 +304,11 @@ export const mockApi: Api = {
     await delay(undefined);
   },
   updateProfile: (data) => {
-    user = { ...signedIn(), fullName: data.fullName.trim(), phone: data.phone, address: data.address, location: data.location ?? null };
+    const account = signedIn();
+    if (!(account.role === 'ADMIN' && data.phone === '') && !/^[+0-9][0-9 -]{8,14}$/.test(data.phone)) {
+      throw new ApiError(400, 'Số điện thoại không hợp lệ.');
+    }
+    user = { ...account, fullName: data.fullName.trim(), phone: data.phone, address: data.address, location: data.location ?? null };
     write('user', user);
     return delay(user);
   },
@@ -640,6 +703,26 @@ export const mockApi: Api = {
     save();
     await delay(undefined);
   },
+  aiKeyAlert: () => {
+    admin();
+    const alert = read<AiKeyAlert | null>('ai-key-alert', null);
+    return delay(alert?.status === 'PRIMARY' ? null : alert);
+  },
+  aiNotifications: () => {
+    admin();
+    return delay(notifications());
+  },
+  markAiNotificationsRead: async (throughId) => {
+    admin();
+    const { items } = notifications();
+    const index = items.findIndex((item) => item.id === throughId);
+    if (index >= 0)
+      items.slice(index).forEach((item) => {
+        item.read = true;
+      });
+    write('ai-notifications-' + user?.id, items);
+    await delay(undefined);
+  },
   aiSettings: () => {
     admin();
     return delay(settings);
@@ -647,24 +730,96 @@ export const mockApi: Api = {
   saveAiSettings: (data) => {
     admin();
     const current = settings.find((s) => s.provider === data.provider)!;
-    if (current.active) current.activeModel = current.model;
-    current.active = false;
-    current.tested = false;
-    current.model = data.model;
-    if (data.apiKey) current.maskedKey = '••••••••';
-    if (data.removeBackupKey) current.maskedBackupKey = '';
-    else if (data.backupApiKey) current.maskedBackupKey = '••••••••';
+    if (data.configId && data.configId !== current.id)
+      throw new ApiError(409, 'Cấu hình đã thay đổi. Hãy tải lại.');
+    const hasLegacyKey = !!data.backupApiKey?.trim();
+    const legacyChange = data.removeBackupKey || hasLegacyKey;
+    if (legacyChange && (data.backupKeys || current.backupKeys.length > 1 || (data.removeBackupKey && hasLegacyKey)))
+      throw new ApiError(409, 'Hãy chỉnh riêng từng key trong danh sách dự phòng.');
+    let backupKeys = current.backupKeys;
+    if (data.backupKeys) {
+      if (data.backupKeys.length > 10) throw new ApiError(400, 'Tối đa 10 key dự phòng.');
+      const ids = new Set<string>();
+      backupKeys = data.backupKeys.map((entry, priority): AiBackupKey => {
+        const previous = current.backupKeys.find((key) => key.id === entry.id);
+        if (entry.id && (!previous || ids.has(entry.id)))
+          throw new ApiError(400, 'Key dự phòng không hợp lệ.');
+        if (entry.id) ids.add(entry.id);
+        if (!entry.name.trim() || (!previous && !entry.apiKey?.trim()))
+          throw new ApiError(400, 'Nhập tên và API key.');
+        return {
+          id: uid('backup'),
+          name: entry.name.trim(),
+          maskedKey: '••••••••',
+          priority: priority + 1,
+          lastStatus: 'UNKNOWN',
+          lastFailureReason: null,
+          lastCheckedAt: null,
+        };
+      });
+    } else if (data.removeBackupKey) backupKeys = [];
+    else if (data.backupApiKey)
+      backupKeys = [
+        {
+          id: uid('backup'),
+          name: 'Key dự phòng 1',
+          maskedKey: '••••••••',
+          priority: 1,
+          lastStatus: 'UNKNOWN',
+          lastFailureReason: null,
+          lastCheckedAt: null,
+        },
+      ];
+    const saved: AiSettings = {
+      ...current,
+      id: uid('config'),
+      model: data.model,
+      active: false,
+      tested: false,
+      activeModel: current.active ? current.model : current.activeModel,
+      maskedKey: data.apiKey ? '••••••••' : current.maskedKey,
+      backupKeys,
+      maskedBackupKey: backupKeys[0]?.maskedKey || '',
+    };
+    settings = [saved];
     save();
-    return delay(current);
+    return delay(saved);
   },
   testAiConnection: (data) => {
     admin();
-    settings.find((s) => s.provider === data.provider)!.tested = true;
+    const current = settings.find((s) => s.provider === data.provider)!;
+    if (data.configId && data.configId !== current.id)
+      throw new ApiError(409, 'Cấu hình đã thay đổi. Hãy tải lại.');
+    current.tested = true;
+    current.backupKeys.forEach((key) => {
+      key.lastStatus = 'WORKING';
+      key.lastFailureReason = null;
+      key.lastCheckedAt = new Date().toISOString();
+    });
     save();
-    return delay({ message: 'Chế độ demo: chỉ kiểm tra giao diện, chưa gọi nhà cung cấp AI.' });
+    return delay({
+      message: 'Chế độ demo: đã mô phỏng kiểm tra kết nối.',
+    });
   },
-  activateProvider: (provider) => {
+  testBackupKey: (configId, keyId) => {
     admin();
+    const key = settings
+      .find((setting) => setting.id === configId)
+      ?.backupKeys.find((key) => key.id === keyId);
+    if (!key) throw new ApiError(404, 'Không tìm thấy key dự phòng đã lưu.');
+    key.lastStatus = 'WORKING';
+    key.lastCheckedAt = new Date().toISOString();
+    key.lastFailureReason = null;
+    save();
+    return delay({
+      message:
+        'Chế độ demo: đã mô phỏng kiểm tra key dự phòng.',
+    });
+  },
+  activateProvider: (provider, configId) => {
+    admin();
+    if (configId && settings.find(setting => setting.provider === provider)?.id !== configId)
+      throw new ApiError(409, 'Cấu hình đã thay đổi. Hãy tải lại và kiểm tra trước khi kích hoạt.');
     if (!settings.find((s) => s.provider === provider)?.maskedKey)
       throw new ApiError(400, 'Vui lòng lưu cấu hình trước khi kích hoạt.');
     if (!settings.find((s) => s.provider === provider)?.tested)

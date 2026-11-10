@@ -14,6 +14,7 @@ import { PasswordField } from '../../shared/components/PasswordField';
 export default function ProfilePage() {
   const auth = useAuth();
   const user = auth.user!;
+  const isCustomer = user.role === 'CUSTOMER';
   const { notify } = useToast();
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
@@ -38,7 +39,13 @@ export default function ProfilePage() {
   });
   const save = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.updateProfile({ fullName: fullName.trim(), phone, address, location }),
+    mutationFn: () =>
+      api.updateProfile({
+        fullName: fullName.trim(),
+        phone,
+        address: isCustomer ? address : user.address,
+        location: isCustomer ? location : (user.location ?? null),
+      }),
     onSuccess: (updated) => {
       auth.setUser(updated);
       setFullName(updated.fullName);
@@ -52,7 +59,7 @@ export default function ProfilePage() {
   const mapAddress = useMapAddress({
     address,
     location,
-    enabled: editing && !save.isPending,
+    enabled: isCustomer && editing && !save.isPending,
     onChange: (nextAddress, point) => {
       setAddress(nextAddress);
       setLocation(point);
@@ -62,7 +69,11 @@ export default function ProfilePage() {
     <>
       <PageHeading
         title="Thông tin tài khoản"
-        description="Quản lý thông tin liên hệ và địa chỉ nhận hàng của bạn."
+        description={
+          isCustomer
+            ? 'Quản lý thông tin liên hệ và địa chỉ nhận hàng của bạn.'
+            : 'Quản lý thông tin liên hệ và bảo mật tài khoản.'
+        }
       />
       <form
         className="card panel profile-form"
@@ -100,40 +111,45 @@ export default function ProfilePage() {
             <input
               type="tel"
               pattern="[+0-9][0-9 -]{8,14}"
-              required
+              required={isCustomer}
+              placeholder={isCustomer ? undefined : 'Không bắt buộc'}
               disabled={!editing || save.isPending}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
             />
           </label>
-          <AddressAutocomplete
-            label="Địa chỉ mặc định"
-            value={address}
-            maxLength={255}
-            disabled={!editing || save.isPending}
-            onChange={(value) => {
-              mapAddress.cancel();
-              setAddress(value);
-              setLocation(null);
-            }}
-            onSelect={(suggestion) => {
-              mapAddress.cancel();
-              setAddress(suggestion.label);
-              setLocation(suggestion.location);
-              setMapSelection((value) => value + 1);
-              notify('Đã chọn địa chỉ và cập nhật vị trí trên bản đồ.');
-            }}
-          />
+          {isCustomer && (
+            <AddressAutocomplete
+              label="Địa chỉ mặc định"
+              value={address}
+              maxLength={255}
+              disabled={!editing || save.isPending}
+              onChange={(value) => {
+                mapAddress.cancel();
+                setAddress(value);
+                setLocation(null);
+              }}
+              onSelect={(suggestion) => {
+                mapAddress.cancel();
+                setAddress(suggestion.label);
+                setLocation(suggestion.location);
+                setMapSelection((value) => value + 1);
+                notify('Đã chọn địa chỉ và cập nhật vị trí trên bản đồ.');
+              }}
+            />
+          )}
         </div>
-        <LocationPicker
-          value={location}
-          address={address}
-          revealKey={mapSelection}
-          onChange={mapAddress.select}
-          resolvingAddress={mapAddress.resolving}
-          disabled={!editing || save.isPending}
-        />
+        {isCustomer && (
+          <LocationPicker
+            value={location}
+            address={address}
+            revealKey={mapSelection}
+            onChange={mapAddress.select}
+            resolvingAddress={mapAddress.resolving}
+            disabled={!editing || save.isPending}
+          />
+        )}
         {mapAddress.resolving && (
           <p className="help-text" role="status">
             Đang lấy địa chỉ theo vị trí đã chọn…

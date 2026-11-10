@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api';
-import type { AiSettings } from '../../shared/types/models';
+import type { AiBackupKey, AiSettings } from '../../shared/types/models';
 import {
   Button,
   ConfirmDialog,
+  Modal,
   ErrorState,
   PageHeading,
   Skeleton,
   useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
+import { formatDate } from '../../shared/utils/format';
+import { reasonMessage } from '../../features/ai-chat/components/AdminAiKeyAlert';
+import './AiSettingsPage.css';
 export default function AiSettingsPage() {
-  const settings = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings });
+  const settings = useQuery({
+    queryKey: ['ai-settings'],
+    queryFn: api.aiSettings,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+  });
   const provider = 'GEMINI';
   return (
     <>
@@ -65,70 +74,141 @@ export default function AiSettingsPage() {
     </>
   );
 }
+type BackupDraft = {
+  id?: string;
+  localId: string;
+  name: string;
+  apiKey?: string;
+  maskedKey: string;
+};
+const toDraft = (setting: AiSettings): BackupDraft[] =>
+  (setting.backupKeys ?? []).map((key) => ({
+    id: key.id,
+    localId: key.id,
+    name: key.name,
+    maskedKey: key.maskedKey,
+  }));
+const statusLabels: Record<AiBackupKey['lastStatus'], string> = {
+  UNKNOWN: 'Chưa kiểm tra',
+  WORKING: 'Hoạt động',
+  KEY_ERROR: 'Lỗi key',
+  PROVIDER_ERROR: 'Lỗi nhà cung cấp',
+};
 function ProviderForm({ setting }: { setting: AiSettings }) {
+  const [baseline, setBaseline] = useState(setting);
   const [model, setModel] = useState(setting.model);
   const [apiKey, setApiKey] = useState('');
-  const [backupApiKey, setBackupApiKey] = useState('');
-  const [removeBackupKey, setRemoveBackupKey] = useState(false);
-  const [backupVisible, setBackupVisible] = useState(false);
+  const [keys, setKeys] = useState(() => toDraft(setting));
   const [visible, setVisible] = useState(false);
-  const [activate, setActivate] = useState(false);
+  const [activate, setActivate] = useState<AiSettings | null>(null);
+  const [editing, setEditing] = useState<BackupDraft | null>(null);
+  const [deleting, setDeleting] = useState<BackupDraft | null>(null);
   const client = useQueryClient();
   const { notify } = useToast();
-  const body = () => ({
-    provider: setting.provider,
-    model: model.trim(),
-    ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
-    ...(backupApiKey.trim() ? { backupApiKey: backupApiKey.trim() } : {}),
-    ...(removeBackupKey ? { removeBackupKey: true } : {}),
-  });
+  const dirty =
+    model.trim() !== baseline.model ||
+    !!apiKey.trim() ||
+    JSON.stringify(
+      keys.map((key) => ({ id: key.id, name: key.name, apiKey: key.apiKey || '' })),
+    ) !==
+      JSON.stringify(toDraft(baseline).map((key) => ({ id: key.id, name: key.name, apiKey: '' })));
+  useEffect(() => {
+    if (!dirty && setting.id !== baseline.id) {
+      setBaseline(setting);
+      setModel(setting.model);
+      setKeys(toDraft(setting));
+    }
+  }, [setting, baseline.id, dirty]);
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: ['ai-settings'] });
+    void client.invalidateQueries({ queryKey: ['ai-key-alert'] });
+    void client.invalidateQueries({ queryKey: ['ai-notifications'] });
+  };
   const save = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.saveAiSettings(body()),
+    mutationFn: () =>
+      api.saveAiSettings({
+        provider: 'GEMINI',
+        configId: baseline.id || undefined,
+        model: model.trim(),
+        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        backupKeys: keys.map((key) => ({
+          ...(key.id ? { id: key.id } : {}),
+          name: key.name,
+          ...(key.apiKey?.trim() ? { apiKey: key.apiKey.trim() } : {}),
+        })),
+      }),
     onSuccess: (saved) => {
       setApiKey('');
-      setBackupApiKey('');
-      setRemoveBackupKey(false);
+      setVisible(false);
+      setBaseline(saved);
+      setModel(saved.model);
+      setKeys(toDraft(saved));
       client.setQueryData<AiSettings[]>(['ai-settings'], (previous) =>
         previous?.map((current) =>
           current.provider === saved.provider
             ? {
                 ...saved,
-                activeModel: current.activeModel || (current.active ? current.model : undefined),
+                activeModel:
+                  saved.activeModel ||
+                  current.activeModel ||
+                  (current.active ? current.model : undefined),
               }
             : current,
         ),
       );
-      void client.invalidateQueries({ queryKey: ['ai-settings'] });
-      notify('Đã lưu cấu hình AI.');
+      refresh();
+      notify('Đã lưu cấu hình AI. Hãy kiểm tra kết nối rồi kích hoạt để áp dụng.');
     },
   });
   const test = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.testAiConnection(body()),
+    mutationFn: () =>
+      api.testAiConnection({
+        provider: 'GEMINI',
+        model: baseline.model,
+        configId: baseline.id || undefined,
+      }),
     onSuccess: (data) => {
-      void client.invalidateQueries({ queryKey: ['ai-settings'] });
-      notify(data.message);
+      refresh();
+      notify(`${data.message} Hãy kích hoạt cấu hình để áp dụng.`);
     },
+  });
+  const individualTest = useMutation({
+    meta: { toast: { success: false } },
+    mutationFn: (keyId: string) => api.testBackupKey(baseline.id, keyId),
+    onSettled: refresh,
+    onSuccess: (data) =>
+      notify(`${data.message} Kiểm tra toàn bộ kết nối rồi kích hoạt để áp dụng.`),
   });
   const activation = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.activateProvider(setting.provider),
+    mutationFn: () => api.activateProvider('GEMINI', activate?.id || undefined),
     onSuccess: (data) => {
       client.setQueryData(['ai-settings'], data);
-      setActivate(false);
-      notify('Đã kích hoạt nhà cung cấp AI.');
+      refresh();
+      setActivate(null);
+      notify('Đã kích hoạt cấu hình Google Gemini.');
     },
   });
-  const busy = save.isPending || test.isPending || activation.isPending;
-  const dirty =
-    model.trim() !== setting.model || !!apiKey.trim() || !!backupApiKey.trim() || removeBackupKey;
+  const busy = save.isPending || test.isPending || individualTest.isPending || activation.isPending;
+  function moveKey(index: number, direction: number) {
+    setKeys((current) => {
+      const reordered = [...current];
+      [reordered[index], reordered[index + direction]] = [
+        reordered[index + direction],
+        reordered[index],
+      ];
+      return reordered;
+    });
+    notify('Đã đổi ưu tiên trong bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.');
+  }
   return (
     <>
       <form
         className="card panel max-w-4xl"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           if (!busy) save.mutate();
         }}
       >
@@ -139,7 +219,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
             <input
               required
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(event) => setModel(event.target.value)}
               disabled={busy}
               placeholder="Nhập mã model Gemini trong project của bạn"
             />
@@ -162,7 +242,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
                 type={visible ? 'text' : 'password'}
                 autoComplete="off"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(event) => setApiKey(event.target.value)}
                 disabled={busy}
                 placeholder="Nhập khóa mới khi cần thay đổi"
               />
@@ -170,63 +250,103 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
                 className="icon-button"
                 type="button"
                 aria-label={visible ? 'Ẩn API Key mới' : 'Hiện API Key mới'}
-                onClick={() => setVisible((v) => !v)}
+                onClick={() => setVisible((value) => !value)}
               >
                 <Icon name={visible ? 'visibility_off' : 'visibility'} />
               </button>
             </div>
           </label>
-          <label className="form-field">
-            API Key dự phòng đã lưu
-            <input
-              aria-label="API Key dự phòng đã lưu"
-              type="password"
-              value={setting.maskedBackupKey || ''}
-              readOnly
-              placeholder="Chưa có key dự phòng"
-            />
-          </label>
-          <label className="form-field">
-            API Key dự phòng mới
-            <div className="password-field">
-              <input
-                aria-label="API Key dự phòng mới"
-                type={backupVisible ? 'text' : 'password'}
-                autoComplete="off"
-                value={backupApiKey}
-                onChange={(e) => setBackupApiKey(e.target.value)}
-                disabled={busy || removeBackupKey}
-                placeholder="Để trống để giữ key đã lưu"
-              />
-              <button
-                className="icon-button"
-                type="button"
-                aria-label={backupVisible ? 'Ẩn API Key dự phòng' : 'Hiện API Key dự phòng'}
-                onClick={() => setBackupVisible((value) => !value)}
-              >
-                <Icon name={backupVisible ? 'visibility_off' : 'visibility'} />
-              </button>
-            </div>
-          </label>
-          {setting.maskedBackupKey && (
-            <label className="col-span-full flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={removeBackupKey}
-                disabled={busy}
-                onChange={(e) => {
-                  setRemoveBackupKey(e.target.checked);
-                  setBackupApiKey('');
-                }}
-              />
-              Xóa API Key dự phòng khi lưu
-            </label>
-          )}
         </div>
+        <section className="mt-7" aria-label="Danh sách key dự phòng">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3>Key dự phòng ({keys.length}/10)</h3>
+            <Button
+              variant="secondary"
+              disabled={busy || keys.length >= 10}
+              onClick={() => setEditing({ localId: crypto.randomUUID(), name: '', maskedKey: '' })}
+            >
+              <Icon name="add" />
+              Thêm key dự phòng
+            </Button>
+          </div>
+          {keys.length === 0 && <p className="help-text">Chưa có key dự phòng.</p>}
+          <ol className="ai-backup-list">
+            {keys.map((key, index) => {
+              const saved = setting.backupKeys?.find((savedKey) => savedKey.id === key.id);
+              const pending = !key.id || !!key.apiKey;
+              return (
+                <li className="ai-backup-row" key={key.localId}>
+                  <div className="ai-backup-summary">
+                    <strong>
+                      {index + 1}. {key.name}
+                    </strong>
+                    <span className="help-text">
+                      {pending ? 'Key mới trong bản nháp' : key.maskedKey}
+                    </span>
+                    <span
+                      className={`badge ${saved?.lastStatus === 'WORKING' && !pending ? 'badge-success' : ''}`}
+                    >
+                      {pending ? 'Chưa lưu' : statusLabels[saved?.lastStatus ?? 'UNKNOWN']}
+                    </span>
+                    {saved?.lastFailureReason && !pending && (
+                      <span className="help-text">{reasonMessage(saved.lastFailureReason)}</span>
+                    )}
+                    {saved?.lastCheckedAt && !pending && (
+                      <span className="help-text">
+                        Kiểm tra lúc {formatDate(saved.lastCheckedAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="ai-backup-actions">
+                    <Button
+                      variant="ghost"
+                      aria-label={`Tăng ưu tiên ${key.name}`}
+                      disabled={busy || index === 0}
+                      onClick={() => moveKey(index, -1)}
+                    >
+                      <Icon name="arrow_upward" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      aria-label={`Giảm ưu tiên ${key.name}`}
+                      disabled={busy || index === keys.length - 1}
+                      onClick={() => moveKey(index, 1)}
+                    >
+                      <Icon name="arrow_downward" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      aria-label={`Kiểm tra ${key.name}`}
+                      disabled={busy || dirty || !key.id || !baseline.id}
+                      onClick={() => individualTest.mutate(key.id!)}
+                    >
+                      Kiểm tra
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      aria-label={`Thay ${key.name}`}
+                      disabled={busy}
+                      onClick={() => setEditing(key)}
+                    >
+                      Thay
+                    </Button>
+                    <Button
+                      variant="danger"
+                      aria-label={`Xóa ${key.name}`}
+                      disabled={busy}
+                      onClick={() => setDeleting(key)}
+                    >
+                      Xóa
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
         <p className="help-text mt-4">
-          Mỗi yêu cầu ưu tiên key chính. Khi nhà cung cấp trả lỗi 429 do quota hoặc giới hạn sử
-          dụng, hệ thống thử key dự phòng một lần với cùng model. Các key Gemini cùng project dùng
-          chung quota.
+          Mỗi yêu cầu ưu tiên key chính, sau đó thử các key dự phòng theo thứ tự từ trên xuống với
+          cùng model. Các key Gemini cùng project dùng chung quota.
         </p>
         {setting.activeModel && !setting.active && (
           <p className="notice mt-7">
@@ -239,6 +359,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         </div>
         {save.error && <ErrorState error={save.error} />}
         {test.error && <ErrorState error={test.error} />}
+        {individualTest.error && <ErrorState error={individualTest.error} />}
         <div className="flex flex-wrap gap-3 justify-end mt-7">
           <Button
             variant="secondary"
@@ -255,7 +376,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           <Button
             variant="ai"
             disabled={busy || setting.active || dirty || !setting.maskedKey || !setting.tested}
-            onClick={() => setActivate(true)}
+            onClick={() => setActivate({ ...setting, id: baseline.id, model: baseline.model })}
           >
             {setting.active ? 'Đang hoạt động' : 'Kích hoạt'}
           </Button>
@@ -268,13 +389,43 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           </p>
         )}
       </form>
+      {editing && (
+        <BackupKeyModal
+          draft={editing}
+          onClose={() => setEditing(null)}
+          onSave={(updated) => {
+            setKeys((current) =>
+              current.some((key) => key.localId === updated.localId)
+                ? current.map((key) => (key.localId === updated.localId ? updated : key))
+                : [...current, updated],
+            );
+            setEditing(null);
+            notify(
+              'Đã cập nhật key trong bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.',
+            );
+          }}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title={`Xóa ${deleting.name}?`}
+          message="Chỉ key này được xóa khỏi bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt cấu hình để áp dụng."
+          label="Xóa key"
+          onClose={() => setDeleting(null)}
+          onConfirm={() => {
+            setKeys((current) => current.filter((key) => key.localId !== deleting.localId));
+            setDeleting(null);
+            notify('Đã xóa key khỏi bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.');
+          }}
+        />
+      )}
       {activate && (
         <ConfirmDialog
           title="Kích hoạt Google Gemini?"
-          message={`Model ${setting.model} sẽ được sử dụng cho các yêu cầu Chat mới.`}
+          message={`Model ${activate.model} sẽ được sử dụng cho các yêu cầu Chat mới.`}
           onConfirm={() => activation.mutate()}
           onClose={() => {
-            setActivate(false);
+            setActivate(null);
             activation.reset();
           }}
           busy={activation.isPending}
@@ -282,5 +433,75 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         />
       )}
     </>
+  );
+}
+function BackupKeyModal({
+  draft,
+  onSave,
+  onClose,
+}: {
+  draft: BackupDraft;
+  onSave: (key: BackupDraft) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(draft.name);
+  const [secret, setSecret] = useState('');
+  const [visible, setVisible] = useState(false);
+  return (
+    <Modal title={draft.name ? 'Thay key dự phòng' : 'Thêm key dự phòng'} onClose={onClose}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave({ ...draft, name: name.trim(), apiKey: secret.trim() || draft.apiKey });
+        }}
+      >
+        <label className="form-field">
+          Tên key
+          <input
+            required
+            maxLength={100}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Ví dụ Project dự phòng"
+          />
+        </label>
+        <label className="form-field mt-4">
+          API key mới
+          <div className="password-field">
+            <input
+              aria-label="API key mới"
+              required={!draft.id && !draft.apiKey}
+              type={visible ? 'text' : 'password'}
+              autoComplete="off"
+              value={secret}
+              onChange={(event) => setSecret(event.target.value)}
+              placeholder={draft.id ? 'Để trống để giữ key đã lưu' : 'Nhập API key Gemini'}
+            />
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={visible ? 'Ẩn key dự phòng mới' : 'Hiện key dự phòng mới'}
+              onClick={() => setVisible((value) => !value)}
+            >
+              <Icon name={visible ? 'visibility_off' : 'visibility'} />
+            </button>
+          </div>
+        </label>
+        <p className="help-text mt-4">
+          Thay đổi được giữ trong bản nháp. Lưu cấu hình, kiểm tra kết nối rồi kích hoạt để áp dụng.
+        </p>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={onClose}>
+            Quay lại
+          </Button>
+          <Button
+            type="submit"
+            disabled={!name.trim() || (!draft.id && !draft.apiKey && !secret.trim())}
+          >
+            Áp dụng vào bản nháp
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
