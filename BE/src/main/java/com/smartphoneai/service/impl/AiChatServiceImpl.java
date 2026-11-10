@@ -84,6 +84,13 @@ public class AiChatServiceImpl implements AiChatService {
         String currentTopic = ChatTopics.normalize(conversation.getTopic());
         var decision=router.route(currentTopic,content,history);
         if (decision==null) throw new AiProviderException();
+        if ("OUT_OF_SCOPE".equals(decision.result())) {
+            var answer = new ChatResponder.Answer("SHOP_SUPPORT".equals(currentTopic)
+                    ? ChatTopics.SHOP_SCOPE_REMINDER : ChatTopics.PHONE_SCOPE_REMINDER, List.of());
+            addMessage(id,"user",content,List.of());
+            addAnswer(id,answer);
+            return answerView(id,null,answer);
+        }
         String suggestedTopic = decision.suggestedTopic() == null ? null : ChatTopics.normalize(decision.suggestedTopic());
         if ("DIFFERENT_TOPIC".equals(decision.result()) && decision.suggestedTopic()!=null
                 && TOPICS.contains(suggestedTopic) && !currentTopic.equals(suggestedTopic)) {
@@ -93,7 +100,9 @@ public class AiChatServiceImpl implements AiChatService {
         }
         if (!"SAME_TOPIC".equals(decision.result()) && !("DIFFERENT_TOPIC".equals(decision.result()) && currentTopic.equals(suggestedTopic))) {
             addMessage(id,"user",content,List.of());
-            String clarification="Bạn muốn hỏi về chủ đề nào? Vui lòng nói rõ thêm.";
+            String clarification="PHONE_CONSULTATION".equals(currentTopic)
+                    ? "Mình chỉ hỗ trợ tư vấn về điện thoại. Bạn vui lòng nói rõ mẫu máy hoặc nhu cầu sử dụng nhé."
+                    : "Bạn muốn hỏi về chủ đề nào? Vui lòng nói rõ thêm.";
             addMessage(id,"assistant",clarification,List.of());
             return Map.of("type","CLARIFICATION_REQUIRED","message",clarification);
         }

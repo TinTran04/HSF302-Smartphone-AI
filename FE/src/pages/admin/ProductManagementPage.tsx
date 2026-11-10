@@ -75,6 +75,7 @@ export default function ProductManagementPage() {
   return (
     <>
       <PageHeading
+        eyebrow="Cửa hàng"
         title="Quản lý sản phẩm"
         description="Quản lý điện thoại, thông số và các phiên bản đang mở bán."
         action={
@@ -85,35 +86,43 @@ export default function ProductManagementPage() {
         }
       />
       <section className="card panel">
-        <div className="flex flex-wrap items-center gap-4 mb-6">
+        <div className="admin-filter-toolbar">
           <form
-            className="search-field flex-1 min-w-[200px]"
+            className="admin-filter-search"
             onSubmit={(e) => {
               e.preventDefault();
               update('keyword', keyword);
             }}
           >
-            <Icon name="search" />
-            <input
-              placeholder="Tìm tên sản phẩm…"
-              aria-label="Tìm sản phẩm quản trị"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-            <button type="submit" className="sr-only">
-              Tìm kiếm
-            </button>
+            <label className="admin-filter-label" htmlFor="admin-product-search">
+              Tìm sản phẩm
+            </label>
+            <div className="search-field">
+              <Icon name="search" />
+              <input
+                id="admin-product-search"
+                placeholder="Tìm tên sản phẩm…"
+                aria-label="Tìm sản phẩm quản trị"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
+              <button type="submit" className="sr-only">
+                Tìm kiếm
+              </button>
+            </div>
           </form>
-          <select
-            className="!w-auto"
-            aria-label="Trạng thái sản phẩm"
-            value={params.get('status') || ''}
-            onChange={(e) => update('status', e.target.value)}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="ACTIVE">Đang mở bán</option>
-            <option value="INACTIVE">Hết hàng</option>
-          </select>
+          <label>
+            <span className="admin-filter-label">Trạng thái sản phẩm</span>
+            <select
+              aria-label="Trạng thái sản phẩm"
+              value={params.get('status') || ''}
+              onChange={(e) => update('status', e.target.value)}
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang mở bán</option>
+              <option value="INACTIVE">Hết hàng</option>
+            </select>
+          </label>
         </div>
         {products.isPending ? (
           <Skeleton count={1} />
@@ -129,7 +138,7 @@ export default function ProductManagementPage() {
         ) : (
           <>
             <div className="table-scroll">
-              <table className="admin-table">
+              <table className="admin-table" aria-label="Danh sách sản phẩm">
                 <thead>
                   <tr>
                     <th>Sản phẩm</th>

@@ -5,28 +5,33 @@ import { ProductCard } from '../../features/products/ProductCard';
 import { chatTopics } from '../../features/ai-chat/constants/chatTopics';
 import { Icon } from '../../shared/components/Icon';
 import { EmptyState, ErrorState, Skeleton } from '../../shared/components/Ui';
+
 export default function HomePage() {
   const products = useProducts(new URLSearchParams({ size: '4' }));
   const brands = useBrands();
   return (
-    <>
+    <div className="storefront-home">
       <HomeHero />
-      <section className="brand-strip">
+      <section className="storefront-brands" aria-label="Khám phá theo thương hiệu">
         <div className="container">
-          <div className="brand-grid">
-            {brands.data?.map((b) => (
-              <Link key={b.id} className="brand-card" to={`/products?brandId=${b.id}`}>
-                <Icon name="smartphone" />
-                <span>
-                  {b.name}
-                  <small className="block text-[10px] font-normal muted mt-1">
-                    Khám phá thiết bị
-                  </small>
-                </span>
-                <Icon name="chevron_right" className="ml-auto !text-base" />
+          <p className="storefront-label">Thương hiệu bạn yêu thích</p>
+          <div className="storefront-brand-grid">
+            {brands.data?.map((brand) => (
+              <Link
+                key={brand.id}
+                className="storefront-brand"
+                to={`/products?brandId=${brand.id}`}
+              >
+                <span>{brand.name}</span>
+                <Icon name="arrow_outward" />
               </Link>
             ))}
           </div>
+          {brands.isPending && (
+            <p className="muted" role="status">
+              Đang tải thương hiệu…
+            </p>
+          )}
           {brands.error && (
             <ErrorState
               error={brands.error}
@@ -37,47 +42,16 @@ export default function HomePage() {
           )}
         </div>
       </section>
-      <section className="section">
+      <section className="storefront-section">
         <div className="container">
-          <div className="ai-heading">
-            <p className="eyebrow">Công nghệ cốt lõi</p>
-            <h2>
-              Chưa biết chọn điện thoại nào?
-              <br />
-              Hãy để AI giúp bạn.
-            </h2>
-            <p className="muted text-sm mt-4">
-              Trợ lý thông minh đồng hành từ việc tìm chiếc máy phù hợp đến tra cứu thông tin và
-              chính sách cửa hàng.
-            </p>
-          </div>
-          <div className="topic-grid">
-            {chatTopics.map((t, i) => (
-              <Link key={t.id} to={`/ai?topic=${t.id}`} className="card topic-card">
-                <span className="icon-tile">
-                  <Icon name={t.icon} />
-                </span>
-                <p className="eyebrow !mt-5 !mb-0">Module 0{i + 1}</p>
-                <h3 className="!mt-2">{t.title}</h3>
-                <p>{t.description}</p>
-                <span className="text-link">
-                  Bắt đầu trò chuyện
-                  <Icon name="arrow_forward" className="!text-base" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section section-subtle">
-        <div className="container">
-          <div className="section-heading">
+          <div className="storefront-section-heading">
             <div>
-              <p className="eyebrow">Bộ sưu tập điện thoại</p>
-              <h2>Khám phá chiếc máy tiếp theo.</h2>
+              <p className="storefront-kicker">Bộ sưu tập điện thoại</p>
+              <h2>Khám phá chiếc máy tiếp theo</h2>
+              <p className="muted">Thông số rõ ràng. Dễ tìm hiểu, dễ so sánh.</p>
             </div>
-            <Link className="text-link text-sm" to="/products">
-              Xem tất cả <span aria-hidden="true">→</span>
+            <Link className="storefront-section-link" to="/products">
+              Xem tất cả <Icon name="arrow_forward" />
             </Link>
           </div>
           {products.isPending ? (
@@ -90,9 +64,9 @@ export default function HomePage() {
               }}
             />
           ) : products.data?.items.length ? (
-            <div className="product-grid home-products">
-              {products.data.items.map((p) => (
-                <ProductCard key={p.id} product={p} />
+            <div className="product-grid home-products storefront-products">
+              {products.data.items.map((product) => (
+                <ProductCard key={product.id} product={product} />
               ))}
             </div>
           ) : (
@@ -100,53 +74,66 @@ export default function HomePage() {
           )}
         </div>
       </section>
-      <section className="section">
+      <section className="storefront-section storefront-ai-section">
         <div className="container">
-          <div className="text-center mb-10">
-            <p className="eyebrow">Trải nghiệm mua sắm thông minh</p>
-            <h2>Vì sao chọn SmartPhone AI?</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                icon: 'psychology',
-                title: 'Tư vấn theo nhu cầu',
-                text: 'Cùng AI tìm hiểu sản phẩm, so sánh cấu hình và lựa chọn phiên bản phù hợp.',
-              },
-              {
-                icon: 'payments',
-                title: 'Thanh toán khi nhận hàng',
-                text: 'Đặt hàng bằng phương thức COD với thông tin đơn hàng rõ ràng.',
-              },
-              {
-                icon: 'description',
-                title: 'Thông tin có nguồn tham khảo',
-                text: 'Tra cứu chính sách từ tài liệu cửa hàng cung cấp qua trợ lý AI.',
-              },
-            ].map((x) => (
-              <div className="card panel" key={x.title}>
-                <span className="icon-tile mb-5">
-                  <Icon name={x.icon} />
-                </span>
-                <h3 className="!text-base">{x.title}</h3>
-                <p className="muted text-sm mt-3">{x.text}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-10 p-8 rounded-2xl bg-gradient-to-r from-secondary to-[#5540b0] text-white flex flex-wrap items-center justify-between gap-5">
+          <div className="storefront-section-heading">
             <div>
-              <h3>Cần hỗ trợ so sánh cấu hình?</h3>
-              <p className="text-sm mt-2 opacity-80">
-                Bắt đầu với một chủ đề phù hợp cùng trợ lý AI.
+              <p className="storefront-kicker">
+                <Icon name="auto_awesome" /> Trợ lý SmartPhone AI
               </p>
+              <h2>Chọn dễ hơn cùng một cuộc trò chuyện</h2>
+              <p className="muted">Chia sẻ nhu cầu hoặc chọn chủ đề để bắt đầu.</p>
             </div>
-            <Link className="button !bg-white !text-secondary !rounded-full" to="/ai">
-              Khởi động AI Trợ lý
-              <Icon name="arrow_forward" />
-            </Link>
+          </div>
+          <div className="storefront-topics">
+            {chatTopics.map((topic) => (
+              <Link key={topic.id} to={`/ai?topic=${topic.id}`} className="storefront-topic">
+                <span className="storefront-topic-icon">
+                  <Icon name={topic.icon} />
+                </span>
+                <div>
+                  <h3>{topic.title}</h3>
+                  <p>{topic.description}</p>
+                  <span className="storefront-topic-action">
+                    Bắt đầu trò chuyện <Icon name="arrow_forward" />
+                  </span>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
-    </>
+      <section className="storefront-section">
+        <div className="container storefront-shopping-guide">
+          <div>
+            <p className="storefront-kicker">Mua sắm theo cách của bạn</p>
+            <h2>Từ tìm hiểu đến lựa chọn</h2>
+          </div>
+          {[
+            {
+              icon: 'tune',
+              title: 'Tìm đúng nhu cầu',
+              text: 'Lọc theo thương hiệu, ngân sách, RAM và dung lượng lưu trữ.',
+            },
+            {
+              icon: 'compare_arrows',
+              title: 'So sánh trước khi chọn',
+              text: 'Đặt các thiết bị cạnh nhau để xem cấu hình và giá.',
+            },
+            {
+              icon: 'payments',
+              title: 'Đặt hàng rõ ràng',
+              text: 'Kiểm tra phiên bản và đơn hàng trước khi thanh toán khi nhận hàng.',
+            },
+          ].map((item) => (
+            <div className="storefront-guide-item" key={item.title}>
+              <Icon name={item.icon} />
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

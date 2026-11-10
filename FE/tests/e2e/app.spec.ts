@@ -22,14 +22,82 @@ async function login(page: Page, admin = false) {
   await expect(page).toHaveURL(admin ? /\/admin$/ : /\/$/);
 }
 
+test('admin AI bell persists unread history and read state without notification toasts', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({
+      id: 'alert-1', model: 'demo-gemini', status: 'USING_BACKUP', reason: 'AI_PROVIDER_AUTH_ERROR',
+      backupFailureReason: null, detectedAt: '2026-11-09T12:00:00Z',
+    }));
+  });
+  await login(page, true);
+  const alert = page.getByRole('region', { name: 'Cảnh báo API key AI' });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('Đã dùng key dự phòng');
+  await expect(alert).toContainText('hết hiệu lực hoặc không có quyền truy cập');
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Cập nhật API key', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/ai-settings$/);
+  await expect(alert).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  await page.reload();
+  await expect(alert).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  const bell = page.getByRole('button', { name: 'Thông báo AI, 1 chưa đọc', exact: true });
+  await bell.click();
+  const dialog = page.getByRole('dialog', { name: 'Thông báo AI', exact: true });
+  await expect(dialog.getByText('Chưa đọc', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/admin-ai-notifications-desktop.png', fullPage: true });
+  await expect(dialog.getByText('Model demo-gemini', { exact: false })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Đánh dấu tất cả đã đọc' }).click();
+  await expect(dialog.getByText('Đã đọc', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Đóng hộp thoại' }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Thông báo AI, 0 chưa đọc', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Đã đọc', { exact: true })).toBeVisible();
+});
+
+test('admin key alert updates on polling and clears after primary recovery on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install();
+  await page.addInitScript(() => {
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({
+      id: 'alert-2', model: 'demo-gemini', status: 'BACKUP_FAILED', reason: 'AI_PROVIDER_AUTH_ERROR',
+      backupFailureReason: 'AI_PROVIDER_RATE_LIMIT', detectedAt: '2026-11-09T12:00:00Z',
+    }));
+  });
+  await login(page, true);
+  const alert = page.getByRole('region', { name: 'Cảnh báo API key AI' });
+  await expect(alert).toContainText('Key dự phòng cũng gặp lỗi');
+  await expect(alert).toContainText('Đã chạm quota hoặc giới hạn sử dụng');
+  await page.screenshot({ path: 'test-results/admin-ai-key-alert-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(page.locator('.toast').filter({ hasText: 'Key AI chính gặp lỗi' })).toHaveCount(0);
+  await expect(alert).toBeVisible();
+  await page.evaluate(() => sessionStorage.setItem('smai-demo-ai-key-alert', 'null'));
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(alert).toHaveCount(0);
+  await page.getByRole('button', { name: 'Thông báo AI, 1 chưa đọc', exact: true }).click();
+  const history = page.getByRole('dialog', { name: 'Thông báo AI', exact: true });
+  await expect(history.getByText('Đã xử lý', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/admin-ai-notifications-mobile.png', fullPage: true });
+});
+
 async function mockMapTiles(page: Page) {
-  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({
-    contentType: 'image/svg+xml',
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eff2e8"/><path d="M0 64H256M0 160H256M64 0V256M160 0V256" stroke="#fff" stroke-width="12"/><path d="M0 64H256M0 160H256M64 0V256M160 0V256" stroke="#cfd5cd" stroke-width="1"/></svg>',
-  }));
+  await page.route('https://tile.openstreetmap.org/**', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eff2e8"/><path d="M0 64H256M0 160H256M64 0V256M160 0V256" stroke="#fff" stroke-width="12"/><path d="M0 64H256M0 160H256M64 0V256M160 0V256" stroke="#cfd5cd" stroke-width="1"/></svg>',
+    }),
+  );
 }
 
-test('selecting a map point fills profile and shipping addresses and requires checkout recheck', async ({ page }) => {
+test('selecting a map point fills profile and shipping addresses and requires checkout recheck', async ({
+  page,
+}) => {
   await mockMapTiles(page);
   await login(page);
   await page.goto('/profile');
@@ -64,7 +132,9 @@ test('selecting a map point fills profile and shipping addresses and requires ch
   await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toHaveCount(0);
 });
 
-test('admin selects product and variant images, keeps them after invalid input, and permanently deletes with confirmation', async ({ page }) => {
+test('admin selects product and variant images, keeps them after invalid input, and permanently deletes with confirmation', async ({
+  page,
+}) => {
   const name = `Máy thử ảnh ${Date.now()}`;
   await login(page, true);
   await page.goto('/admin/products/new');
@@ -75,18 +145,33 @@ test('admin selects product and variant images, keeps them after invalid input, 
   await gallery.setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
   const preview = page.getByRole('img', { name: 'Hình ảnh sản phẩm 1', exact: true });
   await expect(preview).toHaveAttribute('src', /^data:image\/webp;base64,/);
-  await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await gallery.setInputFiles({ name: 'wrong.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
-  await expect(page.locator('.toast-error').filter({ hasText: 'Vui lòng chọn ảnh PNG, JPEG hoặc WebP.' })).toHaveCount(1);
+  await expect
+    .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await gallery.setInputFiles({
+    name: 'wrong.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('not an image'),
+  });
+  await expect(
+    page.locator('.toast-error').filter({ hasText: 'Vui lòng chọn ảnh PNG, JPEG hoặc WebP.' }),
+  ).toHaveCount(1);
   await expect(preview).toBeVisible();
-  await page.getByLabel('Ảnh phiên bản 1', { exact: true }).setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
-  await expect(page.getByRole('img', { name: 'Ảnh phiên bản 1 1', exact: true })).toHaveAttribute('src', /^data:image\/webp;base64,/);
+  await page
+    .getByLabel('Ảnh phiên bản 1', { exact: true })
+    .setInputFiles('public/images/7dc0d3296fa2eaa7.webp');
+  await expect(page.getByRole('img', { name: 'Ảnh phiên bản 1 1', exact: true })).toHaveAttribute(
+    'src',
+    /^data:image\/webp;base64,/,
+  );
   await page.getByLabel('Màu sắc', { exact: true }).fill('Đen');
   await page.getByLabel('Giá (VNĐ)', { exact: true }).fill('9000000');
   await page.screenshot({ path: 'test-results/product-upload-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'test-results/product-upload-mobile.png', fullPage: true });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.getByRole('button', { name: 'Lưu sản phẩm', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/products$/);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -103,12 +188,16 @@ test('admin selects product and variant images, keeps them after invalid input, 
   await row.getByRole('button', { name: `Xóa vĩnh viễn ${name}`, exact: true }).click();
   await dialog.getByRole('button', { name: 'Xóa vĩnh viễn', exact: true }).click();
   await expect(row).toHaveCount(0);
-  await expect(page.locator('.toast').filter({ hasText: 'Đã xóa vĩnh viễn sản phẩm.' })).toHaveCount(1);
+  await expect(
+    page.locator('.toast').filter({ hasText: 'Đã xóa vĩnh viễn sản phẩm.' }),
+  ).toHaveCount(1);
   await page.reload();
   await expect(row).toHaveCount(0);
 });
 
-test('address suggestions select a saved profile point and update checkout map without submitting', async ({ page }) => {
+test('address suggestions select a saved profile point and update checkout map without submitting', async ({
+  page,
+}) => {
   await mockMapTiles(page);
   await login(page);
   await page.goto('/profile');
@@ -116,14 +205,21 @@ test('address suggestions select a saved profile point and update checkout map w
   await expect(address).toBeDisabled();
   await page.getByRole('button', { name: 'Chỉnh sửa thông tin' }).click();
   await address.fill('Nguyễn Huệ');
-  const option = page.getByRole('option', { name: 'Phố đi bộ Nguyễn Huệ, TP. Hồ Chí Minh, Việt Nam', exact: true });
+  const option = page.getByRole('option', {
+    name: 'Phố đi bộ Nguyễn Huệ, TP. Hồ Chí Minh, Việt Nam',
+    exact: true,
+  });
   await expect(option).toBeVisible();
   await expect(page.getByRole('link', { name: 'Powered by Geoapify', exact: true })).toHaveCount(0);
   await address.press('ArrowDown');
   await address.press('Enter');
   await expect(address).toHaveValue('Phố đi bộ Nguyễn Huệ, TP. Hồ Chí Minh, Việt Nam');
   const map = page.getByRole('region', { name: 'Bản đồ địa chỉ' });
-  await expect(map.locator('.leaflet-control-attribution').getByRole('link', { name: 'Geoapify', exact: true })).toBeVisible();
+  await expect(
+    map
+      .locator('.leaflet-control-attribution')
+      .getByRole('link', { name: 'Geoapify', exact: true }),
+  ).toBeVisible();
   await expect(map.locator('path.leaflet-interactive')).toBeVisible();
   await expect(page.locator('.location-picker')).toContainText('10.773900, 106.703100');
   await expect(page.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible();
@@ -142,7 +238,9 @@ test('address suggestions select a saved profile point and update checkout map w
   await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toBeVisible();
   await shipping.fill('Bến Thành');
-  await page.getByRole('option', { name: 'Chợ Bến Thành, TP. Hồ Chí Minh, Việt Nam', exact: true }).click();
+  await page
+    .getByRole('option', { name: 'Chợ Bến Thành, TP. Hồ Chí Minh, Việt Nam', exact: true })
+    .click();
   await expect(page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true })).toBeVisible();
   await expect(map.locator('path.leaflet-interactive')).toBeVisible();
   await expect(page.locator('.location-picker')).toContainText('10.772500, 106.698000');
@@ -154,9 +252,10 @@ for (const interaction of ['manual selection', 'address edit']) {
     await mockMapTiles(page);
     await page.addInitScript(() => {
       navigator.geolocation.getCurrentPosition = (success) => {
-        (window as unknown as { finishGps: () => void }).finishGps = () => success({
-          coords: { latitude: 21.0285, longitude: 105.8542 },
-        } as GeolocationPosition);
+        (window as unknown as { finishGps: () => void }).finishGps = () =>
+          success({
+            coords: { latitude: 21.0285, longitude: 105.8542 },
+          } as GeolocationPosition);
       };
     });
     await login(page);
@@ -168,7 +267,10 @@ for (const interaction of ['manual selection', 'address edit']) {
     await expect(map.locator('.leaflet-control-attribution')).toBeVisible();
     await picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
     if (interaction === 'manual selection') await map.click({ position: { x: 220, y: 120 } });
-    else await page.getByLabel('Địa chỉ mặc định', { exact: true }).fill('Địa chỉ mới khi đang định vị');
+    else
+      await page
+        .getByLabel('Địa chỉ mặc định', { exact: true })
+        .fill('Địa chỉ mới khi đang định vị');
     const latest = await picker.getByRole('status').textContent();
     await page.evaluate(() => (window as unknown as { finishGps: () => void }).finishGps());
     await expect(picker.getByRole('status')).toHaveText(latest!);
@@ -176,18 +278,26 @@ for (const interaction of ['manual selection', 'address edit']) {
   });
 }
 
-test('admin marks a phone sold out while its card and detail stay public, then reopens sales', async ({ page }) => {
+test('admin marks a phone sold out while its card and detail stay public, then reopens sales', async ({
+  page,
+}) => {
   await login(page, true);
   await page.goto('/admin/products?keyword=iPhone+16+Pro+Max');
   const row = page.getByRole('row').filter({ hasText: 'iPhone 16 Pro Max' });
-  await row.getByRole('button', { name: 'Đánh dấu hết hàng iPhone 16 Pro Max', exact: true }).click();
+  await row
+    .getByRole('button', { name: 'Đánh dấu hết hàng iPhone 16 Pro Max', exact: true })
+    .click();
   let dialog = page.getByRole('dialog', { name: 'Đánh dấu sản phẩm hết hàng?' });
   await dialog.getByRole('button', { name: 'Quay lại' }).click();
   await expect(row.getByText('Đang mở bán', { exact: true })).toBeVisible();
-  await row.getByRole('button', { name: 'Đánh dấu hết hàng iPhone 16 Pro Max', exact: true }).click();
+  await row
+    .getByRole('button', { name: 'Đánh dấu hết hàng iPhone 16 Pro Max', exact: true })
+    .click();
   await dialog.getByRole('button', { name: 'Đánh dấu hết hàng', exact: true }).click();
   await expect(row.getByText('Hết hàng', { exact: true })).toBeVisible();
-  await expect(page.locator('.toast').filter({ hasText: 'Đã đánh dấu sản phẩm hết hàng.' })).toHaveCount(1);
+  await expect(
+    page.locator('.toast').filter({ hasText: 'Đã đánh dấu sản phẩm hết hàng.' }),
+  ).toHaveCount(1);
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
   await page.goto('/products?keyword=iPhone+16+Pro+Max');
   const card = page.locator('.product-card').filter({ hasText: 'iPhone 16 Pro Max' });
@@ -207,16 +317,23 @@ test('admin marks a phone sold out while its card and detail stay public, then r
   await expect(row.getByText('Đang mở bán', { exact: true })).toBeVisible();
 });
 
-test('customer saves a map pin, clears stale pins on address edits and uses shipping coordinates', async ({ page, context }) => {
+test('customer saves a map pin, clears stale pins on address edits and uses shipping coordinates', async ({
+  page,
+  context,
+}) => {
   await mockMapTiles(page);
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 10.7769, longitude: 106.7009 });
   await login(page);
   await page.goto('/profile');
   const picker = page.locator('.location-picker');
-  await expect(picker.getByRole('button', { name: 'Chọn vị trí trên bản đồ', exact: true })).toBeDisabled();
+  await expect(
+    picker.getByRole('button', { name: 'Chọn vị trí trên bản đồ', exact: true }),
+  ).toBeDisabled();
   await page.getByRole('button', { name: 'Chỉnh sửa thông tin' }).click();
-  await page.getByLabel('Địa chỉ mặc định', { exact: true }).fill('123 Nguyễn Huệ, TP. Hồ Chí Minh');
+  await page
+    .getByLabel('Địa chỉ mặc định', { exact: true })
+    .fill('123 Nguyễn Huệ, TP. Hồ Chí Minh');
   await picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
   await expect(picker).toContainText('10.776900, 106.700900');
   await picker.getByRole('button', { name: 'Xem vị trí trên bản đồ' }).click();
@@ -241,7 +358,9 @@ test('customer saves a map pin, clears stale pins on address edits and uses ship
   await page.goto('/cart');
   await page.getByRole('link', { name: 'Tiến hành đặt hàng' }).click();
   await expect(picker.getByRole('status')).toHaveText(saved!);
-  await page.getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true }).fill('456 Lê Lợi, TP. Hồ Chí Minh');
+  await page
+    .getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true })
+    .fill('456 Lê Lợi, TP. Hồ Chí Minh');
   await expect(picker).toContainText('Chưa chọn vị trí trên bản đồ.');
   await picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
   await expect(picker).toContainText('10.776900, 106.700900');
@@ -252,7 +371,9 @@ test('customer saves a map pin, clears stale pins on address edits and uses ship
   await map.click({ position: { x: 240, y: 110 } });
   await expect(page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
   await map.scrollIntoViewIfNeeded();
   await expect(map.locator('path.leaflet-interactive')).toBeInViewport({ ratio: 0.9 });
   await page.screenshot({ path: 'test-results/checkout-map-mobile.png', fullPage: true });
@@ -263,14 +384,18 @@ test('customer saves a map pin, clears stale pins on address edits and uses ship
   await expect(picker.getByRole('status')).toHaveText(shippingPoint!);
   await expect(picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true })).toHaveCount(0);
 });
-test('Guest signs in before AI and keeps the requested topic and product context', async ({ page }) => {
+test('Guest signs in before AI and keeps the requested topic and product context', async ({
+  page,
+}) => {
   const destination = '/ai?topic=PHONE_CONSULTATION&productIds=iphone-16-pro-max';
   await page.goto(destination);
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel('Email', { exact: true }).fill('customer@demo.vn');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Demo123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp('/ai\\?topic=PHONE_CONSULTATION&productIds=iphone-16-pro-max$'));
+  await expect(page).toHaveURL(
+    new RegExp('/ai\\?topic=PHONE_CONSULTATION&productIds=iphone-16-pro-max$'),
+  );
   await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
 });
 test('catalog filters, variant selection, guest cart persistence, login merge and COD', async ({
@@ -318,11 +443,46 @@ test('catalog filters, variant selection, guest cart persistence, login merge an
   await expect(page.getByText('Đã hủy', { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
+test('phone consultation shows a scope reminder for unrelated questions and continues the same chat', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await login(page);
+  await page.goto('/ai');
+  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
+  await expect(page).toHaveURL(/\/ai\/conversations\//);
+  const url = page.url();
+  const input = page.getByLabel('Nhập câu hỏi cho trợ lý AI');
+  await input.fill('Thời tiết hôm nay thế nào?');
+  await input.press('Enter');
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.locator('.message.assistant')).toContainText(
+    'Mình chỉ hỗ trợ tư vấn về điện thoại',
+  );
+  await expect(page.locator('.message.assistant .product-card')).toHaveCount(0);
+  await expect(page.locator('.message.assistant .source-card')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(input).toBeEnabled();
+  await input.fill('Tư vấn điện thoại pin tốt');
+  await input.press('Enter');
+  await expect(page.locator('.message.user')).toHaveCount(2);
+  await expect(page.locator('.message.assistant')).toHaveCount(2);
+  await expect(
+    page.locator('.message.assistant').last().locator('.product-card').first(),
+  ).toBeVisible();
+  await expect(page).toHaveURL(url);
+  await page.reload();
+  await expect(page.locator('.message.assistant').first()).toContainText(
+    'Mình chỉ hỗ trợ tư vấn về điện thoại',
+  );
+  await expect(page.locator('.message.user')).toHaveCount(2);
+});
+
 test('unified AI confirms topic switch without resending the question', async ({ page }) => {
   await login(page);
   await page.goto('/ai');
   await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
-  await expect(page.locator('footer').getByRole('link', { name: 'Tư vấn mua điện thoại', exact: true })).toHaveCount(1);
+  await expect(page.locator('footer')).toHaveCount(0);
   await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
   await expect(page).toHaveURL(/\/ai\/conversations\//);
   const oldUrl = page.url();
@@ -373,7 +533,9 @@ test('customer edits profile explicitly and email stays locked', async ({ page }
   await phone.fill('0912345678');
   await page.screenshot({ path: 'test-results/profile-edit.png', fullPage: true });
   await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
-  await expect(page.locator('.toast').filter({ hasText: 'Đã cập nhật thông tin tài khoản.' })).toHaveCount(1);
+  await expect(
+    page.locator('.toast').filter({ hasText: 'Đã cập nhật thông tin tài khoản.' }),
+  ).toHaveCount(1);
   await expect(name).toBeDisabled();
   await page.reload();
   await expect(name).toHaveValue('Khách cập nhật');
@@ -381,7 +543,9 @@ test('customer edits profile explicitly and email stays locked', async ({ page }
   await expect(email).toHaveValue('customer@demo.vn');
 });
 
-test('customer cancels deletion, deletes another chat then deletes the active chat', async ({ page }) => {
+test('customer cancels deletion, deletes another chat then deletes the active chat', async ({
+  page,
+}) => {
   await login(page);
   await page.goto('/ai');
   await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
@@ -404,7 +568,9 @@ test('customer cancels deletion, deletes another chat then deletes the active ch
   await dialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
   await expect(rows).toHaveCount(1);
   await expect(page).toHaveURL(currentUrl);
-  await expect(page.locator('.toast').filter({ hasText: 'Đã xóa cuộc trò chuyện.' })).toHaveCount(1);
+  await expect(page.locator('.toast').filter({ hasText: 'Đã xóa cuộc trò chuyện.' })).toHaveCount(
+    1,
+  );
   await rows.getByRole('button', { name: /Xóa cuộc trò chuyện/ }).click();
   await dialog.getByRole('button', { name: 'Xóa cuộc trò chuyện', exact: true }).click();
   await expect(page).toHaveURL(/\/ai$/);
@@ -422,13 +588,34 @@ test('admin stays in the portal and has personal settings there', async ({ page 
   await page.goto('/admin/profile');
   await expect(page.getByRole('heading', { name: 'Thông tin tài khoản' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Cửa hàng', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Địa chỉ mặc định', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.location-picker')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true }).click();
+  await expect(page.getByLabel('Địa chỉ mặc định', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Vị trí hiện tại', exact: true })).toHaveCount(0);
+  await page.getByLabel('Họ và tên', { exact: true }).fill('Quản trị viên kiểm thử');
+  await expect(page.getByLabel('Số điện thoại', { exact: true })).not.toHaveAttribute('required');
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(page.getByText('Đã cập nhật thông tin tài khoản.', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toHaveValue('Quản trị viên kiểm thử');
+  await expect(page.getByLabel('Số điện thoại', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+  await expect(page.locator('.location-picker')).toHaveCount(0);
 });
 
 test('comparison opens unified phone advice with selected products', async ({ page }) => {
   await login(page);
   await page.goto('/products');
-  await page.getByRole('button', { name: /Thêm .* vào so sánh/ }).first().click();
-  await page.getByRole('button', { name: /Thêm .* vào so sánh/ }).first().click();
+  await page
+    .getByRole('button', { name: /Thêm .* vào so sánh/ })
+    .first()
+    .click();
+  await page
+    .getByRole('button', { name: /Thêm .* vào so sánh/ })
+    .first()
+    .click();
   await page.getByRole('link', { name: 'So sánh', exact: true }).click();
   await page.getByRole('link', { name: 'So sánh cùng AI' }).click();
   await expect(page).toHaveURL(/topic=PHONE_CONSULTATION/);
@@ -458,9 +645,7 @@ test('admin product editing, provider form, document upload and status', async (
   await expect(page.getByLabel('API Key đã lưu')).toHaveValue('••••••••');
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await expect(
-    page.getByText('Chế độ demo: chỉ kiểm tra giao diện, chưa gọi nhà cung cấp AI.', {
-      exact: true,
-    }),
+    page.getByText(/Chế độ demo: đã mô phỏng kiểm tra kết nối/),
   ).toBeVisible();
   await page.goto('/admin/knowledge');
   await page.getByLabel('File tài liệu', { exact: true }).setInputFiles({
@@ -511,7 +696,7 @@ test('14 converted design screens render and public routes fit desktop and table
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Công nghệ bạn yêu/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Điện thoại phù hợp/ })).toBeVisible();
   await expect(page.locator('.home-products .product-card')).toHaveCount(4);
   await page.locator('main img').evaluateAll(async (nodes) => {
     await Promise.all(
@@ -538,21 +723,99 @@ test('comparison picker pages through products and resets paging on search', asy
   await expect(dialog.getByText('iPhone 16 Pro Max')).toBeVisible();
 });
 
-test('admin saves and removes a masked backup AI key', async ({ page }) => {
+test('admin manages multiple backup keys with priority, single delete and individual testing on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await login(page, true);
   await page.goto('/admin/ai-settings');
-  await page.getByLabel('API Key dự phòng mới', { exact: true }).fill('backup-test-secret');
+  async function addKey(name: string, secret: string) {
+    await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
+    const modal = page.getByRole('dialog');
+    await modal.getByLabel('Tên key', { exact: true }).fill(name);
+    const input = modal.getByLabel('API key mới', { exact: true });
+    await expect(input).toHaveAttribute('type', 'password');
+    await input.fill(secret);
+    await modal.getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  }
+  await addKey('Project A', 'backup-test-secret-a');
+  await addKey('Project B', 'backup-test-secret-b');
+  const list = page.getByRole('region', { name: 'Danh sách key dự phòng' });
+  await expect(list).toContainText('Key dự phòng (2/10)');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Project A', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Tăng ưu tiên Project B', exact: true }).click();
+  await expect(list.locator('li').first()).toContainText('Project B');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
-  await expect(page.getByLabel('API Key dự phòng mới', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Project B', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra Project B', exact: true }).click();
+  await expect(list.locator('li').first()).toContainText('Hoạt động');
   await page.reload();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
+  await expect(list.locator('li').first()).toContainText('Project B');
   const stored = await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }));
   expect(stored).not.toContain('backup-test-secret');
-  await page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true }).check();
+  await page.getByRole('button', { name: 'Thay Project B', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('replacement-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.getByRole('button', { name: 'Xóa Project A', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Xóa key', exact: true }).click();
+  await expect(list.locator('li')).toHaveCount(1);
+  await expect(list).toContainText('Project B');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('');
-  await expect(page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kích hoạt', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('replacement-secret');
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await page.getByRole('heading', { name: 'Cấu hình Google Gemini', exact: true }).click();
+  await page.screenshot({ path: 'test-results/admin-ai-keys-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/admin-ai-keys-desktop.png', fullPage: true });
+});
+
+test('AI settings polling preserves unsaved model and backup drafts', async ({ page }) => {
+  await page.clock.install();
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  await page.getByLabel('Chat Model').fill('gemini-draft-model');
+  await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Tên key', { exact: true }).fill('Draft project');
+  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('unsaved-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-draft-model');
+  await expect(page.getByRole('region', { name: 'Danh sách key dự phòng' })).toContainText('Draft project');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Draft project', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('unsaved-secret');
+});
+
+test('activation confirmation rejects a configuration changed by another admin', async ({ page }) => {
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  await page.getByLabel('Chat Model').fill('gemini-reviewed');
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Kích hoạt Google Gemini?' });
+  await expect(dialog).toContainText('gemini-reviewed');
+  await page.evaluate(async modulePath => {
+    const { api } = await import(modulePath);
+    const current = (await api.aiSettings())[0];
+    const saved = await api.saveAiSettings({ provider: 'GEMINI', configId: current.id, model: 'gemini-concurrent', backupKeys: [] });
+    await api.testAiConnection({ provider: 'GEMINI', configId: saved.id, model: saved.model });
+  }, '/src/shared/api/index.ts');
+  await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(dialog).toContainText('Cấu hình đã thay đổi');
+  const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('smai-demo-settings')!));
+  expect(saved[0]).toMatchObject({ model: 'gemini-concurrent', active: false });
+});
+
+test('AI notifications stay outside customer pages', async ({ page }) => {
+  await login(page);
+  await expect(page.getByRole('button', { name: /Thông báo AI/ })).toHaveCount(0);
 });
 
 test('registration shows password strength and enforces eight characters', async ({ page }) => {
@@ -561,7 +824,9 @@ test('registration shows password strength and enforces eight characters', async
   const meter = page.getByRole('meter', { name: 'Độ mạnh mật khẩu' });
   await password.fill('Ab1!xyz');
   await expect(meter).toHaveAttribute('aria-valuetext', 'Yếu');
-  expect(await password.evaluate((input: HTMLInputElement) => input.validity.tooShort)).toBeTruthy();
+  expect(
+    await password.evaluate((input: HTMLInputElement) => input.validity.tooShort),
+  ).toBeTruthy();
   await password.fill('Abcd1234');
   await expect(meter).toHaveAttribute('aria-valuetext', 'Trung bình');
   expect(await password.evaluate((input: HTMLInputElement) => input.validity.tooShort)).toBeFalsy();

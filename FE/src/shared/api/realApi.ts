@@ -31,7 +31,8 @@ export const realAuth = {
   },
   resend: (challengeId: string) => post('/auth/otp/resend', { challengeId }),
   reset: (email: string) => post<{challengeId:string}>('/auth/password-reset', { email }),
-  resetConfirm: (challengeId: string, code: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, code, newPassword }),
+  resetVerify: (challengeId: string, code: string) => post<{resetToken: string; expiresAt: string}>('/auth/password-reset/verify', { challengeId, code }),
+  resetConfirm: (challengeId: string, resetToken: string, newPassword: string) => post('/auth/password-reset/confirm', { challengeId, resetToken, newPassword }),
   acceptInvitation: (token: string, password: string) => post('/auth/account-invitations/accept', { token, password }),
 };
 export const realApi: Api = {
@@ -151,18 +152,25 @@ export const realApi: Api = {
             method: 'PATCH',
             body: jsonBody({ enabled: action === 'enable' }),
           }),
+  aiKeyAlert: async () => {
+    const result = await http<{ alert: import('../types/models').AiKeyAlert | null }>('/admin/ai-settings/key-alert');
+    return result.alert;
+  },
+  aiNotifications: () => http('/admin/ai-settings/notifications'),
+  markAiNotificationsRead: (throughId) => http('/admin/ai-settings/notifications/read', { method: 'POST', body: jsonBody({ throughId }) }),
+  testBackupKey: (configId, keyId) => http('/admin/ai-settings/' + encodeURIComponent(configId) + '/backup-keys/' + encodeURIComponent(keyId) + '/test', { method: 'POST', signal: AbortSignal.timeout(130000) }),
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
-    return (['OPENAI', 'GEMINI'] as const).map(provider => {
-      const latest = configs.find(c => c.provider === provider) ?? { provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
+    return (['GEMINI'] as const).map(provider => {
+      const latest = configs.find(c => c.provider === provider) ?? { id: '', backupKeys: [], provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
       const active = configs.find(c => c.provider === provider && c.active);
-      return { ...latest, ...(active ? { activeModel: active.model } : {}) };
+      return { ...latest, backupKeys: latest.backupKeys ?? [], ...(active ? { activeModel: active.model } : {}) };
     });
   },
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
   testAiConnection: (data) => http('/admin/ai-settings/test', { method: 'POST', body: jsonBody(data), signal: AbortSignal.timeout(130000) }),
-  activateProvider: async (provider) => {
-    await post('/admin/ai-settings/activate', { provider });
+  activateProvider: async (provider, configId) => {
+    await post('/admin/ai-settings/activate', { provider, ...(configId ? { configId } : {}) });
     return realApi.aiSettings();
   },
 };

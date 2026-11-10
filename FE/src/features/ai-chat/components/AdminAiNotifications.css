@@ -1,0 +1,43 @@
+.admin-ai-bell {
+  flex-shrink: 0;
+  position: relative;
+}
+.admin-ai-unread {
+  background: var(--danger, #b91c1c);
+  color: white;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  min-width: 20px;
+  text-align: center;
+}
+.admin-ai-notification-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.admin-ai-notification-list li {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.admin-ai-notification-list li.unread {
+  background: var(--bg);
+  border-left: 3px solid var(--action-primary);
+}
+.admin-ai-notification-list p {
+  margin-top: 8px;
+}
+@media (max-width: 639px) {
+  .admin-ai-bell-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

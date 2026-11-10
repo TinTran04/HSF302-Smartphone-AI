@@ -6,6 +6,8 @@ Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đ
 
 Xác thực dùng access JWT 15 phút và refresh token xoay vòng 7 ngày trong cookie HttpOnly, kèm CSRF. Mỗi thiết bị có thể bị thu hồi khi đăng xuất hoặc khi thông tin tài khoản thay đổi. Khi khởi động, BE áp dụng migration V26 để bổ sung ảnh dataset và V27 để lưu vị trí bản đồ cho hồ sơ, bản xem trước và đơn hàng.
 
+Hướng dẫn đầy đủ về setup, cấu hình Gemini, sử dụng, giải thích code và kịch bản demo nằm trong [User Guide](USER_GUIDE.md).
+
 ## Chức năng chính
 
 - **Cửa hàng:** xem, tìm kiếm và lọc điện thoại; xem phiên bản; so sánh sản phẩm; dùng giỏ hàng và đặt hàng COD.
@@ -36,7 +38,7 @@ Dự án không xử lý tồn kho thực tế, thanh toán trực tuyến hoặ
 | Frontend | React, TypeScript, Vite, React Router, TanStack Query |
 | Backend | Java 21, Spring Boot, Spring Security, Spring Data JPA, Flyway |
 | Dữ liệu | PostgreSQL và extension pgvector |
-| AI | OpenAI hoặc Gemini; truy xuất tài liệu PDF/TXT bằng RAG |
+| AI | Google Gemini; truy xuất tài liệu PDF/TXT bằng RAG |
 | Kiểm thử | Vitest, Playwright, JUnit, H2 |
 
 ```text
@@ -55,7 +57,7 @@ Backend tổ chức theo luồng Controller → Service interface → ServiceImp
 - Node.js 22.12 trở lên và npm.
 - PostgreSQL đã cài extension **pgvector**. Tạo database `smartphone_ai`; tài khoản database cần quyền tạo extension khi Flyway chạy lần đầu.
 - Tài khoản Gmail và mật khẩu ứng dụng để gửi OTP và lời mời kích hoạt tài khoản. Các tính năng này cần SMTP hoạt động.
-- API key của OpenAI hoặc Gemini nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
+- API key của Google Gemini nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
 
 **Nếu database đã có dữ liệu:** sao lưu và thử trên bản sao trước khi khởi động BE. Migration V20 xóa các tài khoản STAFF/MANAGER cũ cùng dữ liệu liên quan của chính các tài khoản đó. Chi tiết tại [README backend](BE/README.md).
 
@@ -117,14 +119,14 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 
 ## Cấu hình AI và RAG
 
-1. Đăng nhập Admin, mở **Cấu hình AI**, lưu cấu hình OpenAI/Gemini, kiểm tra kết nối rồi kích hoạt chat model.
+1. Đăng nhập Admin, mở **Cấu hình AI**, lưu cấu hình Google Gemini, kiểm tra kết nối rồi kích hoạt chat model.
 2. Mở **Cấu hình embedding**, nhập provider, model, số chiều và API key phù hợp; kiểm tra và lưu.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
 
-Mỗi cấu hình Chat hỗ trợ một API key chính và một API key dự phòng tùy chọn, dùng cùng provider và model. Admin nhập key dự phòng, lưu cấu hình, kiểm tra cả hai key rồi kích hoạt. Mỗi yêu cầu ưu tiên key chính. Khi provider trả HTTP 429 do quota hoặc giới hạn sử dụng, BE thử key dự phòng một lần. Để trống trường key giữ giá trị đã lưu, chọn **Xóa API Key dự phòng khi lưu** để gỡ key khỏi bản cấu hình mới. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+Mỗi cấu hình Chat hỗ trợ một API key chính và tối đa 10 key dự phòng có tên, thứ tự ưu tiên và trạng thái riêng. Admin có thể thêm, thay, kiểm tra hoặc xác nhận xóa từng key, sau đó lưu, kiểm tra và kích hoạt cấu hình. Khi key chính gặp lỗi xác thực hoặc quota, BE thử các key dự phòng theo thứ tự và ghi rõ tên key đã dùng. Chuông **Thông báo AI** hiển thị số chưa đọc và lịch sử lưu trong DB, có thao tác đánh dấu đã đọc và mở trang quản lý key. Banner giữ cảnh báo đang cần xử lý. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
-Tư vấn và so sánh điện thoại dùng dữ liệu sản phẩm; trò chuyện chung dùng chat model. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
+Tư vấn điện thoại kết hợp catalog, tài liệu phù hợp và kiến thức Gemini. Hỗ trợ cửa hàng dùng RAG có nguồn. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 
 ### Chế độ demo giao diện
 

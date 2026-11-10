@@ -1,4 +1,5 @@
 package com.smartphoneai.exception;
+import java.util.Locale;
 public class AiProviderException extends RuntimeException {
     private final int providerStatus;
 
@@ -25,6 +26,19 @@ public class AiProviderException extends RuntimeException {
             case 502, 503, 504 -> "AI_PROVIDER_BUSY";
             default -> "AI_PROVIDER_ERROR";
         };
+    }
+
+    public static AiProviderException fromProvider(int status, String message) {
+        String detail = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        if (status == 400 && (detail.contains("api_key_invalid") || detail.contains("api_key_expired")
+                || detail.contains("api key expired") || detail.contains("api key not valid"))) {
+            return new AiProviderException(401);
+        }
+        return new AiProviderException(status);
+    }
+
+    public boolean isKeyFailure() {
+        return providerStatus == 401 || providerStatus == 403 || providerStatus == 429;
     }
 
     public boolean isQuotaExceeded() {

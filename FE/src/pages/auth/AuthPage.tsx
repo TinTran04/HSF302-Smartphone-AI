@@ -11,6 +11,7 @@ import { safeReturnPath } from '../../shared/utils/format';
 import images from '../../design/product-images.json';
 import { clearGuestToken, realAuth } from '../../shared/api/realApi';
 import { getPasswordStrength } from '../../shared/utils/password';
+import { PasswordField } from '../../shared/components/PasswordField';
 
 const strengthLevels = {
   weak: { label: 'Yếu', score: 1, color: 'bg-red-500' },
@@ -18,50 +19,6 @@ const strengthLevels = {
   strong: { label: 'Mạnh', score: 3, color: 'bg-emerald-600' },
 };
 
-function PasswordField({
-  id,
-  label,
-  value,
-  onChange,
-  autoComplete,
-  minLength,
-  describedBy,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoComplete: string;
-  minLength?: number;
-  describedBy?: string;
-}) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="form-field">
-      <label htmlFor={id}>{label}</label>
-      <div className="password-field">
-        <input
-          id={id}
-          type={visible ? 'text' : 'password'}
-          autoComplete={autoComplete}
-          minLength={minLength}
-          aria-describedby={describedBy}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required
-        />
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={visible ? `Ẩn ${label.toLowerCase()}` : `Hiện ${label.toLowerCase()}`}
-          onClick={() => setVisible((v) => !v)}
-        >
-          <Icon name={visible ? 'visibility_off' : 'visibility'} />
-        </button>
-      </div>
-    </div>
-  );
-}
 export default function AuthPage({ register = false }: { register?: boolean }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

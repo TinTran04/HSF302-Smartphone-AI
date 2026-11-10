@@ -91,14 +91,14 @@ class StorefrontRoleSecurityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept"})
+    @ValueSource(strings = {"/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/verify", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept"})
     void accountAccessEndpointsRemainPublic(String path) throws Exception {
         mvc.perform(post(path).with(csrf())).andExpect(status().isOk());
     }
 
     @RestController
     static class ProbeController {
-        @RequestMapping({"/api/products", "/api/products/1", "/api/brands", "/api/ai/conversations", "/api/cart/resolve", "/api/ai/guest-sessions", "/api/cart", "/api/orders", "/api/admin/products", "/api/admin/ai-settings", "/api/users/me", "/api/users/me/password", "/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept"})
+        @RequestMapping({"/api/products", "/api/products/1", "/api/brands", "/api/ai/conversations", "/api/cart/resolve", "/api/ai/guest-sessions", "/api/cart", "/api/orders", "/api/admin/products", "/api/admin/ai-settings", "/api/users/me", "/api/users/me/password", "/api/auth/register", "/api/auth/login", "/api/auth/otp/verify", "/api/auth/otp/resend", "/api/auth/password-reset", "/api/auth/password-reset/verify", "/api/auth/password-reset/confirm", "/api/auth/admin-invitations/accept", "/api/auth/account-invitations/accept"})
         Map<String, Boolean> reachable() { return Map.of("reachable", true); }
     }
 }

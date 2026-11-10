@@ -95,7 +95,7 @@ class RegistrationIntegrationTest {
                 .content("{\"email\":\"pending-reset@example.com\"}")).andExpect(status().isAccepted()).andReturn();
         String id=mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
         mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(java.util.Map.of("challengeId",id,"code",code.get(),"newPassword","Newpassword123!"))))
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId",id,"resetToken",verifyReset(id, code.get()),"newPassword","Newpassword123!"))))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
     }
@@ -115,7 +115,7 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isAccepted()).andReturn();
         String resetId = mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
         mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", resetId, "code", sent.get(), "newPassword", "Newpassword123!"))))
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", resetId, "resetToken", verifyReset(resetId, sent.get()), "newPassword", "Newpassword123!"))))
                 .andExpect(status().isNoContent());
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"reset@example.com\",\"password\":\"Oldpassword123!\"}"))
@@ -130,10 +130,17 @@ class RegistrationIntegrationTest {
                 .content("{\"email\":\"unknown@example.com\"}"))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.challengeId").isNotEmpty()).andReturn();
         String resetId = mapper.readTree(reset.getResponse().getContentAsString()).path("challengeId").asText();
-        mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", resetId, "code", "123456", "newPassword", "Newpassword123!"))))
+        mvc.perform(post("/api/auth/password-reset/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", resetId, "code", "123456"))))
                 .andExpect(status().isConflict());
         verifyNoInteractions(sender);
+    }
+
+    private String verifyReset(String id, String code) throws Exception {
+        var response = mvc.perform(post("/api/auth/password-reset/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("challengeId", id, "code", code))))
+                .andExpect(status().isOk()).andReturn();
+        return mapper.readTree(response.getResponse().getContentAsString()).path("resetToken").asText();
     }
 
     @Test void registrationActivatesOnlyAfterCorrectOtpAndCreatesSession() throws Exception {

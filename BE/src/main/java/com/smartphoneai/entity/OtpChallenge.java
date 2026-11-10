@@ -18,6 +18,9 @@ public class OtpChallenge {
     @Column(name = "failed_attempts", nullable = false) private int failedAttempts;
     @Column(nullable = false) private boolean consumed;
     @Column(nullable = false) private boolean deliverable;
+    @Column(name = "reset_token_hash") private String resetTokenHash;
+    @Column(name = "reset_expires_at") private Instant resetExpiresAt;
+    @Column(name = "reset_credential_version") private Long resetCredentialVersion;
     @Version private long version;
 
     protected OtpChallenge() {}
@@ -50,7 +53,24 @@ public class OtpChallenge {
     }
 
     public UUID getId() { return id; }
-    public void invalidate() { consumed = true; }
+    public void invalidate() {
+        consumed = true;
+        resetTokenHash = null;
+        resetExpiresAt = null;
+        resetCredentialVersion = null;
+    }
+    public void authorizePasswordReset(String tokenHash, Instant expiresAt, long credentialVersion) {
+        resetTokenHash = tokenHash;
+        resetExpiresAt = expiresAt;
+        resetCredentialVersion = credentialVersion;
+    }
+    public boolean consumePasswordReset(boolean matches, Instant now, long credentialVersion) {
+        if (!matches || resetTokenHash == null || resetExpiresAt == null || resetCredentialVersion == null
+                || !now.isBefore(resetExpiresAt) || resetCredentialVersion != credentialVersion) return false;
+        invalidate();
+        return true;
+    }
+    public String getResetTokenHash() { return resetTokenHash; }
     public String getEmail() { return email; }
     public String getPurpose() { return purpose; }
     public String getCodeHash() { return codeHash; }

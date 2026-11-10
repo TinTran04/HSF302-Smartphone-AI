@@ -81,7 +81,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> aiProviderError(AiProviderException exception) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ApiError(exception.getCode(), exception.getMessage(), Instant.now()));
     }
-    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class, InvalidProfileException.class,
             MethodArgumentTypeMismatchException.class, MissingRequestHeaderException.class,
             org.springframework.web.multipart.support.MissingServletRequestPartException.class})
     public ResponseEntity<ApiError> invalidRequest(Exception exception) {

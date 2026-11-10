@@ -117,12 +117,23 @@ describe('real backend contract', () => {
 
   it('retains the active model while exposing a newer draft configuration', async () => {
     vi.mocked(http).mockResolvedValueOnce([
-      { provider: 'OPENAI', model: 'draft', maskedKey: '***', active: false },
-      { provider: 'OPENAI', model: 'active', maskedKey: '***', active: true },
+      { provider: 'GEMINI', model: 'draft', maskedKey: '***', active: false },
+      { provider: 'GEMINI', model: 'active', maskedKey: '***', active: true },
     ]);
     const settings = await realApi.aiSettings();
+    expect(settings).toHaveLength(1);
     expect(settings[0]).toMatchObject({ model: 'draft', active: false, activeModel: 'active' });
   });
+
+  it.each([{ configs: [] }, { configs: [{ provider: 'OPENAI', model: 'legacy-model', maskedKey: 'legacy-key', active: true }] }])(
+    'offers an empty Gemini configuration when the backend has no Gemini settings',
+    async ({ configs }) => {
+      vi.mocked(http).mockResolvedValueOnce(configs);
+      await expect(realApi.aiSettings()).resolves.toEqual([
+        { id: '', backupKeys: [], provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+      ]);
+    },
+  );
 
   it('resolves an oversized guest cart in batches so users can remove items', async () => {
     vi.mocked(http).mockResolvedValue({ items: [], total: 0 });

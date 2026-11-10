@@ -103,7 +103,7 @@ class AiKeyFailoverIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {401, 403, 404, 502, 504})
+    @ValueSource(ints = {400, 404, 502, 504})
     void otherProviderErrorsAreReturnedImmediately(int status) throws Exception {
         saveWithBackup();
         testConnection().andExpect(status().isOk());

@@ -347,8 +347,8 @@ class AccountStatusIntegrationTest {
     }
 
     private void confirmReset(String id, String code, int expectedStatus) throws Exception {
-        mvc.perform(post("/api/auth/password-reset/confirm").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(Map.of("challengeId", id, "code", code, "newPassword", "NewPassword123!"))))
+        mvc.perform(post("/api/auth/password-reset/verify").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("challengeId", id, "code", code))))
                 .andExpect(status().is(expectedStatus));
     }
 }
