@@ -54,6 +54,25 @@ class UnifiedPhoneAdviceIntegrationTest {
         verify(vectors, never()).search(anyString(), anySet(), anyString());
     }
 
+    @Test void productAndDocumentLookupsReleaseTransactionBeforeExternalCalls() throws Exception {
+        phone("Test Phone", 9000000);
+        var doc=documents.saveAndFlush(new KnowledgeDocument("policy.txt",100,"[]",Instant.now()));
+        doc.ready("embedding-v1");
+        documents.saveAndFlush(doc);
+        var chunk=chunks.saveAndFlush(new KnowledgeChunk(doc.getId(),null,"Bảo hành 12 tháng.","embedding-v1"));
+        when(vectors.currentVersion()).thenReturn("embedding-v1");
+        when(vectors.search(anyString(),anySet(),eq("embedding-v1"))).thenAnswer(invocation -> {
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return List.of(new KnowledgeVectorStore.Hit(chunk.getId(),0.95));
+        });
+        when(provider.chat(anyString())).thenAnswer(invocation -> {
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return response("Bảo hành 12 tháng.",List.of(),List.of(),List.of(chunk.getId().toString()));
+        });
+        var answer=responder.answer("PHONE_CONSULTATION","Tư vấn máy 10 triệu và bảo hành bao lâu?",List.of(),List.of());
+        assertEquals("Bảo hành 12 tháng.",answer.text());
+    }
+
     @Test void combinesCatalogDocumentEvidenceAndComparisonInOneConsultation() throws Exception {
         var first = phone("Camera Phone", 9000000);
         var second = phone("Battery Phone", 11000000);
@@ -70,7 +89,7 @@ class UnifiedPhoneAdviceIntegrationTest {
         assertEquals(2, answer.comparedProducts().size());
         assertEquals(doc.getId().toString(), answer.sources().getFirst().documentId());
         verify(provider).chat(argThat(prompt -> prompt.contains("Camera Phone") && prompt.contains("Battery Phone")
-                && prompt.contains("OIS hỗ trợ") && prompt.contains("citedChunkIds")));
+                && prompt.contains("OIS hỗ trợ") && prompt.contains("citedChunkIds") && !prompt.contains("camera-guide.txt")));
     }
 
     @Test void rejectsFabricatedDocumentCitation() throws Exception {

@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.retry.support.RetryTemplate;
 
 @Service
@@ -43,6 +44,9 @@ public class AiProviderServiceImpl implements AiProviderService {
     private final Clock clock;
     private final AiKeyAlertService alerts;
     private final AiBackupKeyRepository backups;
+    private AiQuotaTracker quota;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setQuota(AiQuotaTracker quota) { this.quota=quota; }
     public AiProviderServiceImpl(AiProviderConfigRepository configs, SystemSettingRepository settings,
                              ConfigSecretCipher cipher, ChatProviderClient client, Clock clock, AiKeyAlertService alerts,
                              AiBackupKeyRepository backups) {
@@ -158,8 +162,8 @@ public class AiProviderServiceImpl implements AiProviderService {
         return list();
     }
     @Override
-    @Transactional(readOnly=true)
     public String chat(String prompt) {
+        if (quota!=null && quota.configured()) return chatWithRotation(prompt);
         var deadline = clock.instant().plusSeconds(60);
         var active = configs.findAllByActiveTrue();
         if (active.size() != 1) throw new AiProviderException();
@@ -194,6 +198,63 @@ public class AiProviderServiceImpl implements AiProviderService {
         }
         alerts.record(config.getId(), "PRIMARY", null, null);
         return answer;
+    }
+
+    private record RotationKey(String ref, String secret, AiBackupKey backup) {}
+    private String chatWithRotation(String prompt) {
+        var deadline=clock.instant().plusSeconds(60);
+        var active=configs.findAllByActiveTrue();
+        if (active.size()!=1) throw new AiProviderException();
+        var config=active.getFirst();
+        requireGemini(config.getProvider());
+        var remaining=new ArrayList<RotationKey>();
+        remaining.add(new RotationKey("PRIMARY",cipher.decrypt("GEMINI",config.getKeyCipher()),null));
+        for (var backup:backups.findAllByConfigIdOrderByPriorityAsc(config.getId()))
+            remaining.add(new RotationKey(backup.getId().toString(),cipher.decrypt("GEMINI",backup.getKeyCipher()),backup));
+        var excludedProjects=new HashSet<String>();
+        AiProviderException last=null;
+        String trigger="AI_QUOTA_NEAR_LIMIT";
+        String lastName=null;
+        while (!remaining.isEmpty() && clock.instant().isBefore(deadline)) {
+            var keys=remaining.stream().map(key->new AiQuotaTracker.Key(key.ref(),AiQuotaTracker.fingerprint(key.secret()))).toList();
+            var reservation=quota.reserve(keys,config.getModel(),prompt,excludedProjects);
+            if (reservation==null) break;
+            var chosen=remaining.stream().filter(key->key.ref().equals(reservation.reference())).findFirst().orElseThrow();
+            remaining.remove(chosen);
+            try {
+                String result=availabilityRetry.execute(context -> {
+                    var attempt=context.getRetryCount()==0 ? reservation : quota.reserve(
+                            List.of(new AiQuotaTracker.Key(chosen.ref(),AiQuotaTracker.fingerprint(chosen.secret()))),
+                            config.getModel(),prompt,Set.of());
+                    if (client instanceof com.smartphoneai.service.UsageAwareChatProviderClient usageClient) {
+                        var reply=usageClient.chatWithUsage("GEMINI",config.getModel(),chosen.secret(),prompt);
+                        if (reply==null || reply.text()==null || reply.text().isBlank()) throw new AiProviderException();
+                        quota.finish(attempt.usageId(),reply.inputTokens());
+                        return reply.text();
+                    }
+                    var answer=client.chat("GEMINI",config.getModel(),chosen.secret(),prompt);
+                    if (answer==null || answer.isBlank()) throw new AiProviderException();
+                    return answer;
+                });
+                if (chosen.backup()!=null) {
+                    alerts.recordBackupAttempt(chosen.backup().getId(),null);
+                    alerts.record(config.getId(),"USING_BACKUP",trigger,null,chosen.backup().getName());
+                } else alerts.record(config.getId(),"PRIMARY",null,null);
+                return result;
+            } catch (AiProviderException failure) {
+                last=failure; lastName=chosen.backup()==null?null:chosen.backup().getName();
+                if (chosen.backup()!=null) alerts.recordBackupAttempt(chosen.backup().getId(),failure.getCode());
+                if (!failure.isKeyFailure()) {
+                    if (chosen.backup()!=null) alerts.record(config.getId(),"BACKUP_FAILED",trigger,failure.getCode(),lastName);
+                    throw failure;
+                }
+                if ("AI_QUOTA_NEAR_LIMIT".equals(trigger)) trigger=failure.getCode();
+                if (failure.isQuotaExceeded() && reservation.project()!=null) excludedProjects.add(reservation.project());
+            }
+        }
+        if (last==null) last=new AiProviderException(429);
+        alerts.record(config.getId(),remaining.isEmpty() && lastName==null ? "MISSING_BACKUP" : "BACKUP_FAILED",trigger,last.getCode(),lastName);
+        throw last;
     }
 
     private String call(AiProviderConfig config, String key, String prompt) {

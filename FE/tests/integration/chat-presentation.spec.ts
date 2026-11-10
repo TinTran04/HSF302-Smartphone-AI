@@ -11,7 +11,8 @@ const customer = {
 const answer =
   'Gemini tư vấn điện thoại dựa trên nhu cầu sử dụng, ngân sách và dữ liệu sản phẩm. '.repeat(6);
 const conversationId = 'chat-presentation';
-type Message = { id: string; role: 'user' | 'assistant'; content: string };
+const privateSources = [{ documentId: 'internal-policy-id', documentName: 'internal-policy.txt', excerpt: 'Internal excerpt' }];
+type Message = { id: string; role: 'user' | 'assistant'; content: string; sources?: typeof privateSources };
 
 function gate() {
   let release!: () => void;
@@ -91,14 +92,14 @@ async function chatFixture(
         });
       messages.push(
         { id: `saved-user-${requests}`, role: 'user', content },
-        { id: `saved-assistant-${requests}`, role: 'assistant', content: answer },
+        { id: `saved-assistant-${requests}`, role: 'assistant', content: answer, sources: privateSources },
       );
       return route.fulfill({
         json: {
           type: 'ANSWER',
           conversationId,
           answer,
-          sources: [],
+          sources: privateSources,
           recommendedProducts: [],
           comparedProducts: [],
         },
@@ -194,10 +195,14 @@ test('chat sends immediately, waits with three wave dots and reveals only a newl
   );
   await page.getByRole('button', { name: 'Hiển thị toàn bộ câu trả lời', exact: true }).click();
   await expect(page.locator('.message.assistant')).toContainText(answer);
+  await expect(page.locator('.message.assistant .source-card')).toHaveCount(0);
+  await expect(page.getByText('internal-policy.txt', { exact: true })).toHaveCount(0);
   await expect(page.locator('.message.user')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/chat-gemini-answer.png', fullPage: true });
   await page.reload();
   await expect(page.locator('.message.assistant')).toContainText(answer);
+  await expect(page.locator('.message.assistant .source-card')).toHaveCount(0);
+  await expect(page.getByText('internal-policy.txt', { exact: true })).toHaveCount(0);
   await expect(page.getByTestId('chat-reveal')).toHaveCount(0);
   expect(fixture.requests()).toBe(1);
 });
@@ -305,13 +310,14 @@ test('admin configures only Gemini for chat and embedding with the existing save
       if (method === 'PUT') {
         const data = route.request().postDataJSON();
         expect(data.provider).toBe('GEMINI');
-        expect(data.dimensions).toBe(768);
+        expect(data).not.toHaveProperty('model');
+        expect(data).not.toHaveProperty('dimensions');
         operations.push('embedding');
         return route.fulfill({
           json: {
             configured: true,
             provider: 'GEMINI',
-            model: data.model,
+            model: 'gemini-embedding-001',
             dimensions: 768,
             maskedKey: '••••••••',
             reindexRequired: false,
@@ -339,7 +345,8 @@ test('admin configures only Gemini for chat and embedding with the existing save
   await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
   await page.goto('/admin/embedding');
   await expect(page.getByText('OpenAI', { exact: true })).toHaveCount(0);
-  await page.getByLabel('Model', { exact: true }).fill('gemini-embedding-001');
+  await expect(page.getByLabel('Model', { exact: true })).toHaveValue('gemini-embedding-001');
+  await expect(page.getByLabel('Model', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByLabel(/^API key mới/).fill('test-only-embedding-key');
   await page.getByRole('button', { name: 'Kiểm tra và lưu', exact: true }).click();
   await expect.poll(() => operations).toEqual(['save', 'test', 'activate', 'embedding']);

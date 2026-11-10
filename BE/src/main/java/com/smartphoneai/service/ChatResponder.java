@@ -14,4 +14,8 @@ public interface ChatResponder {
 
     Answer answer(String topic, String question, List<ChatMessageResponse> history,
                   List<String> productIds);
+    default Answer answer(String topic, String question, List<ChatMessageResponse> history,
+                          List<String> productIds, TopicRouter.Decision decision) {
+        return answer(topic, question, history, productIds);
+    }
 }

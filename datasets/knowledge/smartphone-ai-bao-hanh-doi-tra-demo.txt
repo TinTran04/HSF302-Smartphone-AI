@@ -1,0 +1,140 @@
+SMARTPHONE AI – CHÍNH SÁCH MẪU VỀ BẢO HÀNH VÀ ĐỔI TRẢ
+
+Mã tài liệu SPAI-BAOHANH-DOITRA-DEMO-20261110
+Phiên bản 1.0, cập nhật ngày 10/11/2026.
+
+Tài liệu dùng cho môi trường demo và kiểm thử RAG của dự án SmartPhone AI. Mốc thời gian của bản mẫu đã được chọn là bảo hành máy 12 tháng và đổi máy lỗi trong 7 ngày đầu. Các điều kiện bên dưới là nội dung đề xuất cho bản demo, cần chủ cửa hàng duyệt trước khi áp dụng cho hoạt động bán hàng thực tế.
+
+
+1. PHẠM VI ÁP DỤNG
+
+Chính sách mẫu áp dụng cho điện thoại thuộc đơn mua hàng tại SmartPhone AI có thông tin mua hàng được cửa hàng xác thực.
+
+Khách có thể cung cấp mã đơn hàng, chứng từ mua hàng hoặc thông tin giúp cửa hàng tra cứu giao dịch. Khi tiếp nhận, cửa hàng đối chiếu sản phẩm, phiên bản và số IMEI hoặc serial nếu thiết bị có thông tin nhận dạng này.
+
+Thời hạn bảo hành máy và thời hạn đổi máy lỗi được tính từ ngày khách nhận hàng đã được xác nhận trong hồ sơ mua hàng. Ngày đặt đơn và ngày nhận hàng có thể khác nhau.
+
+
+2. THỜI HẠN BẢO HÀNH MÁY
+
+Theo chính sách mẫu SmartPhone AI, điện thoại được bảo hành 12 tháng kể từ ngày nhận hàng được xác nhận.
+
+Trong thời hạn 12 tháng, lỗi kỹ thuật được bộ phận tiếp nhận hoặc đơn vị bảo hành xác nhận thuộc phạm vi bảo hành sẽ được xử lý theo chính sách bảo hành của sản phẩm.
+
+Thời hạn 12 tháng ở đây áp dụng cho máy. Thời hạn bảo hành pin, bộ sạc, cáp, tai nghe và phụ kiện khác cần đối chiếu thông tin đi kèm từng sản phẩm hoặc xác nhận riêng với cửa hàng.
+
+
+3. ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH
+
+Yêu cầu bảo hành cần có thông tin xác thực việc mua hàng tại SmartPhone AI và thông tin nhận dạng của thiết bị để đối chiếu. Thiết bị còn trong thời hạn bảo hành, và lỗi cần được kiểm tra để xác định nguyên nhân cũng như phương án xử lý.
+
+Lỗi phần cứng do nhà sản xuất đã được xác nhận và thuộc phạm vi bảo hành được xử lý miễn phí theo chính sách mẫu. Phương án có thể là sửa chữa hoặc phương án khác được cửa hàng xác nhận dựa trên kết quả kiểm tra và điều kiện của sản phẩm.
+
+Đối với máy có dấu hiệu rơi vỡ, tác động ngoại lực, chất lỏng, sử dụng sai hướng dẫn hoặc đã sửa chữa ở nơi khác, bộ phận tiếp nhận sẽ đánh giá nguyên nhân và phạm vi liên quan đến lỗi đang yêu cầu xử lý. Khi phát sinh dịch vụ có tính phí, cửa hàng thông báo phương án và chi phí để khách xác nhận trước khi thực hiện.
+
+Khi máy hết thời hạn bảo hành, khách có thể đề nghị cửa hàng kiểm tra và báo phương án hỗ trợ. Chi phí sửa chữa ngoài bảo hành cần được cửa hàng báo và khách chấp thuận trước.
+
+
+4. ĐỔI MÁY LỖI TRONG 7 NGÀY ĐẦU
+
+Theo chính sách mẫu SmartPhone AI, khách có thể yêu cầu đổi điện thoại trong 7 ngày đầu kể từ ngày nhận hàng nếu máy có lỗi kỹ thuật do nhà sản xuất được xác nhận.
+
+Ngày nhận hàng được tính là ngày thứ nhất trong khoảng 7 ngày. Khách gửi yêu cầu trong thời hạn này, cung cấp thông tin đơn hàng và mô tả lỗi để cửa hàng ghi nhận thời điểm yêu cầu.
+
+Điều kiện đổi máy gồm giao dịch được xác thực tại SmartPhone AI, thiết bị được đối chiếu đúng với hồ sơ mua hàng, yêu cầu được gửi trong 7 ngày đầu và kết quả kiểm tra xác nhận lỗi kỹ thuật thuộc trường hợp được đổi.
+
+Sau khi yêu cầu được duyệt, cửa hàng ưu tiên đổi máy cùng model và phiên bản tương ứng. Khách bàn giao lại máy cùng các phụ kiện, chứng từ và vật dụng đi kèm còn giữ để cửa hàng đối chiếu theo hồ sơ tiếp nhận.
+
+Nếu phiên bản tương ứng đang hết hàng, cửa hàng trao đổi với khách để thống nhất một trong các phương án gồm chờ hàng thay thế, đổi sang sản phẩm khác phù hợp hoặc trả hàng và hoàn tiền khi hai bên thống nhất phương án đó.
+
+Với phương án đổi sang sản phẩm có giá khác, giá đối chiếu và khoản chênh lệch phải được cửa hàng thông báo, sau đó được khách xác nhận trước khi thực hiện.
+
+
+5. YÊU CẦU SAU THỜI HẠN ĐỔI MÁY
+
+Sau 7 ngày đầu, yêu cầu xử lý lỗi được tiếp nhận theo chính sách bảo hành 12 tháng nếu sản phẩm còn đủ điều kiện. Khách cung cấp thông tin mua hàng và mô tả tình trạng để cửa hàng hướng dẫn tiếp nhận.
+
+Các yêu cầu đổi do thay đổi nhu cầu, muốn đổi màu hoặc muốn đổi model cần được cửa hàng xem xét và xác nhận riêng. Bản mẫu này quy định mốc 7 ngày cho trường hợp lỗi kỹ thuật do nhà sản xuất được xác nhận.
+
+
+6. TRẢ HÀNG VÀ HOÀN TIỀN
+
+Trả hàng và hoàn tiền là phương án cần được cửa hàng và khách thống nhất sau khi kiểm tra điều kiện của yêu cầu. Một trường hợp có thể xem xét là máy đủ điều kiện đổi trong 7 ngày đầu nhưng phiên bản thay thế hết hàng và khách chọn phương án trả hàng đã được cửa hàng chấp thuận.
+
+Khi phương án trả hàng được duyệt, cửa hàng và khách xác nhận tình trạng sản phẩm bàn giao, số tiền hoàn, phương thức nhận tiền và thời điểm hoàn tiền dự kiến. Cửa hàng đối chiếu khoản tiền khách đã thực tế thanh toán cho giao dịch và những khoản điều chỉnh đã được hai bên xác nhận, nếu có.
+
+Thời hạn hoàn tiền cụ thể và phương thức nhận tiền được cửa hàng xác nhận trong từng hồ sơ đã duyệt. Khách giữ lại thông tin xác nhận và biên bản bàn giao để đối chiếu quá trình xử lý.
+
+Trong bản demo, việc tiếp nhận bảo hành, đổi trả và hoàn tiền được nhân sự cửa hàng xử lý trực tiếp. Khách gửi yêu cầu qua đầu mối liên hệ được cửa hàng công bố để được hướng dẫn cho trường hợp của mình.
+
+
+7. GIAO NHẦM SẢN PHẨM, THIẾU HÀNG HOẶC HƯ HỎNG KHI NHẬN
+
+Khách nên đối chiếu tên máy, màu sắc, dung lượng, số lượng và phụ kiện theo đơn khi nhận hàng. Nếu phát hiện giao nhầm, thiếu hàng hoặc dấu hiệu hư hỏng, khách lưu lại thông tin tình trạng và thông báo cho cửa hàng để ghi nhận.
+
+Thông tin hỗ trợ kiểm tra gồm mã đơn hàng, mô tả sai lệch, hình ảnh sản phẩm và bao bì nếu khách có lưu. Cửa hàng đối chiếu hồ sơ và trao đổi phương án khắc phục phù hợp với khách.
+
+
+8. QUY TRÌNH GỬI YÊU CẦU BẢO HÀNH HOẶC ĐỔI TRẢ
+
+Bước 1. Khách chuẩn bị mã đơn hàng hoặc thông tin mua hàng, tên điện thoại, số IMEI hoặc serial nếu có, ngày nhận hàng, mô tả lỗi và thông tin liên hệ để nhận phản hồi.
+
+Bước 2. Khách liên hệ cửa hàng qua kênh hỗ trợ chính thức đã được cửa hàng công bố. Nhân sự cửa hàng ghi nhận yêu cầu và hướng dẫn cách bàn giao hoặc gửi thiết bị.
+
+Bước 3. Cửa hàng lập thông tin tiếp nhận, ghi nhận ngoại quan, phụ kiện bàn giao, lỗi khách mô tả và thông tin nhận dạng của máy.
+
+Bước 4. Bộ phận kiểm tra xác định nguyên nhân, đối chiếu điều kiện bảo hành hoặc đổi trả và thông báo kết quả cùng phương án dự kiến cho khách.
+
+Bước 5. Sau khi phương án được xác nhận, cửa hàng thực hiện sửa chữa, đổi máy hoặc trả hàng và hoàn tiền theo nội dung đã thống nhất, rồi cập nhật kết quả cho khách.
+
+Thời gian kiểm tra, sửa chữa và bàn giao máy phụ thuộc tình trạng thiết bị, linh kiện và đơn vị xử lý. Cửa hàng xác nhận thời gian dự kiến khi tiếp nhận hoặc khi có kết quả kiểm tra.
+
+Trước khi bàn giao máy, khách nên sao lưu dữ liệu cần thiết và ghi nhận tình trạng máy cùng các phụ kiện bàn giao. Các yêu cầu liên quan đến dữ liệu trên thiết bị cần được trao đổi trong hồ sơ tiếp nhận.
+
+
+9. PHÍ VẬN CHUYỂN TRONG QUÁ TRÌNH BẢO HÀNH VÀ ĐỔI TRẢ
+
+Phí giao hàng bằng 0 đồng trong luồng mua hàng của dự án áp dụng cho đơn đặt mua điện thoại. Chi phí gửi máy bảo hành, đổi trả và gửi máy sau xử lý cần được cửa hàng xác nhận riêng theo từng hồ sơ.
+
+Khách nên thống nhất đầu mối nhận máy, cách gửi, thông tin người nhận và chi phí vận chuyển liên quan trước khi gửi thiết bị.
+
+
+10. PHÂN BIỆT HỦY ĐƠN VÀ ĐỔI TRẢ SAU KHI NHẬN HÀNG
+
+Hủy đơn trong hệ thống là thao tác với đơn đặt hàng theo trạng thái xử lý. Customer có thể tự hủy đơn của mình khi đơn còn Chờ duyệt, tương ứng PENDING. Với đơn Đã xác nhận, tương ứng CONFIRMED, khách cần trao đổi với cửa hàng để xem xét xử lý. Khi đơn Đang giao, tương ứng SHIPPING, thao tác hủy theo chức năng hiện tại bị khóa.
+
+Bảo hành, đổi máy lỗi và trả hàng là những yêu cầu phát sinh liên quan đến thiết bị đã nhận và điều kiện của chính sách này. Các yêu cầu đó được cửa hàng tiếp nhận, kiểm tra và xử lý theo hồ sơ riêng.
+
+
+11. CÂU HỎI THƯỜNG GẶP
+
+Điện thoại mua tại SmartPhone AI được bảo hành bao lâu?
+Theo chính sách mẫu, máy được bảo hành 12 tháng kể từ ngày nhận hàng được xác nhận, với điều kiện lỗi và sản phẩm thuộc phạm vi bảo hành.
+
+Điện thoại lỗi có được đổi trong 7 ngày đầu không?
+Khách có thể gửi yêu cầu đổi trong 7 ngày đầu kể từ ngày nhận hàng. Cửa hàng kiểm tra và xác nhận lỗi kỹ thuật do nhà sản xuất cùng các điều kiện đổi máy trước khi duyệt.
+
+Sau 7 ngày, máy lỗi thì xử lý thế nào?
+Khách gửi yêu cầu kiểm tra theo chính sách bảo hành 12 tháng nếu máy còn trong thời hạn và đủ điều kiện.
+
+Pin và phụ kiện có được bảo hành 12 tháng như máy không?
+Thời hạn pin và phụ kiện cần đối chiếu điều kiện của từng sản phẩm hoặc xác nhận riêng với cửa hàng. Mốc 12 tháng trong bản mẫu áp dụng cho máy.
+
+Đổi máy lỗi có được nhận tiền hoàn ngay không?
+Khách và cửa hàng cần xác nhận phương án xử lý. Khi trả hàng và hoàn tiền được duyệt, số tiền, phương thức nhận tiền và thời điểm dự kiến được ghi nhận trong hồ sơ cụ thể.
+
+Máy thay thế hết hàng thì sao?
+Cửa hàng trao đổi để khách chọn phương án đã được xác nhận, như chờ hàng, đổi sang sản phẩm khác hoặc trả hàng và hoàn tiền.
+
+Muốn đổi màu hoặc đổi model vì thay đổi nhu cầu thì sao?
+Khách liên hệ cửa hàng để được xem xét và xác nhận điều kiện riêng cho yêu cầu của mình. Mốc đổi 7 ngày của bản mẫu dành cho lỗi kỹ thuật do nhà sản xuất được xác nhận.
+
+Phí gửi máy bảo hành có được miễn như phí giao đơn mua không?
+Chi phí vận chuyển bảo hành và đổi trả cần được cửa hàng xác nhận riêng theo từng hồ sơ. Phí 0 đồng của luồng đặt mua áp dụng cho đơn mua điện thoại.
+
+
+12. THÔNG TIN CẦN HOÀN THIỆN TRƯỚC KHI ÁP DỤNG THỰC TẾ
+
+Chủ cửa hàng cần duyệt các điều kiện tiếp nhận, phạm vi bảo hành, điều kiện đổi trả, đơn vị kỹ thuật, chi phí vận chuyển, phương thức hoàn tiền và thời gian xử lý cụ thể.
+
+Địa chỉ tiếp nhận máy, hotline, email hỗ trợ và giờ làm việc cần được chủ cửa hàng bổ sung bằng thông tin chính thức. Bản mẫu phục vụ demo hiện sử dụng đầu mối hỗ trợ được cửa hàng công bố.
