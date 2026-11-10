@@ -10,6 +10,7 @@ import { useAuth } from '../features/auth/AuthProvider';
 import { ErrorState, Skeleton } from '../shared/components/Ui';
 import { Icon } from '../shared/components/Icon';
 import { MaintenanceScreen } from './MaintenanceScreen';
+import { AssistantWidget } from '../features/ai-assistant/AssistantWidget';
 
 const authPaths = new Set([
   '/login',
@@ -148,6 +149,7 @@ export function StoreLayout() {
           <CompareTray />
         </>
       )}
+      {showChrome && !authRoute && !chatRoute && <AssistantWidget />}
     </div>
   );
 }

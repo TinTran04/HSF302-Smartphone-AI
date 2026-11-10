@@ -1,0 +1,402 @@
+.ai-widget {
+  --widget-gap: 20px;
+  --mascot-w: 136px;
+  --mascot-h: 160px;
+  position: fixed;
+  right: var(--widget-gap);
+  bottom: 12px;
+  z-index: 38;
+  pointer-events: none;
+}
+/* Leave room for the comparison tray at the bottom of the storefront. */
+/* Above the sticky site header while the panel is open. */
+.ai-widget.is-open {
+  z-index: 60;
+}
+body:has(.compare-tray) .ai-widget {
+  bottom: 96px;
+}
+.ai-widget > * {
+  pointer-events: auto;
+}
+
+.ai-widget-launcher {
+  display: block;
+  width: var(--mascot-w);
+  height: var(--mascot-h);
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: transform var(--motion-fast) ease;
+}
+.ai-widget-launcher {
+  position: relative;
+}
+.ai-widget-launcher:hover {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 8px 18px rgb(242 112 34 / 25%));
+}
+.ai-widget-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ai-widget-ripple {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border: 3px solid var(--ai-accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation: widget-ripple 0.7s ease-out;
+}
+.ai-widget-emoji {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  font-size: 18px;
+  opacity: 0;
+  animation: widget-emoji 1.1s ease-out;
+}
+.ai-widget-emoji:nth-child(2) {
+  --dx: -38px;
+}
+.ai-widget-emoji:nth-child(3) {
+  --dx: 0px;
+  animation-delay: 0.08s;
+}
+.ai-widget-emoji:nth-child(4) {
+  --dx: 38px;
+  animation-delay: 0.16s;
+}
+@keyframes widget-ripple {
+  from {
+    opacity: 0.8;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+@keyframes widget-emoji {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), -70px) scale(1.1);
+  }
+}
+.ai-widget-launcher:focus-visible {
+  outline: 3px solid var(--ai-accent);
+  outline-offset: 2px;
+}
+
+.mascot {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mascot-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mascot:not([data-state='ready']) .mascot-canvas {
+  visibility: hidden;
+}
+
+/* 2D stand-in */
+.mascot-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  padding-bottom: 10px;
+  animation: mascot-bob 2.8s ease-in-out infinite;
+}
+.mascot-fallback-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 58px;
+  border-radius: 50%;
+  border-top: 14px solid;
+  box-shadow: 0 6px 16px rgb(23 36 59 / 12%);
+}
+.mascot-fallback-eye {
+  width: 8px;
+  height: 13px;
+  border-radius: 6px;
+}
+.mascot-fallback-body {
+  width: 58px;
+  height: 40px;
+  margin-top: -4px;
+  border-radius: 24px 24px 12px 12px;
+  border-top: 5px solid;
+}
+.mascot-fallback.is-thinking .mascot-fallback-head {
+  transform: rotate(-8deg);
+}
+@keyframes mascot-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.ai-widget-greeting {
+  position: absolute;
+  right: calc(var(--mascot-w) - 12px);
+  bottom: calc(var(--mascot-h) - 34px);
+  width: max-content;
+  max-width: 220px;
+  padding: 10px 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: var(--shadow-raised);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-primary);
+  animation: widget-pop 0.25s ease-out;
+}
+
+.ai-widget-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--mascot-h) - 6px);
+  display: flex;
+  flex-direction: column;
+  width: min(390px, calc(100vw - 2 * var(--widget-gap)));
+  height: min(600px, calc(100vh - var(--mascot-h) - 40px));
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: 0 18px 50px rgb(23 36 59 / 18%);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: widget-pop 0.22s ease-out;
+}
+@keyframes widget-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+.ai-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--ai-soft), white 70%);
+}
+.ai-widget-dot {
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 80%);
+}
+.ai-widget-heading {
+  flex: 1;
+  min-width: 0;
+}
+.ai-widget-heading h2 {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.ai-widget-heading p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ai-widget-tool {
+  width: 36px;
+  height: 36px;
+  color: var(--text-secondary);
+}
+.ai-widget-tool .material-symbols-outlined {
+  font-size: 20px;
+}
+.ai-widget-tool.is-active {
+  color: var(--ai-accent);
+  background: var(--ai-soft);
+}
+
+.ai-widget-stream {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: #fafbfe;
+}
+.ai-widget-stream > .button {
+  align-self: stretch;
+}
+.ai-widget-stream .message-bubble {
+  max-width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.ai-widget-stream .message.user .message-bubble {
+  max-width: 85%;
+}
+.ai-widget-stream .chat-pending-bubble {
+  min-height: 40px;
+}
+
+.ai-widget-welcome {
+  padding: 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.ai-widget-welcome-title {
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ai-widget-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ai-widget-chips button {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ai-accent);
+  background: var(--ai-soft);
+  border: 1px solid #e4dbff;
+  border-radius: 12px;
+}
+.ai-widget-chips button:hover {
+  border-color: var(--ai-accent);
+}
+
+.ai-widget-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: white;
+}
+.ai-widget-composer textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 120px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: none;
+}
+.ai-widget-send {
+  min-height: 42px;
+  width: 42px;
+  padding: 0;
+}
+
+.ai-widget-section-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ai-widget-skins {
+  display: grid;
+  gap: 10px;
+}
+.ai-widget-skin {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  padding: 10px 36px 10px 10px;
+  text-align: left;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: border-color var(--motion-fast);
+}
+.ai-widget-skin[aria-checked='true'] {
+  border-color: var(--ai-accent);
+  box-shadow: 0 0 0 3px var(--ai-soft);
+}
+.ai-widget-skin-swatch {
+  grid-row: span 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.ai-widget-skin-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.ai-widget-skin-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ai-widget-skin-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--ai-accent);
+}
+
+@media (max-width: 640px) {
+  .ai-widget {
+    --widget-gap: 8px;
+    --mascot-w: 84px;
+    --mascot-h: 106px;
+  }
+  .ai-widget-panel {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    bottom: calc(var(--mascot-h) + 8px);
+    width: auto;
+    height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-widget-burst,
+  .mascot-fallback,
+  .ai-widget-panel,
+  .ai-widget-greeting {
+    animation: none;
+  }
+}
