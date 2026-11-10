@@ -124,7 +124,7 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
 
-Mỗi cấu hình Chat hỗ trợ một API key chính và một API key dự phòng tùy chọn, dùng cùng provider và model. Admin nhập key dự phòng, lưu cấu hình, kiểm tra cả hai key rồi kích hoạt. Mỗi yêu cầu ưu tiên key chính. Khi provider trả HTTP 429 do quota hoặc giới hạn sử dụng, BE thử key dự phòng một lần. Để trống trường key giữ giá trị đã lưu, chọn **Xóa API Key dự phòng khi lưu** để gỡ key khỏi bản cấu hình mới. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+Mỗi cấu hình Chat hỗ trợ một API key chính và tối đa 10 key dự phòng có tên, thứ tự ưu tiên và trạng thái riêng. Admin có thể thêm, thay, kiểm tra hoặc xác nhận xóa từng key, sau đó lưu, kiểm tra và kích hoạt cấu hình. Khi key chính gặp lỗi xác thực hoặc quota, BE thử các key dự phòng theo thứ tự và ghi rõ tên key đã dùng. Chuông **Thông báo AI** hiển thị số chưa đọc và lịch sử lưu trong DB, có thao tác đánh dấu đã đọc và mở trang quản lý key. Banner giữ cảnh báo đang cần xử lý. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 Tư vấn điện thoại kết hợp catalog, tài liệu phù hợp và kiến thức Gemini. Hỗ trợ cửa hàng dùng RAG có nguồn. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 

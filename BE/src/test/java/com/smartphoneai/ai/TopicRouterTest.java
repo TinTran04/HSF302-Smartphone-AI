@@ -62,7 +62,7 @@ class TopicRouterTest {
         legacy.markTested();
         legacy.setActive(true);
         when(configs.findAllByActiveTrue()).thenReturn(List.of(legacy));
-        var provider=new AiProviderServiceImpl(configs,mock(SystemSettingRepository.class),cipher,client,Clock.systemUTC());
+        var provider=new AiProviderServiceImpl(configs,mock(SystemSettingRepository.class),cipher,client,Clock.systemUTC(),mock(com.smartphoneai.service.AiKeyAlertService.class),mock(com.smartphoneai.repository.AiBackupKeyRepository.class));
         var router=new TopicRouterImpl(provider,new ObjectMapper());
 
         assertThrows(InvalidAiConfigurationException.class,

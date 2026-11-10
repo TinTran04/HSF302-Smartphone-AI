@@ -26,9 +26,9 @@ public class SpringAiProviderClient implements ChatProviderClient {
         } catch (Exception exception) {
             for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
                 if (cause instanceof com.google.genai.errors.ApiException googleError)
-                    throw new AiProviderException(googleError.code());
+                    throw AiProviderException.fromProvider(googleError.code(), googleError.message());
                 if (cause instanceof org.springframework.web.client.HttpStatusCodeException httpError)
-                    throw new AiProviderException(httpError.getStatusCode().value());
+                    throw AiProviderException.fromProvider(httpError.getStatusCode().value(), httpError.getResponseBodyAsString());
             }
             throw new AiProviderException();
         }

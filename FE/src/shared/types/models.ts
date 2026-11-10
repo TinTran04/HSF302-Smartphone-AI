@@ -146,7 +146,32 @@ export interface KnowledgeDocument {
   error?: string;
 }
 export type AiProvider = 'GEMINI';
+export interface AiKeyAlert {
+  id: string;
+  model: string;
+  status: 'PRIMARY' | 'USING_BACKUP' | 'BACKUP_FAILED' | 'MISSING_BACKUP';
+  reason: string | null;
+  backupFailureReason: string | null;
+  backupKeyName?: string | null;
+  detectedAt: string;
+}
+export interface AiBackupKey {
+  id: string;
+  name: string;
+  maskedKey: string;
+  priority: number;
+  lastStatus: 'UNKNOWN' | 'WORKING' | 'KEY_ERROR' | 'PROVIDER_ERROR';
+  lastFailureReason: string | null;
+  lastCheckedAt: string | null;
+}
+export interface AiNotifications {
+  items: (AiKeyAlert & { read: boolean; resolved: boolean })[];
+  unreadCount: number;
+  latestId: string | null;
+}
 export interface AiSettings {
+  id: string;
+  backupKeys: AiBackupKey[];
   provider: AiProvider;
   model: string;
   maskedKey: string;

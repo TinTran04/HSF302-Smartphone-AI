@@ -50,11 +50,21 @@ describe('profile editing', () => {
       const html = renderProfile();
       const inputs = html.match(/<input\b[^>]*>/g) ?? [];
 
-      expect(inputs).toHaveLength(4);
+      expect(inputs).toHaveLength(role === 'CUSTOMER' ? 4 : 3);
       for (const input of inputs) expect(input).toContain('disabled=""');
+      const phone = inputs.find((input) => input.includes('type="tel"'))!;
+      expect(phone.includes('required=""')).toBe(role === 'CUSTOMER');
       expect(html).toContain('profile-form');
       expect(html).toContain('Chỉnh sửa thông tin');
       expect(html).not.toContain('Lưu thay đổi');
+      if (role === 'ADMIN') {
+        expect(html).not.toContain('Địa chỉ mặc định');
+        expect(html).not.toContain('địa chỉ nhận hàng');
+        expect(html).not.toContain('Chọn vị trí trên bản đồ');
+        expect(html).not.toContain('Vị trí hiện tại');
+      } else {
+        expect(html).toContain('Địa chỉ mặc định');
+      }
     },
   );
 });

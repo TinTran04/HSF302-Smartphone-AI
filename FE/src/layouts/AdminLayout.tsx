@@ -6,6 +6,8 @@ import { DemoBanner } from './StoreLayout';
 import { useAuth } from '../features/auth/AuthProvider';
 import { Button, Modal, useToast } from '../shared/components/Ui';
 import { errorMessage } from '../shared/utils/format';
+import { AdminAiKeyAlert } from '../features/ai-chat/components/AdminAiKeyAlert';
+import { AdminAiNotifications } from '../features/ai-chat/components/AdminAiNotifications';
 import './AdminLayout.css';
 const links = [
   { to: '/admin', name: 'Tổng quan', icon: 'dashboard', group: 'Không gian làm việc' },
@@ -132,6 +134,7 @@ export function AdminLayout() {
               <span aria-current="page">{currentLink?.name || 'Tổng quan'}</span>
             )}
           </nav>
+          <AdminAiNotifications />
           <Link to="/admin/profile" className="admin-profile-link">
             <Icon name="person" />
             <span>Tài khoản của tôi</span>
@@ -142,6 +145,7 @@ export function AdminLayout() {
         </header>
         <DemoBanner admin />
         <main id="main" className="admin-content">
+          <AdminAiKeyAlert />
           <Outlet />
         </main>
       </div>

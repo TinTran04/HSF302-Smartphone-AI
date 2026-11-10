@@ -22,6 +22,70 @@ async function login(page: Page, admin = false) {
   await expect(page).toHaveURL(admin ? /\/admin$/ : /\/$/);
 }
 
+test('admin AI bell persists unread history and read state without notification toasts', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({
+      id: 'alert-1', model: 'demo-gemini', status: 'USING_BACKUP', reason: 'AI_PROVIDER_AUTH_ERROR',
+      backupFailureReason: null, detectedAt: '2026-11-09T12:00:00Z',
+    }));
+  });
+  await login(page, true);
+  const alert = page.getByRole('region', { name: 'Cảnh báo API key AI' });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('Đã dùng key dự phòng');
+  await expect(alert).toContainText('hết hiệu lực hoặc không có quyền truy cập');
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Cập nhật API key', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/ai-settings$/);
+  await expect(alert).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  await page.reload();
+  await expect(alert).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'Đã dùng key dự phòng' })).toHaveCount(0);
+  const bell = page.getByRole('button', { name: 'Thông báo AI, 1 chưa đọc', exact: true });
+  await bell.click();
+  const dialog = page.getByRole('dialog', { name: 'Thông báo AI', exact: true });
+  await expect(dialog.getByText('Chưa đọc', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/admin-ai-notifications-desktop.png', fullPage: true });
+  await expect(dialog.getByText('Model demo-gemini', { exact: false })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Đánh dấu tất cả đã đọc' }).click();
+  await expect(dialog.getByText('Đã đọc', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Đóng hộp thoại' }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Thông báo AI, 0 chưa đọc', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Đã đọc', { exact: true })).toBeVisible();
+});
+
+test('admin key alert updates on polling and clears after primary recovery on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install();
+  await page.addInitScript(() => {
+    sessionStorage.setItem('smai-demo-ai-key-alert', JSON.stringify({
+      id: 'alert-2', model: 'demo-gemini', status: 'BACKUP_FAILED', reason: 'AI_PROVIDER_AUTH_ERROR',
+      backupFailureReason: 'AI_PROVIDER_RATE_LIMIT', detectedAt: '2026-11-09T12:00:00Z',
+    }));
+  });
+  await login(page, true);
+  const alert = page.getByRole('region', { name: 'Cảnh báo API key AI' });
+  await expect(alert).toContainText('Key dự phòng cũng gặp lỗi');
+  await expect(alert).toContainText('Đã chạm quota hoặc giới hạn sử dụng');
+  await page.screenshot({ path: 'test-results/admin-ai-key-alert-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(page.locator('.toast').filter({ hasText: 'Key AI chính gặp lỗi' })).toHaveCount(0);
+  await expect(alert).toBeVisible();
+  await page.evaluate(() => sessionStorage.setItem('smai-demo-ai-key-alert', 'null'));
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(alert).toHaveCount(0);
+  await page.getByRole('button', { name: 'Thông báo AI, 1 chưa đọc', exact: true }).click();
+  const history = page.getByRole('dialog', { name: 'Thông báo AI', exact: true });
+  await expect(history.getByText('Đã xử lý', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/admin-ai-notifications-mobile.png', fullPage: true });
+});
+
 async function mockMapTiles(page: Page) {
   await page.route('https://tile.openstreetmap.org/**', (route) =>
     route.fulfill({
@@ -524,6 +588,21 @@ test('admin stays in the portal and has personal settings there', async ({ page 
   await page.goto('/admin/profile');
   await expect(page.getByRole('heading', { name: 'Thông tin tài khoản' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Cửa hàng', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Địa chỉ mặc định', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.location-picker')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true }).click();
+  await expect(page.getByLabel('Địa chỉ mặc định', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Vị trí hiện tại', exact: true })).toHaveCount(0);
+  await page.getByLabel('Họ và tên', { exact: true }).fill('Quản trị viên kiểm thử');
+  await expect(page.getByLabel('Số điện thoại', { exact: true })).not.toHaveAttribute('required');
+  await page.getByLabel('Số điện thoại', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+  await expect(page.getByText('Đã cập nhật thông tin tài khoản.', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Họ và tên', { exact: true })).toHaveValue('Quản trị viên kiểm thử');
+  await expect(page.getByLabel('Số điện thoại', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+  await expect(page.locator('.location-picker')).toHaveCount(0);
 });
 
 test('comparison opens unified phone advice with selected products', async ({ page }) => {
@@ -566,9 +645,7 @@ test('admin product editing, provider form, document upload and status', async (
   await expect(page.getByLabel('API Key đã lưu')).toHaveValue('••••••••');
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await expect(
-    page.getByText('Chế độ demo: chỉ kiểm tra giao diện, chưa gọi nhà cung cấp AI.', {
-      exact: true,
-    }),
+    page.getByText(/Chế độ demo: đã mô phỏng kiểm tra kết nối/),
   ).toBeVisible();
   await page.goto('/admin/knowledge');
   await page.getByLabel('File tài liệu', { exact: true }).setInputFiles({
@@ -646,21 +723,99 @@ test('comparison picker pages through products and resets paging on search', asy
   await expect(dialog.getByText('iPhone 16 Pro Max')).toBeVisible();
 });
 
-test('admin saves and removes a masked backup AI key', async ({ page }) => {
+test('admin manages multiple backup keys with priority, single delete and individual testing on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await login(page, true);
   await page.goto('/admin/ai-settings');
-  await page.getByLabel('API Key dự phòng mới', { exact: true }).fill('backup-test-secret');
+  async function addKey(name: string, secret: string) {
+    await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
+    const modal = page.getByRole('dialog');
+    await modal.getByLabel('Tên key', { exact: true }).fill(name);
+    const input = modal.getByLabel('API key mới', { exact: true });
+    await expect(input).toHaveAttribute('type', 'password');
+    await input.fill(secret);
+    await modal.getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  }
+  await addKey('Project A', 'backup-test-secret-a');
+  await addKey('Project B', 'backup-test-secret-b');
+  const list = page.getByRole('region', { name: 'Danh sách key dự phòng' });
+  await expect(list).toContainText('Key dự phòng (2/10)');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Project A', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Tăng ưu tiên Project B', exact: true }).click();
+  await expect(list.locator('li').first()).toContainText('Project B');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
-  await expect(page.getByLabel('API Key dự phòng mới', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Project B', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra Project B', exact: true }).click();
+  await expect(list.locator('li').first()).toContainText('Hoạt động');
   await page.reload();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('••••••••');
+  await expect(list.locator('li').first()).toContainText('Project B');
   const stored = await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }));
   expect(stored).not.toContain('backup-test-secret');
-  await page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true }).check();
+  await page.getByRole('button', { name: 'Thay Project B', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('replacement-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.getByRole('button', { name: 'Xóa Project A', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Xóa key', exact: true }).click();
+  await expect(list.locator('li')).toHaveCount(1);
+  await expect(list).toContainText('Project B');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
-  await expect(page.getByLabel('API Key dự phòng đã lưu', { exact: true })).toHaveValue('');
-  await expect(page.getByLabel('Xóa API Key dự phòng khi lưu', { exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kích hoạt', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('replacement-secret');
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await page.getByRole('heading', { name: 'Cấu hình Google Gemini', exact: true }).click();
+  await page.screenshot({ path: 'test-results/admin-ai-keys-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/admin-ai-keys-desktop.png', fullPage: true });
+});
+
+test('AI settings polling preserves unsaved model and backup drafts', async ({ page }) => {
+  await page.clock.install();
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  await page.getByLabel('Chat Model').fill('gemini-draft-model');
+  await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Tên key', { exact: true }).fill('Draft project');
+  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('unsaved-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-draft-model');
+  await expect(page.getByRole('region', { name: 'Danh sách key dự phòng' })).toContainText('Draft project');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Draft project', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('unsaved-secret');
+});
+
+test('activation confirmation rejects a configuration changed by another admin', async ({ page }) => {
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  await page.getByLabel('Chat Model').fill('gemini-reviewed');
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Kích hoạt Google Gemini?' });
+  await expect(dialog).toContainText('gemini-reviewed');
+  await page.evaluate(async modulePath => {
+    const { api } = await import(modulePath);
+    const current = (await api.aiSettings())[0];
+    const saved = await api.saveAiSettings({ provider: 'GEMINI', configId: current.id, model: 'gemini-concurrent', backupKeys: [] });
+    await api.testAiConnection({ provider: 'GEMINI', configId: saved.id, model: saved.model });
+  }, '/src/shared/api/index.ts');
+  await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(dialog).toContainText('Cấu hình đã thay đổi');
+  const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('smai-demo-settings')!));
+  expect(saved[0]).toMatchObject({ model: 'gemini-concurrent', active: false });
+});
+
+test('AI notifications stay outside customer pages', async ({ page }) => {
+  await login(page);
+  await expect(page.getByRole('button', { name: /Thông báo AI/ })).toHaveCount(0);
 });
 
 test('registration shows password strength and enforces eight characters', async ({ page }) => {
