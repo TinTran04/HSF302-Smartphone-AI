@@ -468,7 +468,7 @@ test('phone consultation shows a scope reminder for unrelated questions and cont
   await expect(page.locator('.message.user')).toHaveCount(2);
   await expect(page.locator('.message.assistant')).toHaveCount(2);
   await expect(
-    page.locator('.message.assistant').last().locator('.product-card').first(),
+    page.locator('.message.assistant').last().locator('.chat-product').first(),
   ).toBeVisible();
   await expect(page).toHaveURL(url);
   await page.reload();
@@ -837,4 +837,29 @@ test('registration shows password strength and enforces eight characters', async
   await page.goto('/login');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('LongTest123!');
   await expect(page.getByRole('meter')).toHaveCount(0);
+});
+test('floating assistant chats from any page and remembers the chosen outfit', async ({ page }) => {
+  await login(page);
+  await page.goto('/products');
+  await page.getByRole('button', { name: 'Mở trợ lý AI' }).click();
+  const panel = page.getByRole('dialog', { name: 'Trợ lý SmartPhone AI' });
+  await panel.getByLabel('Nhập câu hỏi cho trợ lý AI').fill('Tư vấn điện thoại pin tốt');
+  await panel.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
+  await expect(panel.locator('.message.assistant .chat-product').first()).toBeVisible();
+  await panel.getByRole('button', { name: 'Đổi trang phục trợ lý' }).click();
+  await panel.getByRole('radio', { name: /FPT University/ }).click();
+  await expect(panel.getByRole('radio', { name: /FPT University/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'Mở trợ lý AI' }).click();
+  await expect(page.locator('.ai-widget .message.user')).toHaveText('Tư vấn điện thoại pin tốt');
+  await page.getByRole('button', { name: 'Đổi trang phục trợ lý' }).click();
+  await expect(page.getByRole('radio', { name: /FPT University/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await page.goto('/ai');
+  await expect(page.locator('.ai-widget')).toHaveCount(0);
 });
