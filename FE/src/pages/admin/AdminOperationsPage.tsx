@@ -18,6 +18,7 @@ const write = <T,>(url: string, method: string, body?: unknown) =>
 type Operation = { url: string; method: string; body?: unknown; message: string };
 type Confirmation = { title: string; message: string; operation: Operation };
 type EmbeddingSettings = {
+  configured?: boolean;
   provider?: string;
   model?: string;
   dimensions?: number;
@@ -36,9 +37,7 @@ export default function AdminOperationsPage({
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [editName, setEditName] = useState('');
   const [name, setName] = useState('');
-  const [model, setModel] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [dimensions, setDimensions] = useState<number | null>(null);
   const endpoint = {
     brands: '/admin/brands',
     maintenance: '/maintenance',
@@ -51,8 +50,8 @@ export default function AdminOperationsPage({
   });
   const embedding = query.data as EmbeddingSettings | undefined;
   const geminiEmbedding = embedding?.provider === 'GEMINI' ? embedding : undefined;
-  const embeddingModel = model ?? geminiEmbedding?.model ?? '';
-  const embeddingDimensions = dimensions ?? geminiEmbedding?.dimensions ?? 768;
+  const embeddingModel = geminiEmbedding?.model ?? 'gemini-embedding-001';
+  const embeddingDimensions = geminiEmbedding?.dimensions ?? 768;
   const mutation = useMutation({
     meta: { toast: false },
     mutationFn: (request: Operation) => write<unknown>(request.url, request.method, request.body),
@@ -62,8 +61,6 @@ export default function AdminOperationsPage({
       notify(request.message);
       setName('');
       setApiKey('');
-      setModel(null);
-      setDimensions(null);
       void client.invalidateQueries({ queryKey: ['admin-ops', section] });
     },
     onError: (error) => notify(errorMessage(error), 'error'),
@@ -90,7 +87,7 @@ export default function AdminOperationsPage({
           {
             brands: 'Sắp xếp danh mục thương hiệu để quản lý sản phẩm nhất quán.',
             maintenance: 'Theo dõi trạng thái cửa hàng và chủ động bật hoặc tắt chế độ bảo trì.',
-            embedding: 'Thiết lập model Gemini để lập chỉ mục và truy xuất tài liệu cho AI.',
+            embedding: 'Model đã được thiết lập sẵn. Nhập API key Gemini để xử lý và truy xuất tài liệu.',
           }[section]
         }
       />
@@ -195,15 +192,13 @@ export default function AdminOperationsPage({
                   'PUT',
                   {
                     provider: 'GEMINI',
-                    model: embeddingModel.trim(),
-                    dimensions: embeddingDimensions,
                     ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
                   },
                   'Đã kiểm tra và lưu cấu hình embedding.',
                 );
               }}
             >
-              <p>Hiện tại: {geminiEmbedding?.model || 'Chưa cấu hình Gemini'}</p>
+              <p>{embedding?.configured ? 'Đã cấu hình embedding.' : 'Nhập API key để kích hoạt cấu hình embedding có sẵn.'}</p>
               {embedding?.reindexRequired && (
                 <p className="notice">Một số tài liệu cần được lập chỉ mục lại.</p>
               )}
@@ -214,23 +209,16 @@ export default function AdminOperationsPage({
               <label className="form-field">
                 Model
                 <input
-                  required
                   value={embeddingModel}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="Ví dụ gemini-embedding-001"
-                  disabled={query.isPending || mutation.isPending}
+                  readOnly
                 />
               </label>
               <label className="form-field">
                 Số chiều
                 <input
-                  required
                   type="number"
-                  min={1}
-                  max={4096}
                   value={embeddingDimensions}
-                  onChange={(e) => setDimensions(Number(e.target.value))}
-                  disabled={query.isPending || mutation.isPending}
+                  readOnly
                 />
               </label>
               <label className="form-field">
@@ -245,6 +233,7 @@ export default function AdminOperationsPage({
               <label className="form-field">
                 API key mới
                 <input
+                  aria-label="API key mới"
                   type="password"
                   autoComplete="off"
                   value={apiKey}
@@ -255,8 +244,8 @@ export default function AdminOperationsPage({
                 <span className="help-text">Để trống để giữ API key Gemini đã lưu.</span>
               </label>
               <p className="help-text mt-4">
-                Dùng API key Gemini cho embedding. Kiểm tra và lưu sẽ xác thực kết nối. Khi đổi
-                model hoặc số chiều, lập chỉ mục lại tài liệu được đánh dấu.
+                Model và số chiều đã được hệ thống thiết lập. Bạn chỉ cần nhập API key Gemini rồi
+                kiểm tra và lưu. Sau đó xử lý lại các tài liệu đang báo thất bại.
               </p>
               <Button
                 type="submit"

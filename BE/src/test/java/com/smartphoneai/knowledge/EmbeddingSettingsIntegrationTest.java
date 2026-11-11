@@ -4,6 +4,7 @@ import com.smartphoneai.repository.EmbeddingConfigRepository;
 import com.smartphoneai.service.support.EmbeddingModelFactory;
 import com.smartphoneai.service.OtpSender;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +31,52 @@ class EmbeddingSettingsIntegrationTest {
     @Autowired EmbeddingConfigRepository configs;
     @MockitoBean OtpSender sender;
     @MockitoBean EmbeddingModelFactory factory;
+    @BeforeEach void resetConfigs() { configs.deleteAll(); }
+
+    @Test void exposesPresetBeforeAnApiKeyIsSaved() throws Exception {
+        mvc.perform(get("/api/admin/embedding-settings").with(adminSession()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(false))
+                .andExpect(jsonPath("$.provider").value("GEMINI"))
+                .andExpect(jsonPath("$.model").value("gemini-embedding-001"))
+                .andExpect(jsonPath("$.dimensions").value(768));
+        verifyNoInteractions(factory);
+    }
+
+    @Test void configuresPresetUsingOnlyTheApiKey() throws Exception {
+        var model = mock(EmbeddingModel.class);
+        when(factory.create("GEMINI", "gemini-embedding-001", "preset-secret", 768, false)).thenReturn(model);
+        when(model.embed(anyString())).thenReturn(new float[768]);
+        mvc.perform(put("/api/admin/embedding-settings").with(adminSession()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"GEMINI\",\"apiKey\":\"preset-secret\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.model").value("gemini-embedding-001"))
+                .andExpect(jsonPath("$.dimensions").value(768))
+                .andExpect(content().string(not(containsString("preset-secret"))));
+    }
+
+    @Test void keyReplacementKeepsPreviouslyConfiguredModelAndDimensions() throws Exception {
+        var model = mock(EmbeddingModel.class);
+        when(factory.create(eq("GEMINI"), eq("existing-model"), anyString(), eq(3), eq(false))).thenReturn(model);
+        when(model.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f, 0.3f});
+        var session = adminSession();
+        mvc.perform(put("/api/admin/embedding-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"GEMINI\",\"model\":\"existing-model\",\"dimensions\":3,\"apiKey\":\"first-secret\"}"))
+                .andExpect(status().isOk());
+        var originalId = configs.findByActiveTrue().orElseThrow().getId();
+        mvc.perform(put("/api/admin/embedding-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"GEMINI\",\"apiKey\":\"replacement-secret\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.model").value("existing-model"))
+                .andExpect(jsonPath("$.dimensions").value(3));
+        org.junit.jupiter.api.Assertions.assertEquals(originalId, configs.findByActiveTrue().orElseThrow().getId());
+    }
+
+    private JwtTestClient adminSession() throws Exception {
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"identifier\":\"embedadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
+                .andExpect(status().isOk());
+        return session;
+    }
     @Test void verifiesEmbeddingAndKeepsSecretsEncrypted() throws Exception {
         var model=mock(EmbeddingModel.class);
         when(factory.create(eq("GEMINI"),eq("embed-model"),eq("embedding-secret"),eq(3),eq(false))).thenReturn(model);

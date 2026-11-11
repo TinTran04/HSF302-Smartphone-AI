@@ -58,6 +58,7 @@ let switches = read<
     { conversationId: string; owner: string; question: string; topic: ChatTopic; answer?: AiAnswer }
   >
 >('switches', {});
+let chatReceipts = read<Record<string, { content: string; response: ChatSendResponse }>>('chat-receipts', {});
 let documents = read<KnowledgeDocument[]>('documents', [
   {
     id: 'demo-policy',
@@ -167,6 +168,7 @@ const save = () => {
   write('orders', allOrders);
   write('chats', chats);
   write('switches', switches);
+  write('chat-receipts', chatReceipts);
   write('documents', documents);
   write('settings', settings);
 };
@@ -516,6 +518,7 @@ export const mockApi: Api = {
   deleteConversation: (id) => {
     myChat(id);
     chats[owner()] = chats[owner()].filter(chat => chat.id !== id);
+    for (const key of Object.keys(chatReceipts)) if (key.startsWith(`${owner()}:${id}:`)) delete chatReceipts[key];
     for (const [switchId, request] of Object.entries(switches)) {
       if (request.owner === owner() && (request.conversationId === id || request.answer?.newConversationId === id))
         delete switches[switchId];
@@ -523,8 +526,19 @@ export const mockApi: Api = {
     save();
     return delay(undefined);
   },
-  sendMessage: (id, content): Promise<ChatSendResponse> => {
+  sendMessage: (id, content, requestId): Promise<ChatSendResponse> => {
     const chat = myChat(id);
+    const receiptKey = requestId ? `${owner()}:${id}:${requestId}` : undefined;
+    const previous = receiptKey ? chatReceipts[receiptKey] : undefined;
+    if (previous) {
+      if (previous.content !== content.trim()) return Promise.reject(new ApiError(409, 'Mã yêu cầu đã được dùng cho nội dung khác.', 'CHAT_REQUEST_CONFLICT'));
+      return delay(previous.response);
+    }
+    const finish = (response: ChatSendResponse) => {
+      if (receiptKey) chatReceipts[receiptKey] = { content: content.trim(), response };
+      save();
+      return delay(response);
+    };
     if (chat.pendingSwitch)
       throw new ApiError(409, 'Vui lòng xác nhận hoặc hủy chuyển chủ đề trước.');
     chat.messages.push({ id: uid('msg'), role: 'user', content });
@@ -539,7 +553,7 @@ export const mockApi: Api = {
         : 'Mình chỉ hỗ trợ tư vấn về điện thoại, như chọn mua, so sánh, cấu hình và cách sử dụng. Bạn muốn tìm hiểu điện thoại nào?';
       chat.messages.push({ id: uid('msg'), role: 'assistant', content: answer });
       save();
-      return delay({
+      return finish({
         type: 'ANSWER',
         conversationId: id,
         answer,
@@ -558,7 +572,7 @@ export const mockApi: Api = {
         content: clarification,
       });
       save();
-      return delay({
+      return finish({
         type: 'CLARIFICATION_REQUIRED',
         message: clarification,
       });
@@ -579,11 +593,11 @@ export const mockApi: Api = {
       };
       chat.pendingSwitch = pending;
       save();
-      return delay(pending);
+      return finish(pending);
     }
     const answer = responseFor(chat, content);
     save();
-    return delay(answer);
+    return finish(answer);
   },
   confirmSwitch: (switchId) => {
     customer();

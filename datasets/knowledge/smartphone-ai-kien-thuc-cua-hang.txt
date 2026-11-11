@@ -1,0 +1,141 @@
+SMARTPHONE AI – HƯỚNG DẪN MUA HÀNG VÀ HỖ TRỢ KHÁCH HÀNG
+
+Mã tài liệu SPAI-KB-20261110
+Phiên bản 1.1, cập nhật ngày 10/11/2026.
+Tài liệu tổng hợp các nghiệp vụ đã có trong dự án SmartPhone AI. Các mục cần chủ cửa hàng xác nhận được ghi rõ ở phần cuối.
+
+
+1. GIỚI THIỆU VÀ CÁC CHỨC NĂNG DÀNH CHO KHÁCH HÀNG
+
+SmartPhone AI là website bán điện thoại, hỗ trợ xem sản phẩm, tìm kiếm, lọc, so sánh, giỏ hàng, đặt hàng và tư vấn bằng AI.
+
+Khách chưa đăng nhập có thể xem danh mục điện thoại, xem chi tiết, so sánh sản phẩm và thêm phiên bản vào giỏ hàng tạm. Khách đăng nhập bằng tài khoản Customer để đặt hàng, xem đơn hàng cá nhân và trò chuyện với trợ lý AI.
+
+Khách hàng có thể so sánh từ hai đến ba điện thoại để đối chiếu những thông số mà danh mục sản phẩm đã cung cấp.
+
+
+2. TÌM KIẾM, GIÁ BÁN VÀ PHIÊN BẢN ĐIỆN THOẠI
+
+Khách có thể tìm điện thoại theo tên và sử dụng các bộ lọc đang có trên trang danh mục, gồm thương hiệu, khoảng giá, RAM, dung lượng và thông số được hệ thống hỗ trợ.
+
+Một điện thoại có thể có nhiều phiên bản về màu sắc, bộ nhớ hoặc cấu hình. Khách cần chọn đúng phiên bản mong muốn trước khi thêm vào giỏ. Giá được tính theo phiên bản đã chọn và số lượng đặt mua.
+
+Giá bán, phiên bản và trạng thái bán hiện tại được lấy từ danh mục sản phẩm của cửa hàng. Tài liệu hướng dẫn này cung cấp cách mua hàng. Khi cần báo giá một chiếc điện thoại cụ thể, khách nên xem dữ liệu hiện tại trên trang sản phẩm và bước kiểm tra đơn hàng.
+
+Điện thoại có trạng thái Đang mở bán hoặc Hết hàng. Điện thoại được đánh dấu Hết hàng vẫn có thể xuất hiện trong danh mục, xem chi tiết và so sánh. Việc đặt mua yêu cầu sản phẩm và phiên bản đã chọn đang được mở bán. Khách có thể tìm phiên bản khác đang mở bán hoặc quay lại kiểm tra khi cửa hàng cập nhật trạng thái.
+
+
+3. ĐĂNG KÝ, ĐĂNG NHẬP VÀ QUÊN MẬT KHẨU
+
+Để đăng ký Customer, khách nhập họ tên, số điện thoại, email, mật khẩu và xác nhận mật khẩu. Mật khẩu tối thiểu tám ký tự. Sau khi gửi đăng ký, khách nhận mã OTP qua email và nhập mã để xác minh tài khoản.
+
+Khách đã kích hoạt tài khoản đăng nhập bằng email và mật khẩu. OTP được dùng trong luồng đăng ký và quên mật khẩu.
+
+Nếu quên mật khẩu, khách chọn Quên mật khẩu, nhập email tài khoản, nhận mã OTP và xác thực mã. Sau khi xác thực thành công, khách nhập mật khẩu mới và xác nhận mật khẩu mới. Nếu mã hết hiệu lực, khách có thể yêu cầu gửi lại theo thời gian chờ hiển thị trên giao diện.
+
+Khách cũng có thể đổi mật khẩu trong trang tài khoản bằng mật khẩu hiện tại và mật khẩu mới. Sau khi đổi mật khẩu, các thiết bị khác cần đăng nhập lại. Sau khi hoàn tất quên mật khẩu và đặt lại mật khẩu, các phiên đăng nhập cũ được thu hồi.
+
+Hệ thống hỗ trợ đăng nhập trên nhiều thiết bị. Khi đăng xuất trên một thiết bị, phiên của thiết bị đó được kết thúc.
+
+
+4. CHỈNH SỬA HỒ SƠ VÀ ĐỊA CHỈ NHẬN HÀNG
+
+Khách mở Thông tin tài khoản và bấm Chỉnh sửa thông tin để cập nhật họ tên, số điện thoại và địa chỉ mặc định. Email được hệ thống quản lý và hiển thị ở trạng thái khóa. Khách bấm Lưu thay đổi để lưu dữ liệu hoặc Hủy để bỏ thay đổi đang nhập.
+
+Khi nhập địa chỉ, khách có thể chọn một địa chỉ gợi ý để cập nhật nội dung địa chỉ và ghim vị trí trên bản đồ. Khách cũng có thể chọn điểm trực tiếp trên bản đồ. Hệ thống lấy địa chỉ theo điểm đã chọn khi dịch vụ địa chỉ phản hồi thành công.
+
+Chức năng Vị trí hiện tại sử dụng quyền định vị của trình duyệt. Khi vị trí chưa chính xác hoặc việc định vị gặp lỗi, khách có thể nhập địa chỉ chi tiết và chọn lại điểm trên bản đồ. Vị trí bản đồ là thông tin tùy chọn. Địa chỉ nhận hàng dạng chữ cần đầy đủ để đặt hàng.
+
+Khách nên ghi số nhà, tên đường, phường hoặc xã, quận hoặc huyện nếu cần, tỉnh hoặc thành phố và những chỉ dẫn cần thiết trong phần ghi chú. Địa chỉ gợi ý có thể cần bổ sung số nhà, số phòng hoặc tên tòa nhà.
+
+
+5. GIỎ HÀNG
+
+Khách có thể thêm điện thoại theo phiên bản đã chọn, thay đổi số lượng hoặc xóa từng dòng trong giỏ. Số lượng đặt là số nguyên dương. Khi thêm lại cùng một phiên bản, số lượng được cộng dồn.
+
+Giỏ của khách chưa đăng nhập được giữ tạm trên trình duyệt. Khi đăng nhập Customer, các dòng trong giỏ tạm được hợp nhất vào giỏ tài khoản. Các phiên bản trùng nhau được cộng số lượng.
+
+Khách có thể chọn một số hoặc toàn bộ các dòng hợp lệ trong giỏ để đặt hàng. Dòng được đánh dấu Hết hàng cần được xử lý trước khi đặt mua phiên bản đó. Khách có thể xóa dòng này hoặc chọn một phiên bản đang mở bán khác.
+
+Khi đặt hàng thành công, hệ thống gỡ những dòng đã đặt khỏi giỏ và giữ các dòng còn lại. Giỏ gắn với tài khoản vẫn được lưu để khách tiếp tục sử dụng khi đăng nhập lại.
+
+
+6. CÁCH ĐẶT HÀNG VÀ NÚT KIỂM TRA ĐƠN HÀNG
+
+Khách chọn các dòng cần mua trong giỏ, đăng nhập Customer, mở trang thanh toán và nhập thông tin người nhận. Thông tin nhận hàng gồm họ tên, số điện thoại, địa chỉ và ghi chú tùy chọn.
+
+Khách bấm Kiểm tra đơn hàng để máy chủ kiểm tra lại các dòng đã chọn, trạng thái bán, số lượng, giá hiện tại và thông tin nhận hàng. Khách xem kết quả rồi bấm xác nhận đặt hàng để tạo đơn.
+
+Khi giá hiện tại thay đổi so với giá khách đã xem, giao diện yêu cầu khách xem lại giá và xác nhận theo dữ liệu mới. Khi thông tin đơn hoặc vị trí nhận hàng thay đổi sau bước kiểm tra, khách cần kiểm tra đơn lại trước khi xác nhận.
+
+Mỗi đơn lưu thông tin sản phẩm, phiên bản, giá, số lượng và địa chỉ nhận hàng tại thời điểm đặt. Việc cập nhật hồ sơ sau đó giữ nguyên thông tin nhận hàng đã lưu trong đơn cũ.
+
+
+7. THANH TOÁN VÀ PHÍ GIAO HÀNG
+
+Phương thức thanh toán được hỗ trợ trong dự án SmartPhone AI là COD, tức thanh toán khi nhận hàng. Khách chọn COD khi xác nhận đặt hàng và thanh toán theo đơn khi nhận hàng.
+
+Phí giao hàng trong nghiệp vụ hiện tại bằng 0 đồng. Cửa hàng áp dụng giao hàng miễn phí trong luồng đặt hàng hiện có.
+
+Tổng tiền đơn được tính từ giá hiện tại của các phiên bản đã chọn nhân với số lượng tương ứng, cộng phí giao hàng bằng 0 đồng. Khách xem tổng tiền ở bước kiểm tra đơn hàng trước khi xác nhận.
+
+Thời gian giao hàng dự kiến, phạm vi phục vụ và điều kiện giao đến từng địa chỉ cụ thể cần được cửa hàng xác nhận. Khách nên kiểm tra thông tin cửa hàng công bố hoặc trao đổi với cửa hàng về đơn của mình để có lịch giao cụ thể.
+
+
+8. THEO DÕI ĐƠN HÀNG VÀ CÁC TRẠNG THÁI
+
+Customer xem danh sách đơn, chi tiết đơn và lịch sử trạng thái của các đơn thuộc tài khoản mình. Danh sách đơn hiển thị đơn đặt gần nhất trước.
+
+Chờ duyệt, tương ứng PENDING, là trạng thái đơn mới được tạo và đang chờ cửa hàng xử lý.
+
+Đã xác nhận, tương ứng CONFIRMED, là trạng thái cửa hàng đã xác nhận đơn.
+
+Đang giao, tương ứng SHIPPING, là trạng thái đơn đã chuyển sang quá trình giao hàng.
+
+Đã giao, tương ứng COMPLETED, là trạng thái cửa hàng đã cập nhật đơn hoàn thành giao hàng.
+
+Đã hủy, tương ứng CANCELLED, là trạng thái đơn đã được hủy.
+
+Trạng thái đơn được cửa hàng cập nhật trong hệ thống. Khách xem lịch sử trạng thái tại trang chi tiết đơn để theo dõi các cập nhật đã được ghi nhận.
+
+
+9. HỦY ĐƠN HÀNG
+
+Customer được tự hủy đơn thuộc tài khoản mình khi đơn còn Chờ duyệt, tương ứng PENDING. Khách mở chi tiết đơn đủ điều kiện và thực hiện thao tác Hủy đơn theo xác nhận trên giao diện.
+
+Với đơn Đã xác nhận, tương ứng CONFIRMED, cửa hàng là bên có thể xem xét và thực hiện hủy theo chức năng quản trị hiện có. Khách cần trao đổi với cửa hàng khi có nhu cầu thay đổi đơn ở giai đoạn này.
+
+Khi đơn đã Đang giao, tương ứng SHIPPING, việc hủy theo chức năng hiện tại bị khóa. Các yêu cầu phát sinh ở giai đoạn giao hàng cần được cửa hàng xác nhận phương án xử lý cụ thể.
+
+
+10. SỬ DỤNG TRỢ LÝ AI
+
+Customer đăng nhập để sử dụng trợ lý AI và lưu lịch sử trò chuyện. Có hai chủ đề là Tư vấn mua điện thoại và Hỗ trợ cửa hàng.
+
+Tư vấn mua điện thoại hỗ trợ chọn máy, so sánh máy, giải thích thông số, công nghệ và cách sử dụng điện thoại. Câu trả lời có thể kết hợp thông tin sản phẩm trong danh mục, tài liệu liên quan và kiến thức AI tham khảo. Giá bán và phiên bản tại cửa hàng cần đối chiếu danh mục hiện tại.
+
+Khách nên nêu ngân sách, nhu cầu sử dụng, thương hiệu yêu thích và những tiêu chí quan trọng như pin, camera, bộ nhớ hoặc chơi game. AI ưu tiên điện thoại trong ngân sách. Các gợi ý cao hơn ngân sách được phép vượt tối đa 10% và cần nêu rõ giá, số tiền cùng tỷ lệ vượt. Ví dụ ngân sách 10 triệu đồng có giới hạn gợi ý cao hơn là 11 triệu đồng. Đây là giới hạn gợi ý của AI, giá đặt mua vẫn theo danh mục và bước kiểm tra đơn hàng.
+
+Hỗ trợ cửa hàng giúp tra cứu cách mua hàng, thanh toán, giao hàng, trạng thái đơn và chính sách có tài liệu làm căn cứ. Hệ thống xử lý tài liệu nội bộ để cung cấp phần trả lời trực tiếp cho khách.
+
+Khách có thể mở cuộc trò chuyện mới, xem hội thoại cũ hoặc xóa hội thoại của chính mình sau khi xác nhận. Khi cần đổi giữa tư vấn điện thoại và hỗ trợ cửa hàng, khách chọn chủ đề phù hợp hoặc xác nhận đề nghị chuyển chủ đề trên giao diện.
+
+Khách tự kiểm tra giỏ, thông tin nhận hàng và xác nhận đặt hàng trên website. Trợ lý AI cung cấp thông tin tư vấn và hỗ trợ trong phạm vi điện thoại, mua hàng và chính sách cửa hàng.
+
+
+11. KHI WEBSITE BẢO TRÌ HOẶC CHỨC NĂNG AI GẶP LỖI
+
+Màn hình Shop đang bảo trì cho biết cửa hàng đang tạm dừng các chức năng shop để xử lý hệ thống. Khách chờ cửa hàng sẵn sàng và tải lại trang để tiếp tục. Giỏ và đơn đã lưu được giữ trong hệ thống. Khi tiếp tục đặt hàng, khách kiểm tra lại giá và điều kiện đặt mua.
+
+Nếu một lượt chat gặp lỗi kết nối hoặc giới hạn dịch vụ AI, khách có thể gửi lại câu hỏi sau khi dịch vụ hoạt động trở lại. Lịch sử hội thoại đã lưu có thể được mở lại bằng tài khoản Customer.
+
+
+12. THÔNG TIN CHÍNH SÁCH CẦN CHỦ CỬA HÀNG XÁC NHẬN
+
+Thời hạn bảo hành, đơn vị nhận bảo hành, điều kiện bảo hành, phụ kiện được bảo hành và trường hợp loại trừ cần được chủ cửa hàng xác nhận bằng chính sách chính thức. Khách có nhu cầu bảo hành nên trao đổi với cửa hàng về sản phẩm và chứng từ mua hàng.
+
+Thời hạn đổi hoặc trả sau khi nhận hàng, điều kiện chấp nhận đổi trả, chi phí phát sinh và cách xử lý từng trường hợp cần được cửa hàng công bố cụ thể. Việc hủy đơn ở giai đoạn Chờ duyệt là một thao tác đặt hàng riêng. Chính sách đổi trả sau khi nhận hàng cần được xác nhận riêng với cửa hàng.
+
+Thông tin hóa đơn, xuất hóa đơn theo yêu cầu, chương trình trả góp, ưu đãi, mã giảm giá và quy trình hoàn tiền cần được cửa hàng xác nhận trước khi đưa ra cam kết cụ thể cho khách.
+
+Địa chỉ cửa hàng, hotline, email chăm sóc khách hàng, giờ làm việc và lịch giao hàng cụ thể cần được chủ cửa hàng bổ sung bằng thông tin chính thức. Khách nên sử dụng các kênh liên hệ được cửa hàng công bố trên website.

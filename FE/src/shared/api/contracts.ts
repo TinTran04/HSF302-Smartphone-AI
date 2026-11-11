@@ -53,7 +53,7 @@ export interface Api {
   createConversation(topic: ChatTopic, context?: { productIds?: string[] }): Promise<Conversation>;
   conversation(id: string): Promise<Conversation>;
   deleteConversation(id: string): Promise<void>;
-  sendMessage(id: string, content: string): Promise<ChatSendResponse>;
+  sendMessage(id: string, content: string, requestId?: string): Promise<ChatSendResponse>;
   confirmSwitch(id: string): Promise<ChatSendResponse>;
   cancelSwitch(id: string): Promise<void>;
   dashboard(): Promise<Dashboard>;

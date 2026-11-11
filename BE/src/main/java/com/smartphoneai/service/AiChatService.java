@@ -14,6 +14,7 @@ public interface AiChatService {
     void delete(Authentication auth, UUID id);
 
     Map<String, Object> send(Authentication auth, String token, UUID id, String rawContent);
+    Map<String, Object> send(Authentication auth, String token, UUID id, String rawContent, UUID requestId);
 
     Map<String, Object> confirm(Authentication auth, String token, UUID switchId);
 

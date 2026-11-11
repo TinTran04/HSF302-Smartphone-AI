@@ -10,6 +10,21 @@ async function login(page: Page, admin = false) {
   await expect(page).toHaveURL(admin ? /\/admin$/ : /\/$/);
 }
 
+test('admin product search text stays clear of the icon', async ({ page }) => {
+  await login(page, true);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/admin/products');
+    const input = page.getByLabel('Tìm sản phẩm quản trị');
+    const icon = page.locator('.admin-filter-search .search-field > .material-symbols-outlined');
+    await input.fill('test');
+    const padding = await input.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft));
+    const inputBounds = await input.boundingBox();
+    const iconBounds = await icon.boundingBox();
+    expect(inputBounds!.x + padding - (iconBounds!.x + iconBounds!.width)).toBeGreaterThanOrEqual(8);
+  }
+});
+
 test('primary mobile controls provide comfortable pointer targets', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/products');

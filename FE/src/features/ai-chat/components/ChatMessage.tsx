@@ -3,7 +3,6 @@ import type { ChatMessage as Message } from '../../../shared/types/models';
 import { ChatComparison, ChatProductList } from './ChatProducts';
 import { FormattedAnswer } from './FormattedAnswer';
 import { Icon } from '../../../shared/components/Icon';
-import { isDemo } from '../../../shared/api';
 import { useAnswerReveal } from '../hooks/useAnswerReveal';
 import './ChatPresentation.css';
 export function ChatMessage({
@@ -80,27 +79,6 @@ export function ChatMessage({
         {!revealing && compared.length >= 2 && (
           <ChatComparison products={compared} open={tableOpen} />
         )}
-        {!revealing &&
-          message.sources?.map((s, i) => (
-            <span key={`${s.documentId}-${i}`} className="source-card" title={s.excerpt}>
-              <Icon name="description" className="!text-base" />
-              <span>
-                {s.documentName}
-                {s.pageNumber ? ` · Trang ${s.pageNumber}` : ''}
-                {s.section ? ` · ${s.section}` : ''}
-              </span>
-              {isDemo && s.documentId === 'demo-policy' && (
-                <a
-                  href="/demo/Chinh-sach-minh-hoa.txt"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Mở tài liệu minh họa"
-                >
-                  <Icon name="open_in_new" className="!text-sm" />
-                </a>
-              )}
-            </span>
-          ))}
       </div>
     </article>
   );

@@ -1,6 +1,6 @@
 package com.smartphoneai.service.impl;
 
-import com.smartphoneai.service.ChatProviderClient;
+import com.smartphoneai.service.UsageAwareChatProviderClient;
 
 import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;
@@ -13,8 +13,11 @@ import com.google.genai.types.HttpRetryOptions;
 import org.springframework.retry.support.RetryTemplate;
 
 @Component
-public class SpringAiProviderClient implements ChatProviderClient {
+public class SpringAiProviderClient implements UsageAwareChatProviderClient {
     @Override public String chat(String provider, String model, String apiKey, String prompt) {
+        return chatWithUsage(provider,model,apiKey,prompt).text();
+    }
+    @Override public Reply chatWithUsage(String provider, String model, String apiKey, String prompt) {
         if (!"GEMINI".equals(provider)) throw new InvalidAiConfigurationException();
         try {
             var google = Client.builder().apiKey(apiKey).httpOptions(HttpOptions.builder().timeout(25000)
@@ -22,7 +25,11 @@ public class SpringAiProviderClient implements ChatProviderClient {
             var client = GoogleGenAiChatModel.builder().genAiClient(google)
                     .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                     .defaultOptions(GoogleGenAiChatOptions.builder().model(model).build()).build();
-            try { return client.call(prompt); } finally { client.destroy(); }
+            try {
+                var response=client.call(new org.springframework.ai.chat.prompt.Prompt(prompt));
+                var usage=response.getMetadata() == null ? null : response.getMetadata().getUsage();
+                return new Reply(response.getResult().getOutput().getText(),usage == null ? null : usage.getPromptTokens());
+            } finally { client.destroy(); }
         } catch (Exception exception) {
             for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
                 if (cause instanceof com.google.genai.errors.ApiException googleError)

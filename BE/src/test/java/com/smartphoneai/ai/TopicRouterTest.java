@@ -26,6 +26,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class TopicRouterTest {
+    @Test void classifierReturnsTheDataNeededForAQuestion() {
+        var provider = mock(AiProviderService.class);
+        when(provider.chat(anyString())).thenReturn("{\"result\":\"SAME_TOPIC\",\"suggestedTopic\":null,\"needsCatalog\":true,\"needsDocuments\":true}");
+        var decision = new TopicRouterImpl(provider, new ObjectMapper())
+                .route("PHONE_CONSULTATION", "Máy dưới 10 triệu bảo hành bao lâu?", List.of());
+        assertEquals(Boolean.TRUE, decision.needsCatalog());
+        assertEquals(Boolean.TRUE, decision.needsDocuments());
+    }
     @ParameterizedTest
     @ValueSource(strings = {
             "{\"result\":\"OUT_OF_SCOPE\",\"suggestedTopic\":null}",

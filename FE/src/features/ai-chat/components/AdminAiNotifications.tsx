@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Icon } from '../../../shared/components/Icon';
 import { Button, ErrorState, Modal, Skeleton } from '../../../shared/components/Ui';
 import { formatDate } from '../../../shared/utils/format';
-import { outcomes, reasonMessage } from './AdminAiKeyAlert';
+import { notificationTitle, outcomes, reasonMessage } from './AdminAiKeyAlert';
 import './AdminAiNotifications.css';
 
 export function AdminAiNotifications() {
@@ -84,11 +84,7 @@ export function AdminAiNotifications() {
                     {item.resolved ? 'Đã xử lý' : 'Cần kiểm tra'}
                   </span>
                 </div>
-                <h3>
-                  {item.status === 'PRIMARY'
-                    ? 'API key AI chính đã phục hồi'
-                    : 'API key AI chính gặp lỗi'}
-                </h3>
+                <h3>{notificationTitle(item.status, item.reason)}</h3>
                 <p>
                   {item.reason && reasonMessage(item.reason)} {outcomes[item.status]}
                 </p>

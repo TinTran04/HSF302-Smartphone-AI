@@ -55,7 +55,7 @@ class RagServiceTest {
         responder.answer("SHOP_SUPPORT","Áp dụng bao lâu?",history,List.of());
         verify(vectors).search(argThat(q -> q.contains("Chính sách bảo hành") && q.contains("Áp dụng bao lâu")),anySet(),eq("v1"));
     }
-    @Test void newerEvidenceIsPresentedFirstAndOnlyRetrievedIdsMayBeCited() {
+    @Test void moreRelevantEvidenceIsPresentedFirstAndOnlyRetrievedIdsMayBeCited() {
         var docs=mock(KnowledgeDocumentRepository.class);
         var chunks=mock(KnowledgeChunkRepository.class);
         var vectors=mock(KnowledgeVectorStore.class);
@@ -76,7 +76,9 @@ class RagServiceTest {
         var result=service.answer("Chính sách?");
         assertEquals(newDoc.getId().toString(),result.sources().getFirst().documentId());
         var prompt=ArgumentCaptor.forClass(String.class); verify(ai).chat(prompt.capture());
-        assertTrue(prompt.getValue().indexOf("new.txt")<prompt.getValue().indexOf("old.txt"));
+        assertTrue(prompt.getValue().indexOf("Chính sách cũ")<prompt.getValue().indexOf("Chính sách mới"));
+        assertFalse(prompt.getValue().contains("new.txt"));
+        assertFalse(prompt.getValue().contains("old.txt"));
         assertTrue(service.answer("Chính sách?").sources().isEmpty());
     }
 }

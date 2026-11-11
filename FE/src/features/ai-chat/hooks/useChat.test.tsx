@@ -113,7 +113,7 @@ describe('chat send request ownership', () => {
         client.getQueryData<Conversation>(key)?.messages.map((message) => message.content),
       ).toEqual(['Question', 'Actual JSON answer']),
     );
-    expect(api.sendMessage).toHaveBeenCalledWith('current', 'Question');
+    expect(api.sendMessage).toHaveBeenCalledWith('current', 'Question', expect.any(String));
   });
   it('blocks two submissions in the same render before the pending state can rerender', async () => {
     vi.mocked(api.sendMessage).mockResolvedValue({

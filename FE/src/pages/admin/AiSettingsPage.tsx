@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../shared/api';
+import { api, isDemo } from '../../shared/api';
+import { http } from '../../shared/api/httpClient';
 import type { AiBackupKey, AiSettings } from '../../shared/types/models';
 import {
   Button,
@@ -14,6 +15,7 @@ import {
 import { Icon } from '../../shared/components/Icon';
 import { formatDate } from '../../shared/utils/format';
 import { reasonMessage } from '../../features/ai-chat/components/AdminAiKeyAlert';
+import { AiQuotaSettings } from './AiQuotaSettings';
 import './AiSettingsPage.css';
 export default function AiSettingsPage() {
   const settings = useQuery({
@@ -30,6 +32,7 @@ export default function AiSettingsPage() {
         title="Cấu hình Google Gemini"
         description="Lưu model và API key, kiểm tra kết nối, sau đó kích hoạt cho Chat."
       />
+      <AiMetrics />
       {settings.isPending ? (
         <Skeleton count={1} />
       ) : settings.error ? (
@@ -74,6 +77,24 @@ export default function AiSettingsPage() {
     </>
   );
 }
+export function AiMetrics() {
+  const metrics = useQuery({
+    queryKey: ['ai-metrics'],
+    queryFn: () => http<{ requests: number; failures: number; averageMillis: number }>('/admin/ai-settings/metrics'),
+    refetchInterval: 30_000,
+    enabled: !isDemo,
+    retry: false,
+  });
+  return (
+    <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <h2 className="!text-xl">Hoạt động chatbot</h2>
+      <p className="help-text">Số liệu từ lần khởi động backend gần nhất. Cảnh báo key dự phòng được lưu trong thông báo quản trị.</p>
+      {metrics.data ? (
+        <p>Yêu cầu: <strong>{metrics.data.requests}</strong> · Lỗi: <strong>{metrics.data.failures}</strong> · Thời gian trung bình: <strong>{metrics.data.averageMillis} ms</strong></p>
+      ) : <p className="help-text">{metrics.isError ? 'Không thể tải số liệu.' : 'Chưa có số liệu.'}</p>}
+    </div>
+  );
+}
 type BackupDraft = {
   id?: string;
   localId: string;
@@ -94,9 +115,11 @@ const statusLabels: Record<AiBackupKey['lastStatus'], string> = {
   KEY_ERROR: 'Lỗi key',
   PROVIDER_ERROR: 'Lỗi nhà cung cấp',
 };
+const defaultChatModel = 'gemini-3.6-flash';
+const initialModel = (setting: AiSettings) => setting.model || (!setting.id ? defaultChatModel : '');
 function ProviderForm({ setting }: { setting: AiSettings }) {
   const [baseline, setBaseline] = useState(setting);
-  const [model, setModel] = useState(setting.model);
+  const [model, setModel] = useState(() => initialModel(setting));
   const [apiKey, setApiKey] = useState('');
   const [keys, setKeys] = useState(() => toDraft(setting));
   const [visible, setVisible] = useState(false);
@@ -106,7 +129,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
   const client = useQueryClient();
   const { notify } = useToast();
   const dirty =
-    model.trim() !== baseline.model ||
+    model.trim() !== initialModel(baseline) ||
     !!apiKey.trim() ||
     JSON.stringify(
       keys.map((key) => ({ id: key.id, name: key.name, apiKey: key.apiKey || '' })),
@@ -115,12 +138,13 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
   useEffect(() => {
     if (!dirty && setting.id !== baseline.id) {
       setBaseline(setting);
-      setModel(setting.model);
+      setModel(initialModel(setting));
       setKeys(toDraft(setting));
     }
   }, [setting, baseline.id, dirty]);
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ['ai-settings'] });
+    void client.invalidateQueries({ queryKey: ['ai-quota'] });
     void client.invalidateQueries({ queryKey: ['ai-key-alert'] });
     void client.invalidateQueries({ queryKey: ['ai-notifications'] });
   };
@@ -223,7 +247,10 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
               disabled={busy}
               placeholder="Nhập mã model Gemini trong project của bạn"
             />
-            <span className="help-text">Model hợp lệ được Backend và nhà cung cấp kiểm tra.</span>
+            <span className="help-text">
+              {!baseline.id ? 'Mặc định gemini-3.6-flash; bạn có thể đổi model. ' : ''}
+              Model hợp lệ được Backend và nhà cung cấp kiểm tra.
+            </span>
           </label>
           <label className="form-field">
             API Key đã lưu
@@ -389,6 +416,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           </p>
         )}
       </form>
+      <AiQuotaSettings configId={baseline.id || ''} />
       {editing && (
         <BackupKeyModal
           draft={editing}

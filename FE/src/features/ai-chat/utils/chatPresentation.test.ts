@@ -105,6 +105,12 @@ describe('chat turn presentation', () => {
     expect(canResendChat({ status: 504 }, history, turn)).toBe(false);
     expect(canResendChat(new Error('Disconnected'), history, turn)).toBe(false);
   });
+  it('allows retrying an uncertain request only when a stable request id is available', () => {
+    const identified: ChatTurn = { ...turn, user: { ...turn.user, id: 'local-123e4567-e89b-42d3-a456-426614174000' } };
+    expect(canResendChat({ status: 0 }, history, identified)).toBe(true);
+    expect(canResendChat({ status: 409, code: 'CHAT_BUSY' }, history, identified)).toBe(true);
+    expect(canResendChat({ status: 0 }, [...history, { id: 'saved-user', role: 'user', content: 'Hello' }], identified)).toBe(false);
+  });
   it('recovers a persisted answer after a lost response', () => {
     const saved: ChatMessage[] = [
       ...history,
