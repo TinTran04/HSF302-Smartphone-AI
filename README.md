@@ -120,13 +120,13 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 ## Cấu hình AI và RAG
 
 1. Đăng nhập Admin, mở **Cấu hình AI**, lưu cấu hình Google Gemini, kiểm tra kết nối rồi kích hoạt chat model.
-2. Mở **Cấu hình embedding**, nhập provider, model, số chiều và API key phù hợp; kiểm tra và lưu.
+2. Mở **Cấu hình embedding**. Hệ thống đặt sẵn Gemini `gemini-embedding-001` với 768 chiều cho cấu hình mới. Nhập API key Gemini rồi bấm **Kiểm tra và lưu**.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
 
 Mỗi cấu hình Chat hỗ trợ một API key chính và tối đa 10 key dự phòng có tên, thứ tự ưu tiên và trạng thái riêng. Admin có thể thêm, thay, kiểm tra hoặc xác nhận xóa từng key, sau đó lưu, kiểm tra và kích hoạt cấu hình. Khi key chính gặp lỗi xác thực hoặc quota, BE thử các key dự phòng theo thứ tự và ghi rõ tên key đã dùng. Chuông **Thông báo AI** hiển thị số chưa đọc và lịch sử lưu trong DB, có thao tác đánh dấu đã đọc và mở trang quản lý key. Banner giữ cảnh báo đang cần xử lý. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
-Tư vấn điện thoại kết hợp catalog, tài liệu phù hợp và kiến thức Gemini. Hỗ trợ cửa hàng dùng RAG có nguồn. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
+Tư vấn điện thoại kết hợp catalog, tài liệu phù hợp và kiến thức Gemini. Hỗ trợ cửa hàng truy xuất tài liệu và kiểm chứng căn cứ ở BE, Customer nhận nội dung trả lời và các gợi ý sản phẩm. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 
 ### Chế độ demo giao diện
 

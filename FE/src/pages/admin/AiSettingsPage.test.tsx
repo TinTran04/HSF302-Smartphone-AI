@@ -22,6 +22,17 @@ function renderWithSettings(key: string[], settings: unknown, content: ReactNode
 }
 
 describe('Gemini administration settings', () => {
+  it('suggests Gemini 3.6 Flash for the first chat configuration', () => {
+    const html = renderWithSettings(['ai-settings'], [{ provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false }], <AiSettingsPage />);
+    expect(html).toContain('value="gemini-3.6-flash"');
+  });
+  it('shows operational metrics since backend startup', async () => {
+    const { AiMetrics } = await import('./AiSettingsPage');
+    const html = renderWithSettings(['ai-metrics'], { requests: 12, failures: 2, averageMillis: 350 }, <AiMetrics />);
+    expect(html).toContain('12');
+    expect(html).toContain('350 ms');
+    expect(html).toContain('khởi động');
+  });
   it('opens the saved Gemini chat configuration and offers the save, test and activate workflow', () => {
     const html = renderWithSettings(
       ['ai-settings'],
@@ -96,7 +107,18 @@ describe('Gemini administration settings', () => {
     expect(html).toContain('value="gemini-embedding-001"');
     expect(html).toContain('value="768"');
     expect(html).toContain('value="masked-key"');
+    const fields = html.match(/<input\b[^>]*>/g) ?? [];
+    expect(fields.find((field) => field.includes('value="gemini-embedding-001"'))).toContain('readOnly=""');
+    expect(fields.find((field) => field.includes('value="768"'))).toContain('readOnly=""');
     expect(html).not.toContain('OPENAI');
+  });
+
+  it('presets embedding model and dimensions before the first save', () => {
+    const html = renderWithSettings(['admin-ops', 'embedding'], { configured: false },
+      <AdminOperationsPage section="embedding" />);
+    expect(html).toContain('value="gemini-embedding-001"');
+    expect(html).toContain('value="768"');
+    expect(html).toContain('Kiểm tra và lưu');
   });
 
   it('opens a blank Gemini embedding configuration when only a legacy provider is returned', () => {

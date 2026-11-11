@@ -31,7 +31,8 @@ class TopicSwitchLockOrderTest {
         when(switches.findLocked(request.getId())).thenReturn(Optional.of(request));
         when(conversations.findLocked(conversation.getId())).thenReturn(Optional.of(conversation));
         var service = new AiChatServiceImpl(guests, conversations, messages, switches, mock(TopicRouter.class),
-                mock(ChatResponder.class), new ObjectMapper(), Clock.systemUTC());
+                mock(ChatResponder.class), new ObjectMapper(), Clock.systemUTC(),
+                mock(com.smartphoneai.service.impl.OrderChatLookup.class), mock(AiChatReceiptRepository.class), mock(org.springframework.transaction.PlatformTransactionManager.class));
         service.cancel(UsernamePasswordAuthenticationToken.authenticated(new AccountPrincipal(user), null,
                 List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))), null, request.getId());
         var order = inOrder(conversations, switches);

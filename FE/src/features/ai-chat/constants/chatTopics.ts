@@ -18,7 +18,7 @@ export const chatTopics: {
     id: 'SHOP_SUPPORT',
     title: 'Hỗ trợ cửa hàng',
     icon: 'support_agent',
-    description: 'Tra cứu chính sách cửa hàng với nguồn tham khảo từ kho kiến thức được cung cấp.',
+    description: 'Hỏi chính sách cửa hàng và tra cứu trạng thái đơn hàng của bạn.',
     prompt: 'Chính sách bảo hành của cửa hàng như thế nào?',
   },
 ];

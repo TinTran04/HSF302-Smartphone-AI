@@ -1,0 +1,65 @@
+CHÍNH SÁCH CỬA HÀNG SMARTPHONE AI
+Phiên bản dùng để kiểm thử và trình bày dự án
+
+1. Giới thiệu
+
+SmartPhone AI là cửa hàng điện thoại trực tuyến, hỗ trợ khách hàng tìm hiểu, so sánh và lựa chọn điện thoại theo nhu cầu và ngân sách.
+
+Khách hàng có thể xem sản phẩm, thêm vào giỏ hàng, đặt hàng và hỏi trợ lý AI. Giá bán, phiên bản và tình trạng sản phẩm được hiển thị trên hệ thống tại thời điểm khách hàng xem hoặc đặt hàng.
+
+2. Chính sách bảo hành
+
+Thời hạn bảo hành demo: 12 tháng đối với điện thoại, tính từ ngày mua hàng.
+
+Bảo hành áp dụng cho lỗi kỹ thuật do nhà sản xuất sau khi cửa hàng hoặc đơn vị bảo hành kiểm tra và xác nhận.
+
+Một số trường hợp cần kiểm tra riêng trước khi xác định có được bảo hành hay không:
+
+- Máy có dấu hiệu rơi vỡ, móp méo hoặc hư hỏng do va đập.
+- Máy bị vào nước hoặc tiếp xúc với hóa chất.
+- Máy đã được sửa chữa, tháo lắp hoặc thay thế linh kiện ngoài hệ thống bảo hành được chấp nhận.
+- Máy không còn thông tin cần thiết để đối chiếu việc mua hàng.
+
+Cửa hàng sẽ thông báo phương án xử lý sau khi kiểm tra sản phẩm. Thời gian xử lý cụ thể chưa được quy định trong bản demo này.
+
+3. Chính sách đổi hàng trong 7 ngày
+
+Trong 7 ngày đầu kể từ ngày mua hàng, khách hàng có thể yêu cầu đổi máy nếu sản phẩm có lỗi kỹ thuật do nhà sản xuất và lỗi được xác nhận sau khi kiểm tra.
+
+Khi yêu cầu đổi hàng, khách hàng cần cung cấp thông tin đơn hàng và mô tả tình trạng lỗi. Cửa hàng sẽ kiểm tra máy trước khi xác nhận phương án đổi.
+
+Nếu phiên bản tương ứng không còn hàng, cửa hàng sẽ trao đổi với khách hàng về phương án xử lý phù hợp.
+
+Yêu cầu đổi vì thay đổi nhu cầu, muốn đổi màu hoặc đổi sang model khác cần được cửa hàng xem xét và xác nhận riêng.
+
+4. Trả hàng và hoàn tiền
+
+Việc trả hàng và hoàn tiền chỉ được thực hiện sau khi cửa hàng kiểm tra điều kiện và thống nhất với khách hàng.
+
+Khi yêu cầu được chấp thuận, cửa hàng và khách hàng sẽ xác nhận tình trạng sản phẩm, số tiền hoàn, phương thức hoàn tiền và thời gian dự kiến.
+
+Bản demo chưa quy định thời hạn hoàn tiền cố định.
+
+5. Giao hàng và kiểm tra khi nhận
+
+Khách hàng cần kiểm tra thông tin người nhận và địa chỉ trước khi đặt hàng.
+
+Khi nhận hàng, khách hàng nên kiểm tra tình trạng bên ngoài của kiện hàng và đối chiếu sản phẩm nhận được với đơn hàng.
+
+Nếu phát hiện giao nhầm, giao thiếu hoặc sản phẩm bị hư hỏng khi nhận, khách hàng cần lưu lại thông tin và liên hệ cửa hàng để được hỗ trợ.
+
+Phí giao hàng và thời gian giao hàng cụ thể chưa được quy định trong bản demo này.
+
+6. Thanh toán
+
+Phương thức thanh toán được hỗ trợ trong bản demo là thanh toán khi nhận hàng, viết tắt là COD.
+
+Khách hàng thanh toán trực tiếp khi nhận hàng.
+
+7. Tra cứu đơn hàng
+
+Khách hàng đăng nhập vào tài khoản để xem đơn hàng của mình trong mục đơn hàng hoặc hỏi trợ lý AI trong chủ đề Hỗ trợ cửa hàng.
+
+Các trạng thái đơn hàng gồm: Chờ xác nhận, Đã xác nhận, Đang giao hàng, Hoàn thành và Đã hủy.
+
+Trạng thái Đang giao hàng không thể hiện vị trí thực tế của người giao hàng.

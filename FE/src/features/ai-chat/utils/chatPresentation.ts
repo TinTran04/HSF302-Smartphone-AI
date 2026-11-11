@@ -58,6 +58,10 @@ export function mergeChatTurn(messages: ChatMessage[], turn: ChatTurn | null): C
 export function canResendChat(error: unknown, messages: ChatMessage[], turn: ChatTurn) {
   const status = error && typeof error === 'object' && 'status' in error ? error.status : 0;
   const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+  const stableRequestId = /^local-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(turn.user.id);
+  if (stableRequestId && (status === 0 || status === 408 || status === 504 || code === 'CHAT_BUSY')) {
+    return !findPersistedTurn(messages, turn);
+  }
   const rejected = [
     'AI_PROVIDER_ERROR',
     'AI_PROVIDER_AUTH_ERROR',

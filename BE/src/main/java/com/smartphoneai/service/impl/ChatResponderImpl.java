@@ -24,4 +24,11 @@ public class ChatResponderImpl implements ChatResponder {
         if ("PHONE_CONSULTATION".equals(topic)) return phones.advise(question, history, productIds);
         throw new AiProviderException();
     }
+    @Override
+    public Answer answer(String topic, String question, List<ChatMessageResponse> history, List<String> productIds,
+                         com.smartphoneai.service.TopicRouter.Decision decision) {
+        if ("PHONE_CONSULTATION".equals(ChatTopics.normalize(topic)))
+            return phones.advise(question, history, productIds, decision);
+        return answer(topic, question, history, productIds);
+    }
 }

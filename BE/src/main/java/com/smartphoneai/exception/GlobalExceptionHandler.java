@@ -69,6 +69,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> invalidTopicSwitch(InvalidTopicSwitchException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("INVALID_TOPIC_SWITCH", "Yêu cầu chuyển chủ đề không hợp lệ", Instant.now()));
     }
+    @ExceptionHandler(ChatBusyException.class)
+    public ResponseEntity<ApiError> chatBusy(ChatBusyException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("CHAT_BUSY", "Hội thoại đang xử lý. Vui lòng thử lại sau.", Instant.now()));
+    }
+    @ExceptionHandler(ChatRequestConflictException.class)
+    public ResponseEntity<ApiError> chatRequestConflict(ChatRequestConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("CHAT_REQUEST_CONFLICT", "Mã yêu cầu đã được dùng cho nội dung khác.", Instant.now()));
+    }
     @ExceptionHandler(ConversationNotFoundException.class)
     public ResponseEntity<ApiError> conversationNotFound(ConversationNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("CONVERSATION_NOT_FOUND", "Không tìm thấy hội thoại", Instant.now()));

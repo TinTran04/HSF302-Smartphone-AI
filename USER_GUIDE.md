@@ -1,6 +1,6 @@
 # SmartPhone AI — User Guide
 
-Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 09/11/2026 sử dụng Google Gemini cho Chat Model và Embedding Model.
+Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 10/11/2026 sử dụng Google Gemini cho Chat Model và Embedding Model.
 
 ## 1. Phạm vi và tài khoản
 
@@ -146,8 +146,8 @@ Dataset đã chuẩn hóa 138 điện thoại, giá VNĐ minh họa và ảnh tr
 ### 3.2. Embedding Model
 
 1. Mở **Cấu hình embedding** tại `/admin/embedding`.
-2. Chọn model embedding Gemini mà project của bạn hỗ trợ. Ví dụ `gemini-embedding-001` với 768 chiều, nếu model này còn được cấp cho project.
-3. Nhập số chiều khớp model và key có quyền gọi embedding. Có thể dùng cùng Gemini key khi project hỗ trợ cả chat và embedding.
+2. Model và số chiều đã được thiết lập sẵn, cấu hình mới dùng `gemini-embedding-001` với 768 chiều. Hai trường hiển thị ở chế độ chỉ đọc.
+3. Nhập API key có quyền gọi model embedding. Có thể dùng cùng Gemini key khi project hỗ trợ cả chat và embedding.
 4. Bấm nút kiểm tra và lưu. BE tạo vector thử, kiểm tra đủ số chiều và lưu cấu hình.
 5. Nếu đổi model hoặc số chiều sau khi đã tải tài liệu, lập chỉ mục lại các tài liệu để vector khớp cấu hình mới.
 
@@ -155,7 +155,7 @@ Chat Model sinh câu trả lời. Embedding Model biến văn bản thành vecto
 
 ### Chuyển từ phiên bản có OpenAI
 
-Cấu hình OpenAI cũ hiển thị như chưa cấu hình Gemini. Nhập key Gemini mới cho Chat, thực hiện Lưu cấu hình, Kiểm tra kết nối và Kích hoạt. Trong cấu hình embedding, nhập key và model Gemini mới rồi lưu, sau đó lập chỉ mục lại tài liệu đã có. Ô key để trống chỉ tái sử dụng key Gemini đã lưu đúng mục cấu hình. Giữ `AI_CONFIG_ENCRYPTION_KEY` theo database để đọc cấu hình Gemini hiện có.
+Cấu hình OpenAI cũ hiển thị như chưa cấu hình Gemini. Nhập key Gemini mới cho Chat, thực hiện Lưu cấu hình, Kiểm tra kết nối và Kích hoạt. Trong cấu hình embedding, nhập key Gemini rồi kiểm tra và lưu cấu hình có sẵn, sau đó lập chỉ mục lại tài liệu đã có. Ô key để trống tái sử dụng key Gemini đã lưu đúng mục cấu hình. Giữ `AI_CONFIG_ENCRYPTION_KEY` theo database để đọc cấu hình Gemini hiện có.
 
 ### 3.3. Tải tài liệu RAG
 
@@ -163,7 +163,7 @@ Cấu hình OpenAI cũ hiển thị như chưa cấu hình Gemini. Nhập key Ge
 2. Vào **Kho kiến thức AI** tại `/admin/knowledge`, chọn file tải lên.
 3. Theo dõi `PROCESSING` đến `READY`. Khi `FAILED`, xem lại file, model, key và số chiều rồi lập chỉ mục lại.
 4. Dùng bật/tắt để chọn tài liệu được phép truy xuất. Thay nội dung tài liệu sẽ tạo lại embedding.
-5. Đăng nhập CUSTOMER, chọn **Hỗ trợ cửa hàng** và hỏi nội dung có trong tài liệu. Câu trả lời đủ căn cứ hiển thị tên nguồn và số trang nếu có.
+5. Đăng nhập CUSTOMER, chọn **Hỗ trợ cửa hàng** và hỏi nội dung có trong tài liệu. Đối chiếu câu trả lời với nội dung đã tải lên. Nguồn và số trang được BE xử lý nội bộ, Customer nhận phần trả lời.
 
 Có file mẫu `FE/public/demo/Chinh-sach-minh-hoa.txt` để thử luồng tải file. File này ghi rõ dữ liệu minh họa. Để demo một chính sách cụ thể, dùng tài liệu do nhóm tự xác nhận và hỏi câu có câu trả lời trong tài liệu đó. PDF scan ảnh cần được OCR trước khi tải.
 
@@ -174,11 +174,21 @@ Có file mẫu `FE/public/demo/Chinh-sach-minh-hoa.txt` để thử luồng tả
 | Chủ đề | Cách dùng | Nguồn câu trả lời |
 | --- | --- | --- |
 | Tư vấn mua điện thoại | Hỏi chọn máy, so sánh hoặc kiến thức công nghệ | Catalog, tài liệu liên quan và kiến thức Gemini |
-| Hỗ trợ cửa hàng | Hỏi chính sách bảo hành, giao hàng, đổi trả đã tải | RAG từ tài liệu đang bật và `READY` |
+| Hỗ trợ cửa hàng | Hỏi chính sách bảo hành, giao hàng, đổi trả hoặc trạng thái đơn hàng | RAG từ tài liệu đang bật và `READY`, hoặc đơn hàng của khách đang đăng nhập |
 
 Ví dụ hỏi tư vấn “Tôi có 10 triệu, cần điện thoại pin tốt để học và chụp ảnh”. Hệ thống ưu tiên máy trong mức tiền. Máy vượt tối đa 10% được ghi số tiền và tỷ lệ vượt. Giá tại shop được lấy từ catalog.
 
-Tư vấn mua điện thoại chỉ xử lý nội dung liên quan điện thoại như chọn mua, so sánh, cấu hình, pin, camera và cách sử dụng. Câu hỏi nối tiếp được xét theo ngữ cảnh, ví dụ “Còn pin thì sao?” sau khi đang nói về một mẫu máy. Với câu hỏi ngoài phạm vi như thời tiết, nấu ăn hoặc viết bài văn, hệ thống trả lời “Mình chỉ hỗ trợ tư vấn về điện thoại, như chọn mua, so sánh, cấu hình và cách sử dụng. Bạn muốn tìm hiểu điện thoại nào?”. Câu hỏi về chính sách cửa hàng được đề nghị chuyển sang Hỗ trợ cửa hàng.
+Tư vấn mua điện thoại chỉ xử lý nội dung liên quan điện thoại như chọn mua, so sánh, cấu hình, pin, camera và cách sử dụng. Câu hỏi nối tiếp được xét theo ngữ cảnh, ví dụ “Còn pin thì sao?” sau khi đang nói về một mẫu máy. Với câu hỏi ngoài phạm vi như thời tiết, nấu ăn hoặc viết bài văn, hệ thống trả lời “Mình chỉ hỗ trợ tư vấn về điện thoại, như chọn mua, so sánh, cấu hình và cách sử dụng. Bạn muốn tìm hiểu điện thoại nào?”. Câu hỏi kết hợp tư vấn máy và chính sách có thể được trả lời cùng lúc; câu hỏi riêng về chính sách được đề nghị chuyển sang Hỗ trợ cửa hàng.
+
+Trong Hỗ trợ cửa hàng, khách có thể hỏi “Đơn hàng của tôi đang ở đâu?”. Khi có nhiều đơn, hãy gửi đầy đủ mã đơn mà chatbot gợi ý. Hệ thống chỉ tra cứu đơn của tài khoản hiện tại và hiển thị trạng thái đã lưu, không theo dõi vị trí vận chuyển trực tiếp.
+
+Trang Cấu hình AI hiển thị số yêu cầu chat, số lỗi và thời gian trung bình tính từ lần khởi động BE gần nhất. Cảnh báo chuyển sang key dự phòng nằm trong thông báo quản trị và được lưu lại.
+
+Để tự chuyển key trước khi chạm hạn mức input TPM, mở **Cấu hình AI → Tự chuyển key theo quota project**, nhập Google Cloud Project ID và giới hạn input token/phút tương ứng với model đang chọn cho mỗi key, rồi chọn **Lưu quota**. Các key cùng project phải ghi cùng Project ID và giới hạn. Khi mức ứng dụng ghi nhận trong 60 giây gần nhất đạt 80%, hệ thống ưu tiên key thuộc project khác còn dưới ngưỡng và thông báo cho admin. Nếu tất cả đều trên ngưỡng, hệ thống vẫn thử theo thứ tự ưu tiên; khi Google trả lỗi 429, hệ thống chuyển sang project khác nếu có. Để trống hai trường để tắt dự đoán cho key đó.
+
+Con số này chỉ là ước tính cho các lượt **Chat** do backend ghi nhận, không phải số dư chính thức của Google. Các lượt kiểm tra kết nối, embedding, ứng dụng khác, các giới hạn RPM/RPD và số token thiếu metadata có thể làm chênh lệch; hãy đối chiếu hạn mức trong Google AI Studio. Project ID phải được nhập chính xác: hệ thống không tự xác minh hai key có cùng Google Cloud project hay không. Nếu dùng nhiều BE, các BE cần dùng chung database để chia sẻ bộ đếm.
+
+Khi gửi chat, hệ thống chỉ giữ giao dịch database trong lúc lưu hoặc lấy dữ liệu; thời gian chờ Gemini không giữ giao dịch chat. Nếu mạng bị gián đoạn, dùng nút thử lại trong hội thoại: cùng một lượt gửi có mã riêng để hệ thống trả lại kết quả đã lưu thay vì tạo tin nhắn trùng. Nếu hội thoại đang xử lý, đợi phản hồi hoặc thử lại sau. BE cần được khởi động cùng phiên bản FE mới để hỗ trợ cơ chế này.
 
 Gửi bằng nút gửi hoặc Enter, dùng Shift+Enter để xuống dòng. Tin nhắn của bạn xuất hiện ngay. Ba chấm chuyển động báo AI đang xử lý, sau khi BE trả kết quả, giao diện hiển thị dần câu trả lời. Khi gửi lỗi, dùng thao tác thử lại trên tin nhắn. Hội thoại cũ hiển thị nội dung đã lưu khi mở lại.
 
@@ -188,7 +198,7 @@ Khi mất kết nối hoặc gateway trả lỗi chưa xác định, nút thử 
 
 Nếu câu hỏi khác chủ đề, ứng dụng đề nghị chuyển. Xác nhận tạo hội thoại theo chủ đề mới và xử lý câu hỏi đã gửi. Bạn có thể hủy để giữ chủ đề hiện tại. Nút xóa trong lịch sử yêu cầu xác nhận và xóa hội thoại của chính tài khoản.
 
-Thông tin công nghệ của Gemini cần được đối chiếu khi quyết định mua. Các nguồn RAG hiển thị giúp người dùng kiểm tra câu trả lời. Khi tài liệu thiếu căn cứ, Hỗ trợ cửa hàng thông báo chưa đủ thông tin.
+Thông tin công nghệ của Gemini cần được đối chiếu khi quyết định mua. BE kiểm tra các trích dẫn RAG bằng ID đoạn đã truy xuất trước khi tạo câu trả lời. API Customer trả mảng sources rỗng và giao diện ẩn tên file, trích đoạn, số trang cùng thẻ nguồn. Khi tài liệu thiếu căn cứ, Hỗ trợ cửa hàng thông báo chưa đủ thông tin.
 
 ## 5. Mua hàng và quản trị
 
@@ -217,7 +227,7 @@ Quên mật khẩu gồm ba bước. Nhập email để nhận mã, nhập OTP v
 | Bảo trì | Bật/tắt màn hình Shop đang bảo trì, tiếp tục sử dụng dashboard |
 | Kho kiến thức | Tải/thay nội dung, bật/tắt, lập chỉ mục lại và xóa tài liệu |
 | Cấu hình AI | Lưu, kiểm tra, kích hoạt Gemini và key dự phòng |
-| Cấu hình embedding | Kiểm tra, lưu model và số chiều Gemini |
+| Cấu hình embedding | Nhập API key, kiểm tra và lưu cấu hình Gemini đã thiết lập sẵn |
 
 Ảnh PNG/JPEG/WebP tối đa 5 MiB mỗi file. Chọn ảnh từ máy, chờ tải xong rồi lưu sản phẩm. File ảnh lưu ở thư mục uploads theo cấu hình. Khi sao lưu/chuyển máy, giữ cả database, khóa mã hóa và thư mục ảnh. Xóa sản phẩm giữ snapshot đơn đã đặt, gỡ sản phẩm khỏi giỏ và vô hiệu bản kiểm tra đơn liên quan. File ảnh có thể còn được tham chiếu nên tồn tại độc lập trên đĩa.
 
@@ -279,7 +289,7 @@ flowchart LR
     F --> E
     E --> H[Đoạn phù hợp và nguồn]
     H --> G[Gemini sinh câu trả lời]
-    G --> R[Câu trả lời và trích dẫn]
+    G --> R[Câu trả lời cho khách hàng]
 ```
 
 `KnowledgeTextExtractor` đọc TXT/PDF, chia đoạn 1.500 ký tự Unicode và chồng lấn 200 ký tự. `KnowledgeIndexWorkerImpl` tạo chunks, gọi embedding và đánh dấu tài liệu READY. `SpringAiKnowledgeVectorStore` ghi vector và tìm tương đồng theo phiên bản embedding. `RagServiceImpl` chỉ dùng tài liệu READY phù hợp phiên bản, chọn nguồn có điểm phù hợp và kiểm tra chunk ID mà AI trích dẫn. Mặc định truy xuất dùng ngưỡng tương đồng 0,72.
@@ -312,7 +322,7 @@ Access JWT hạn 15 phút, refresh token xoay vòng hạn 7 ngày trong cookie H
 | 2 | Lưu Gemini, kiểm tra và kích hoạt | Toast thành công, cấu hình hoạt động, key đã che |
 | 3 | Cấu hình embedding, tải tài liệu của nhóm | Tài liệu chuyển PROCESSING sang READY |
 | 4 | Đăng nhập Customer, hỏi tư vấn hoặc kiến thức điện thoại | Tin nhắn hiện ngay, ba chấm chờ, câu trả lời hiện dần |
-| 5 | Hỏi Hỗ trợ cửa hàng đúng nội dung tài liệu | Câu trả lời kèm tên nguồn và trang nếu có |
+| 5 | Hỏi Hỗ trợ cửa hàng đúng nội dung tài liệu | Câu trả lời khớp nội dung, giao diện và API Customer ẩn metadata nguồn |
 | 6 | Hỏi thông tin chính sách chưa có tài liệu | Phản hồi chưa đủ căn cứ |
 | 7 | Hỏi khác chủ đề, xác nhận chuyển | Hội thoại mới, câu hỏi được xử lý |
 | 8 | Đặt một đơn COD, mở lịch sử | Giá được kiểm tra ở BE, đơn được tạo và xem lại được |

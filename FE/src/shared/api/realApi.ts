@@ -110,7 +110,7 @@ export const realApi: Api = {
   },
   conversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`),
   deleteConversation: (id) => http(`/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  sendMessage: (id, content) => http(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content }), signal: AbortSignal.timeout(400000) }),
+  sendMessage: (id, content, requestId) => http(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: jsonBody({ content, ...(requestId ? { requestId } : {}) }), signal: AbortSignal.timeout(400000) }),
   confirmSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/confirm`, { method: 'POST', signal: AbortSignal.timeout(400000) }),
   cancelSwitch: (id) => http(`/ai/topic-switches/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   dashboard: () => http('/admin/dashboard'),

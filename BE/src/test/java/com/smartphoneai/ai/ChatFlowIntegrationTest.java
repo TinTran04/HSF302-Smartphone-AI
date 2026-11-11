@@ -52,6 +52,111 @@ class ChatFlowIntegrationTest {
     @MockitoBean TopicRouter router;
     @MockitoBean ChatResponder responder;
 
+    @Test void sendingDoesNotHoldDatabaseTransactionWhileWaitingForAi() throws Exception {
+        when(router.route(anyString(), anyString(), anyList())).thenAnswer(invocation -> {
+            org.junit.jupiter.api.Assertions.assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return new TopicRouter.Decision("SAME_TOPIC", null);
+        });
+        when(responder.answer(anyString(), anyString(), anyList(), anyList())).thenAnswer(invocation -> {
+            org.junit.jupiter.api.Assertions.assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return new ChatResponder.Answer("OK", java.util.List.of());
+        });
+        var session = customer();
+        var created = mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String id = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Tư vấn điện thoại\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.answer").value("OK"));
+    }
+
+    @Test void concurrentSendsReserveTheConversationWithoutCallingAiTwice() throws Exception {
+        var entered=new java.util.concurrent.CountDownLatch(1);
+        var release=new java.util.concurrent.CountDownLatch(1);
+        when(router.route(anyString(),anyString(),anyList())).thenAnswer(invocation -> {
+            entered.countDown();
+            org.junit.jupiter.api.Assertions.assertTrue(release.await(10,java.util.concurrent.TimeUnit.SECONDS));
+            return new TopicRouter.Decision("SAME_TOPIC",null);
+        });
+        when(responder.answer(anyString(),anyString(),anyList(),anyList()))
+                .thenReturn(new ChatResponder.Answer("OK",java.util.List.of()));
+        var session=customer();
+        var created=mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String id=mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        try (var executor=java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first=executor.submit(() -> mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Tư vấn điện thoại\"}")).andReturn().getResponse().getStatus());
+            try {
+                org.junit.jupiter.api.Assertions.assertTrue(entered.await(10,java.util.concurrent.TimeUnit.SECONDS));
+                mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Tư vấn điện thoại\"}"))
+                        .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CHAT_BUSY"));
+            } finally { release.countDown(); }
+            org.junit.jupiter.api.Assertions.assertEquals(200,first.get(10,java.util.concurrent.TimeUnit.SECONDS));
+        }
+        verify(router,times(1)).route(anyString(),anyString(),anyList());
+        mvc.perform(get("/api/ai/conversations/"+id).with(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.messages.length()").value(2));
+    }
+
+    @Test void failedAiRequestReleasesReservationForRetry() throws Exception {
+        when(router.route(anyString(),anyString(),anyList()))
+                .thenThrow(new com.smartphoneai.exception.AiProviderException())
+                .thenReturn(new TopicRouter.Decision("SAME_TOPIC",null));
+        when(responder.answer(anyString(),anyString(),anyList(),anyList()))
+                .thenReturn(new ChatResponder.Answer("OK",java.util.List.of()));
+        var session=customer();
+        var created=mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String id=mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        for (int attempt=0; attempt<2; attempt++) {
+            var result=mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Tư vấn điện thoại\"}"));
+            result.andExpect(attempt==0 ? status().isServiceUnavailable() : status().isOk());
+        }
+        mvc.perform(get("/api/ai/conversations/"+id).with(session)).andExpect(jsonPath("$.messages.length()").value(2));
+    }
+
+    @Test void repeatedRequestIdReturnsTheSavedAnswerWithoutCallingAiAgain() throws Exception {
+        when(router.route(anyString(),anyString(),anyList())).thenReturn(new TopicRouter.Decision("SAME_TOPIC",null));
+        when(responder.answer(anyString(),anyString(),anyList(),anyList())).thenReturn(new ChatResponder.Answer("OK",java.util.List.of()));
+        var session=customer();
+        var created=mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String id=mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        String requestId=UUID.randomUUID().toString();
+        String body=mapper.writeValueAsString(Map.of("content","Tư vấn điện thoại","requestId",requestId));
+        for (int attempt=0; attempt<2; attempt++)
+            mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.answer").value("OK"));
+        mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("content","Câu khác", "requestId",requestId))))
+                .andExpect(status().isConflict());
+        verify(router,times(1)).route(anyString(),anyString(),anyList());
+        mvc.perform(get("/api/ai/conversations/"+id).with(session)).andExpect(jsonPath("$.messages.length()").value(2));
+    }
+
+    @Test void shopOrderLookupRejectsUnknownOrderWithoutSendingPrivateDataToModel() throws Exception {
+        var session = customer();
+        var created = mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"SHOP_SUPPORT\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String conversation = mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        mvc.perform(post("/api/ai/conversations/" + conversation + "/messages").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("content", "Đơn hàng " + UUID.randomUUID()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("ANSWER"))
+                .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("Không tìm thấy")))
+                .andExpect(jsonPath("$.sources").isEmpty());
+        verifyNoInteractions(router, responder);
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
             "PHONE_CONSULTATION|Mình chỉ hỗ trợ tư vấn về điện thoại, như chọn mua, so sánh, cấu hình và cách sử dụng. Bạn muốn tìm hiểu điện thoại nào?",
@@ -178,6 +283,43 @@ class ChatFlowIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("SWITCH_REQUIRED"));
         mvc.perform(get("/api/ai/conversations/" + id).with(session)).andExpect(status().isOk());
         mvc.perform(get("/api/ai/conversations/" + id)).andExpect(status().isUnauthorized());
+    }
+
+    @Test void concurrentSwitchConfirmationsDoNotHoldTransactionOrCreateTwoChats() throws Exception {
+        when(router.route(anyString(),anyString(),anyList())).thenReturn(new TopicRouter.Decision("DIFFERENT_TOPIC","SHOP_SUPPORT"));
+        var entered=new java.util.concurrent.CountDownLatch(1);
+        var release=new java.util.concurrent.CountDownLatch(1);
+        when(responder.answer(anyString(),anyString(),anyList(),anyList())).thenAnswer(invocation -> {
+            org.junit.jupiter.api.Assertions.assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            entered.countDown();
+            org.junit.jupiter.api.Assertions.assertTrue(release.await(10,java.util.concurrent.TimeUnit.SECONDS));
+            return new ChatResponder.Answer("OK",java.util.List.of());
+        });
+        var session=customer();
+        var created=mvc.perform(post("/api/ai/conversations").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"topic\":\"PHONE_CONSULTATION\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String id=mapper.readTree(created.getResponse().getContentAsString()).path("conversationId").asText();
+        var suggested=mvc.perform(post("/api/ai/conversations/"+id+"/messages").with(session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Bảo hành thế nào?\"}"))
+                .andExpect(status().isOk()).andReturn();
+        String switchId=mapper.readTree(suggested.getResponse().getContentAsString()).path("switchRequestId").asText();
+        try (var executor=java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first=executor.submit(() -> mvc.perform(post("/api/ai/topic-switches/"+switchId+"/confirm").with(session).with(csrf())).andReturn());
+            try {
+                org.junit.jupiter.api.Assertions.assertTrue(entered.await(10,java.util.concurrent.TimeUnit.SECONDS));
+                mvc.perform(post("/api/ai/topic-switches/"+switchId+"/confirm").with(session).with(csrf()))
+                        .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CHAT_BUSY"));
+                mvc.perform(post("/api/ai/topic-switches/"+switchId+"/cancel").with(session).with(csrf()))
+                        .andExpect(status().isConflict());
+            } finally { release.countDown(); }
+            var result=first.get(10,java.util.concurrent.TimeUnit.SECONDS);
+            org.junit.jupiter.api.Assertions.assertEquals(200,result.getResponse().getStatus());
+            String next=mapper.readTree(result.getResponse().getContentAsString()).path("newConversationId").asText();
+            mvc.perform(post("/api/ai/topic-switches/"+switchId+"/confirm").with(session).with(csrf()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.newConversationId").value(next));
+        }
+        verify(responder,times(1)).answer(anyString(),anyString(),anyList(),anyList());
     }
 
     @Test void registrationClaimsExistingGuestHistoryAndDropsEmptyGuestChats() throws Exception {

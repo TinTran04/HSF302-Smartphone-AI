@@ -99,7 +99,10 @@ class GeminiOnlyConfigurationTest {
         var description = embedding.describe();
         assertEquals(false, description.get("configured"));
         assertEquals(true, description.get("reindexRequired"));
-        assertFalse(description.containsKey("provider"));
+        assertEquals("GEMINI", description.get("provider"));
+        assertEquals("gemini-embedding-001", description.get("model"));
+        assertEquals(768, description.get("dimensions"));
+        assertEquals("", description.get("maskedKey"));
         assertThrows(InvalidAiConfigurationException.class, embedding::current);
         assertTrue(legacy.isActive());
         assertEquals("legacy-version", doc.getEmbeddingVersion());
