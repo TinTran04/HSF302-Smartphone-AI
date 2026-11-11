@@ -14,7 +14,15 @@ import {
   type ChatTurn,
 } from '../utils/chatPresentation';
 
-export function useChat(id: string) {
+export function useChat(
+  id: string,
+  options?: {
+    /** Stay on the current screen after a topic switch instead of opening the full chat page. */
+    onSwitched?: (conversationId: string) => void;
+    /** Skip the "message sent" toast, e.g. in the floating assistant. */
+    quiet?: boolean;
+  },
+) {
   const { user } = useAuth();
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -69,7 +77,7 @@ export function useChat(id: string) {
     conversation.data?.pendingSwitch;
   const send = useMutation({
     mutationKey: ['chat', user?.id, id, 'send'],
-    meta: { toast: { success: 'Đã gửi tin nhắn.' } },
+    meta: { toast: { success: options?.quiet ? false : 'Đã gửi tin nhắn.' } },
     retry: false,
     mutationFn: ({ turn: attempt }: { turn: ChatTurn; owner: ChatRequestOwner }) =>
       api.sendMessage(id, attempt.user.content, attempt.user.id.slice('local-'.length)),
@@ -214,7 +222,8 @@ export function useChat(id: string) {
       client.setQueryData(['chat-reveal', request.accountId, nextId], received);
       setPendingSwitch(null);
       void client.invalidateQueries({ queryKey: key });
-      navigate(`/ai/conversations/${nextId}`, { replace: true });
+      if (options?.onSwitched) options.onSwitched(nextId);
+      else navigate(`/ai/conversations/${nextId}`, { replace: true });
     },
   });
   const cancel = useMutation({
