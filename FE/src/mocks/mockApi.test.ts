@@ -165,6 +165,17 @@ describe('Fake backend business contracts', () => {
     expect(restored[0]).toEqual(expect.objectContaining({ ...gemini, backupKeys: [expect.objectContaining({ name: 'Key dự phòng 1', maskedKey: 'masked-backup' })] }));
   });
 
+  it('offers ranked demo model options once a key is available', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    await expect(async () => backend.aiModelOptions('GROQ')).rejects.toMatchObject({ status: 409 });
+    const groq = await backend.aiModelOptions('GROQ', 'gsk-typed');
+    expect(groq.source).toBe('LIVE');
+    expect(groq.models.map((model) => model.requestsPerDay)).toEqual([14400, 1000, 1000]);
+    expect((await backend.aiModelOptions('GEMINI')).models[0].id).toBe('gemini-3.6-flash-lite');
+    expect((await backend.aiModelOptions('DEEPSEEK', 'sk')).source).toBe('NONE');
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('gsk-typed');
+  });
+
   it('switches the single active chat platform between Gemini, Groq and DeepSeek', async () => {
     await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
     for (const [provider, model] of [['GROQ', 'llama-3.3-70b-versatile'], ['DEEPSEEK', 'deepseek-chat']] as const) {

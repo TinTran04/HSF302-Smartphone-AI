@@ -143,12 +143,20 @@ Trang **Cấu hình AI** tại `/admin/ai-settings` có ba thẻ nền tảng: *
 | Groq | [Groq Console](https://console.groq.com/keys), key dạng `gsk_...` | `llama-3.3-70b-versatile` | API tương thích OpenAI tại `api.groq.com/openai` |
 | DeepSeek | [DeepSeek Platform](https://platform.deepseek.com/api_keys), key dạng `sk-...` | `deepseek-chat` | API tương thích OpenAI tại `api.deepseek.com`; tài khoản cần còn số dư |
 
-Model gợi ý chỉ là giá trị điền sẵn cho cấu hình mới. Kiểm tra danh sách model đang được cấp trong tài khoản của bạn trước khi lưu. [Model Groq](https://console.groq.com/docs/models), [Model DeepSeek](https://api-docs.deepseek.com/quick_start/pricing), [Model Gemini](https://ai.google.dev/gemini-api/docs/models)
+Ô **Chat Model** là danh sách chọn. Bấm **Tải danh sách model** để BE gọi API của nền tảng bằng API key mới vừa nhập (hoặc key đã lưu nếu để trống), lọc model chat và đưa ra **3 model có hạn mức dùng miễn phí lớn nhất**. Cấu hình mới tự chọn model đứng đầu; model đang lưu luôn có trong danh sách với nhãn "đang lưu". Kết quả được BE nhớ 10 phút.
+
+| Nền tảng | Nguồn danh sách model | Cách xếp hạng hạn mức miễn phí |
+| --- | --- | --- |
+| Groq | `GET /openai/v1/models` | Gửi mỗi model một yêu cầu rất nhỏ (`max_tokens=1`, tối đa 25 model) và đọc header `x-ratelimit-limit-requests` (lượt/ngày), `x-ratelimit-limit-tokens` (token/phút): đây là hạn mức thật của tài khoản. Xếp theo lượt/ngày rồi token/phút |
+| Google Gemini | `GET /v1beta/models` | Google không trả hạn mức qua API nên dùng ước tính theo dòng model (Flash-Lite > Flash > Pro), ưu tiên phiên bản mới và bản ổn định; nhãn ghi "ước tính". Số thật của project xem trong AI Studio, bảng ước tính nằm ở `AiFreeTierEstimates.java` |
+| DeepSeek | `GET /models` | DeepSeek không có gói miễn phí, danh sách chỉ gồm các model chat khả dụng |
+
+Nhà cung cấp có thể đổi danh sách model và hạn mức bất cứ lúc nào. Model gợi ý trong bảng trên chỉ là giá trị điền sẵn khi chưa tải danh sách. [Model Groq](https://console.groq.com/docs/models), [Model DeepSeek](https://api-docs.deepseek.com/quick_start/pricing), [Model Gemini](https://ai.google.dev/gemini-api/docs/models)
 
 1. Tạo API key ở trang của nền tảng muốn dùng theo bảng trên.
 2. Đăng nhập Admin bằng `ROOT_ADMIN_EMAIL` và mật khẩu khởi tạo, mở **Cấu hình AI** tại `/admin/ai-settings`.
 3. Bấm thẻ nền tảng cần cấu hình. Form bên dưới đổi sang nền tảng đó.
-4. Điền Chat Model bằng đúng mã model trong tài khoản, nhập API key vào ô key mới.
+4. Nhập API key vào ô key mới, bấm **Tải danh sách model** rồi chọn model trong ô Chat Model.
 5. Bấm **Lưu cấu hình**, sau đó **Kiểm tra kết nối**. BE gửi một yêu cầu thử tới nền tảng đã chọn bằng key chính và từng key dự phòng.
 6. Khi kiểm tra thành công, bấm **Kích hoạt** và xác nhận. Thẻ nền tảng hiển thị **Đang hoạt động** và các yêu cầu chat mới dùng nền tảng này.
 
@@ -329,6 +337,7 @@ flowchart LR
 | `POST /api/ai/topic-switches/{id}/confirm` | Xác nhận chuyển chủ đề |
 | `DELETE /api/ai/conversations/{id}` | Xóa hội thoại của mình |
 | `GET/PUT /api/admin/ai-settings` | Xem/lưu cấu hình Chat của `GEMINI`, `GROQ` hoặc `DEEPSEEK` |
+| `POST /api/admin/ai-settings/models` | Lấy 3 model chat có hạn mức miễn phí lớn nhất của nền tảng (key trong body hoặc key đã lưu) |
 | `POST /api/admin/ai-settings/test` | Kiểm tra key và model |
 | `POST /api/admin/ai-settings/activate` | Kích hoạt cấu hình đã kiểm tra, chuyển Chat sang nền tảng đó |
 | `GET/PUT /api/admin/embedding-settings` | Xem/kiểm tra/lưu embedding |

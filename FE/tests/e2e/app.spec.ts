@@ -784,12 +784,24 @@ test('admin switches the chat platform from Gemini to Groq and back', async ({ p
   await expect(page.getByLabel('Chat Model')).toHaveValue('llama-3.3-70b-versatile');
   await expect(page.getByRole('region', { name: 'Quota Gemini theo project' })).toHaveCount(0);
   await page.getByPlaceholder('Nhập khóa mới khi cần thay đổi').fill('gsk-demo-secret');
+  await page.getByRole('button', { name: 'Tải danh sách model', exact: true }).click();
+  const modelSelect = page.getByLabel('Chat Model');
+  await expect(modelSelect.locator('option')).toContainText([
+    '1. llama-3.1-8b-instant — 14.400 lượt/ngày · 6.000 token/phút',
+    '2. llama-3.3-70b-versatile — 1.000 lượt/ngày · 12.000 token/phút',
+    '3. openai/gpt-oss-120b — 1.000 lượt/ngày · 8.000 token/phút',
+  ]);
+  await expect(page.getByText(/Top 3 model có hạn mức miễn phí lớn nhất/)).toBeVisible();
+  await expect(modelSelect).toHaveValue('llama-3.1-8b-instant');
+  await modelSelect.selectOption('llama-3.3-70b-versatile');
+  await expect(modelSelect).toHaveValue('llama-3.3-70b-versatile');
+  await modelSelect.selectOption('llama-3.1-8b-instant');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
   await page.getByRole('dialog', { name: 'Kích hoạt Groq?' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
-  await expect(platforms.getByRole('button', { name: /Groq/ })).toContainText('Đang hoạt động: llama-3.3-70b-versatile');
+  await expect(platforms.getByRole('button', { name: /Groq/ })).toContainText('Đang hoạt động: llama-3.1-8b-instant');
   await expect(platforms.getByRole('button', { name: /Google Gemini/ })).not.toContainText('Đang hoạt động');
   expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('gsk-demo-secret');
   await platforms.getByRole('button', { name: /Google Gemini/ }).click();
@@ -804,14 +816,14 @@ test('AI settings polling preserves unsaved model and backup drafts', async ({ p
   await page.clock.install();
   await login(page, true);
   await page.goto('/admin/ai-settings');
-  await page.getByLabel('Chat Model').fill('gemini-draft-model');
+  await page.getByLabel('Chat Model').selectOption('gemini-3.6-flash-lite');
   await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Tên key', { exact: true }).fill('Draft project');
   await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('unsaved-secret');
   await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
   await page.clock.fastForward(16_000);
   await page.clock.runFor(500);
-  await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-draft-model');
+  await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-3.6-flash-lite');
   await expect(page.getByRole('region', { name: 'Danh sách key dự phòng' })).toContainText('Draft project');
   await expect(page.getByRole('button', { name: 'Kiểm tra Draft project', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('unsaved-secret');
@@ -820,13 +832,13 @@ test('AI settings polling preserves unsaved model and backup drafts', async ({ p
 test('activation confirmation rejects a configuration changed by another admin', async ({ page }) => {
   await login(page, true);
   await page.goto('/admin/ai-settings');
-  await page.getByLabel('Chat Model').fill('gemini-reviewed');
+  await page.getByLabel('Chat Model').selectOption('gemini-3.5-pro');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Kích hoạt Google Gemini?' });
-  await expect(dialog).toContainText('gemini-reviewed');
+  await expect(dialog).toContainText('gemini-3.5-pro');
   await page.evaluate(async modulePath => {
     const { api } = await import(modulePath);
     const current = (await api.aiSettings())[0];
