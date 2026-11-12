@@ -149,6 +149,15 @@ describe('real backend contract', () => {
     ]);
   });
 
+  it('requests model options with the typed key only when one is provided', async () => {
+    vi.mocked(http).mockResolvedValue({ provider: 'GROQ', source: 'LIVE', note: '', models: [], fetchedAt: '' });
+    await realApi.aiModelOptions('GROQ');
+    await realApi.aiModelOptions('DEEPSEEK', 'sk-new');
+    expect(vi.mocked(http).mock.calls[0][0]).toBe('/admin/ai-settings/models');
+    expect(vi.mocked(http).mock.calls[0][1]).toMatchObject({ method: 'POST', body: JSON.stringify({ provider: 'GROQ' }) });
+    expect(vi.mocked(http).mock.calls[1][1]).toMatchObject({ body: JSON.stringify({ provider: 'DEEPSEEK', apiKey: 'sk-new' }) });
+  });
+
   it('resolves an oversized guest cart in batches so users can remove items', async () => {
     vi.mocked(http).mockResolvedValue({ items: [], total: 0 });
     await realApi.resolveCart(Array.from({length: 101}, (_, i) => ({ variantId: String(i + 1), quantity: 1 })));

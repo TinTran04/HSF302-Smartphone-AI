@@ -294,6 +294,18 @@ test('admin configures only Gemini for chat and embedding with the existing save
       operations.push('save');
       return route.fulfill({ json: settings });
     }
+    if (path === '/api/admin/ai-settings/models') {
+      expect(route.request().postDataJSON()).toMatchObject({ provider: 'GEMINI' });
+      return route.fulfill({
+        json: {
+          provider: 'GEMINI',
+          source: 'ESTIMATE',
+          note: 'Ước tính theo dòng model.',
+          fetchedAt: '2026-11-12T00:00:00Z',
+          models: [{ id: 'gemini-test-model', displayName: 'Gemini test', requestsPerDay: 1000, tokensPerMinute: 250000 }],
+        },
+      });
+    }
     if (path === '/api/admin/ai-settings/test') {
       expect(route.request().postDataJSON().provider).toBe('GEMINI');
       settings.tested = true;
@@ -333,8 +345,9 @@ test('admin configures only Gemini for chat and embedding with the existing save
     page.getByRole('heading', { name: 'Cấu hình nền tảng Chat AI', exact: true }),
   ).toBeVisible();
   await expect(page.getByText('OpenAI', { exact: true })).toHaveCount(0);
-  await page.getByLabel('Chat Model').fill('gemini-test-model');
   await page.getByPlaceholder('Nhập khóa mới khi cần thay đổi').fill('test-only-fake-key');
+  await page.getByRole('button', { name: 'Tải danh sách model', exact: true }).click();
+  await page.getByLabel('Chat Model').selectOption('gemini-test-model');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();

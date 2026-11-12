@@ -169,6 +169,7 @@ export const realApi: Api = {
     });
   },
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
+  aiModelOptions: (provider, apiKey) => http('/admin/ai-settings/models', { method: 'POST', body: jsonBody({ provider, ...(apiKey ? { apiKey } : {}) }), signal: AbortSignal.timeout(60000) }),
   testAiConnection: (data) => http('/admin/ai-settings/test', { method: 'POST', body: jsonBody(data), signal: AbortSignal.timeout(130000) }),
   activateProvider: async (provider, configId) => {
     await post('/admin/ai-settings/activate', { provider, ...(configId ? { configId } : {}) });

@@ -2,6 +2,8 @@ package com.smartphoneai.controller;
 import com.smartphoneai.dto.request.*;
 import com.smartphoneai.dto.response.AiSettingsResponse;
 import com.smartphoneai.service.AiProviderService;
+import com.smartphoneai.service.AiModelCatalogService;
+import com.smartphoneai.dto.response.AiModelOptionsResponse;
 import com.smartphoneai.service.AiKeyAlertService;
 import com.smartphoneai.dto.response.AiKeyAlertResponse;
 import jakarta.validation.Valid;
@@ -13,7 +15,14 @@ import java.util.Map;
 public class AiProviderController {
     private final AiProviderService providers;
     private final AiKeyAlertService alerts;
-    public AiProviderController(AiProviderService providers, AiKeyAlertService alerts) { this.providers=providers; this.alerts=alerts; }
+    private final AiModelCatalogService models;
+    public AiProviderController(AiProviderService providers, AiKeyAlertService alerts, AiModelCatalogService models) {
+        this.providers=providers; this.alerts=alerts; this.models=models;
+    }
+    /** POST để API key mới (nếu có) đi trong body, không nằm trên URL. */
+    @PostMapping("/models") public AiModelOptionsResponse models(@Valid @RequestBody AiModelOptionsRequest input) {
+        return models.options(input);
+    }
     public record KeyAlertStatus(AiKeyAlertResponse alert) {}
     @GetMapping("/key-alert") public KeyAlertStatus keyAlert() { return new KeyAlertStatus(alerts.current().orElse(null)); }
     @GetMapping public List<AiSettingsResponse> list() { return providers.list(); }

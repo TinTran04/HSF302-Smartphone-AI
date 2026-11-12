@@ -119,6 +119,47 @@ describe('Gemini administration settings', () => {
     expect(html).not.toContain('Quota Gemini theo project');
   });
 
+  it('turns the chat model into a dropdown of the top free models and keeps the saved model selectable', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['ai-settings'], [
+      { id: '', provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] },
+      { id: '7', provider: 'GROQ', model: 'qwen/qwen3-32b', maskedKey: 'masked', maskedBackupKey: '', active: true, tested: true, activeModel: 'qwen/qwen3-32b', backupKeys: [] },
+      { id: '', provider: 'DEEPSEEK', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] },
+    ]);
+    client.setQueryData(['ai-models', 'GROQ', '7', 0], {
+      provider: 'GROQ',
+      source: 'LIVE',
+      note: 'Hạn mức đọc trực tiếp từ tài khoản Groq.',
+      fetchedAt: '2026-11-12T00:00:00Z',
+      models: [
+        { id: 'llama-3.1-8b-instant', displayName: 'llama-3.1-8b-instant', requestsPerDay: 14400, tokensPerMinute: 6000 },
+        { id: 'llama-3.3-70b-versatile', displayName: 'llama-3.3-70b-versatile', requestsPerDay: 1000, tokensPerMinute: 12000 },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <ToastProvider>
+          <AiSettingsPage />
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+    expect(html).toMatch(/<select[^>]*required/);
+    expect(html).not.toContain('placeholder="Nhập mã model Groq');
+    expect(html).toContain('1. llama-3.1-8b-instant — 14.400 lượt/ngày · 6.000 token/phút');
+    expect(html).toContain('2. llama-3.3-70b-versatile — 1.000 lượt/ngày · 12.000 token/phút');
+    expect(html).toMatch(/<option value="qwen\/qwen3-32b" selected="">qwen\/qwen3-32b \(đang lưu\)<\/option>/);
+    expect(html).toContain('Top 2 model có hạn mức miễn phí lớn nhất.');
+    expect(html).toContain('Tải danh sách model');
+  });
+
+  it('labels estimated Gemini limits and DeepSeek models without a free tier', async () => {
+    const { modelOptionLabel } = await import('./AiSettingsPage');
+    expect(modelOptionLabel({ id: 'gemini-3.6-flash-lite', displayName: '', requestsPerDay: 1000, tokensPerMinute: 250000 }, 'ESTIMATE', 1))
+      .toBe('1. gemini-3.6-flash-lite — ~1.000 lượt/ngày · 250.000 token/phút (ước tính)');
+    expect(modelOptionLabel({ id: 'deepseek-chat', displayName: '', requestsPerDay: null, tokensPerMinute: null }, 'NONE', 2))
+      .toBe('2. deepseek-chat');
+  });
+
   it('opens the saved Gemini embedding model and dimensions', () => {
     const html = renderWithSettings(
       ['admin-ops', 'embedding'],

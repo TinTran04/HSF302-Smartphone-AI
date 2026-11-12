@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, isDemo } from '../../shared/api';
 import { http } from '../../shared/api/httpClient';
-import type { AiBackupKey, AiProvider, AiSettings } from '../../shared/types/models';
+import type { AiBackupKey, AiModelOption, AiModelOptions, AiProvider, AiSettings } from '../../shared/types/models';
 import { AI_PROVIDER_INFO } from '../../shared/constants/aiProviders';
 import {
   Button,
@@ -124,6 +124,17 @@ const statusLabels: Record<AiBackupKey['lastStatus'], string> = {
   KEY_ERROR: 'Lỗi key',
   PROVIDER_ERROR: 'Lỗi nhà cung cấp',
 };
+const formatNumber = (value: number) => value.toLocaleString('vi-VN');
+export function modelOptionLabel(option: AiModelOption, source: AiModelOptions['source'], rank: number) {
+  const usage = [
+    option.requestsPerDay != null ? `${formatNumber(option.requestsPerDay)} lượt/ngày` : '',
+    option.tokensPerMinute != null ? `${formatNumber(option.tokensPerMinute)} token/phút` : '',
+  ].filter(Boolean).join(' · ');
+  const suffix = usage
+    ? ` — ${source === 'ESTIMATE' ? '~' : ''}${usage}${source === 'ESTIMATE' ? ' (ước tính)' : ''}`
+    : '';
+  return `${rank}. ${option.id}${suffix}`;
+}
 const initialModel = (setting: AiSettings) =>
   setting.model || (!setting.id ? AI_PROVIDER_INFO[setting.provider].defaultModel : '');
 function ProviderForm({ setting }: { setting: AiSettings }) {
@@ -131,12 +142,15 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
   const info = AI_PROVIDER_INFO[provider];
   const [baseline, setBaseline] = useState(setting);
   const [model, setModel] = useState(() => initialModel(setting));
+  const [modelTouched, setModelTouched] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [keys, setKeys] = useState(() => toDraft(setting));
   const [visible, setVisible] = useState(false);
   const [activate, setActivate] = useState<AiSettings | null>(null);
   const [editing, setEditing] = useState<BackupDraft | null>(null);
   const [deleting, setDeleting] = useState<BackupDraft | null>(null);
+  // Key dùng để tải danh sách model; không đưa vào queryKey để key thô không nằm trong cache.
+  const [lookup, setLookup] = useState<{ key?: string; version: number }>({ version: 0 });
   const client = useQueryClient();
   const { notify } = useToast();
   const dirty =
@@ -153,6 +167,34 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
       setKeys(toDraft(setting));
     }
   }, [setting, baseline.id, dirty]);
+  const canLookup = !!setting.maskedKey || !!lookup.key;
+  const modelOptions = useQuery({
+    queryKey: ['ai-models', provider, baseline.id, lookup.version],
+    queryFn: () => api.aiModelOptions(provider, lookup.key),
+    enabled: canLookup,
+    staleTime: 10 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const fetchedModels = modelOptions.data?.models ?? [];
+  const topModel = modelOptions.data?.models[0]?.id;
+  useEffect(() => {
+    // Cấu hình mới mà Admin chưa tự chọn model thì chọn model có hạn mức miễn phí lớn nhất.
+    if (!baseline.id && !modelTouched && topModel) setModel(topModel);
+  }, [baseline.id, modelTouched, topModel]);
+  const modelChoices = fetchedModels.map((option, index) => ({
+    value: option.id,
+    label: modelOptionLabel(option, modelOptions.data!.source, index + 1),
+  }));
+  if (model && !modelChoices.some((choice) => choice.value === model))
+    modelChoices.unshift({
+      value: model,
+      label: `${model} (${model === baseline.model && baseline.id ? 'đang lưu' : 'gợi ý mặc định'})`,
+    });
+  const loadModels = () => {
+    const key = apiKey.trim() || undefined;
+    setLookup((current) => ({ key, version: current.version + 1 }));
+  };
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ['ai-settings'] });
     void client.invalidateQueries({ queryKey: ['ai-quota'] });
@@ -249,18 +291,32 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
       >
         <h2 className="!text-xl mb-7">Cấu hình chi tiết — {info.label}</h2>
         <div className="form-grid">
-          <label className="form-field">
+          <label className="form-field col-span-full">
             Chat Model
-            <input
+            <select
               required
               value={model}
-              onChange={(event) => setModel(event.target.value)}
-              disabled={busy}
-              placeholder={info.modelHint}
-            />
-            <span className="help-text">
-              {!baseline.id ? `Mặc định ${info.defaultModel}; bạn có thể đổi model. ` : ''}
-              Model hợp lệ được Backend và nhà cung cấp kiểm tra.
+              onChange={(event) => {
+                setModelTouched(true);
+                setModel(event.target.value);
+              }}
+              disabled={busy || modelChoices.length === 0}
+            >
+              {modelChoices.length === 0 && <option value="">Chưa có danh sách model</option>}
+              {modelChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            <span className="help-text" aria-live="polite">
+              {modelOptions.isFetching
+                ? 'Đang tải danh sách model từ nhà cung cấp…'
+                : modelOptions.error
+                  ? `Không tải được danh sách model: ${modelOptions.error.message}`
+                  : modelOptions.data
+                    ? `Top ${fetchedModels.length} model có hạn mức miễn phí lớn nhất. ${modelOptions.data.note}`
+                    : 'Nhập API key rồi bấm Tải danh sách model để chọn model.'}
             </span>
           </label>
           <label className="form-field">
@@ -294,6 +350,20 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
               </button>
             </div>
           </label>
+          <div className="col-span-full flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              busy={modelOptions.isFetching}
+              disabled={busy || modelOptions.isFetching || (!apiKey.trim() && !setting.maskedKey)}
+              onClick={loadModels}
+            >
+              <Icon name="refresh" />
+              Tải danh sách model
+            </Button>
+            <span className="help-text">
+              Dùng API key mới nếu đã nhập, nếu không thì dùng key đã lưu.
+            </span>
+          </div>
         </div>
         <section className="mt-7" aria-label="Danh sách key dự phòng">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

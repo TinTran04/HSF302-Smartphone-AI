@@ -3,6 +3,7 @@ import { ApiError } from '../shared/api/httpClient';
 import type {
   AiAnswer,
   AiKeyAlert,
+  AiModelOptions,
   AiBackupKey,
   AiNotifications,
   AiProvider,
@@ -122,6 +123,37 @@ function restoreSettings(provider: AiProvider): AiSettings {
 }
 let settings: AiSettings[] = AI_PROVIDERS.map(restoreSettings);
 write('settings', settings);
+const demoModelOptions: Record<AiProvider, Omit<AiModelOptions, 'fetchedAt'>> = {
+  GEMINI: {
+    provider: 'GEMINI',
+    source: 'ESTIMATE',
+    note: 'Chế độ demo: danh sách minh họa. Gemini không trả hạn mức miễn phí qua API, thứ tự dựa trên ước tính theo dòng model.',
+    models: [
+      { id: 'gemini-3.6-flash-lite', displayName: 'Gemini 3.6 Flash-Lite', requestsPerDay: 1000, tokensPerMinute: 250000 },
+      { id: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', requestsPerDay: 250, tokensPerMinute: 250000 },
+      { id: 'gemini-3.5-pro', displayName: 'Gemini 3.5 Pro', requestsPerDay: 100, tokensPerMinute: 250000 },
+    ],
+  },
+  GROQ: {
+    provider: 'GROQ',
+    source: 'LIVE',
+    note: 'Chế độ demo: hạn mức minh họa, không gọi Groq thật.',
+    models: [
+      { id: 'llama-3.1-8b-instant', displayName: 'llama-3.1-8b-instant', requestsPerDay: 14400, tokensPerMinute: 6000 },
+      { id: 'llama-3.3-70b-versatile', displayName: 'llama-3.3-70b-versatile', requestsPerDay: 1000, tokensPerMinute: 12000 },
+      { id: 'openai/gpt-oss-120b', displayName: 'openai/gpt-oss-120b', requestsPerDay: 1000, tokensPerMinute: 8000 },
+    ],
+  },
+  DEEPSEEK: {
+    provider: 'DEEPSEEK',
+    source: 'NONE',
+    note: 'Chế độ demo: DeepSeek không có gói miễn phí, tính phí theo token.',
+    models: [
+      { id: 'deepseek-chat', displayName: 'deepseek-chat', requestsPerDay: null, tokensPerMinute: null },
+      { id: 'deepseek-reasoner', displayName: 'deepseek-reasoner', requestsPerDay: null, tokensPerMinute: null },
+    ],
+  },
+};
 function notifications(): AiNotifications {
   const current = read<AiKeyAlert | null>('ai-key-alert', null);
   const items = read<AiNotifications['items']>('ai-notifications-' + user?.id, []);
@@ -832,6 +864,12 @@ export const mockApi: Api = {
       message:
         'Chế độ demo: đã mô phỏng kiểm tra key dự phòng.',
     });
+  },
+  aiModelOptions: (provider, apiKey) => {
+    admin();
+    if (!apiKey?.trim() && !settings.find((s) => s.provider === provider)?.maskedKey)
+      throw new ApiError(409, 'Nhập API key hoặc lưu cấu hình trước khi tải danh sách model.');
+    return delay({ ...demoModelOptions[provider], fetchedAt: new Date().toISOString() });
   },
   activateProvider: (provider, configId) => {
     admin();
