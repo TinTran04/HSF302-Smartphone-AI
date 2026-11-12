@@ -5,6 +5,7 @@ import type {
   AiKeyAlert,
   AiBackupKey,
   AiNotifications,
+  AiProvider,
   AiSettings,
   Cart,
   CartEntry,
@@ -25,6 +26,7 @@ import { mockBrands, mockProducts } from './products';
 import { normalizeTopic, topicInfo } from '../features/ai-chat/constants/chatTopics';
 import { catalogVariants } from '../features/products/availability';
 import { sortOrdersNewestFirst } from '../features/orders/sortOrders';
+import { AI_PROVIDERS } from '../shared/constants/aiProviders';
 
 // Local fake backend. It never connects to an AI provider or stores credentials.
 // It is loaded only when the explicitly visible demo mode is enabled.
@@ -80,21 +82,21 @@ const storedSettings = read<AiSettings[]>('settings', [
     active: true,
   },
 ]);
-const storedGemini =
-  Array.isArray(storedSettings) && storedSettings.find((setting) => setting?.provider === 'GEMINI');
-let settings: AiSettings[] = [
-  {
-    id: (storedGemini && storedGemini.id) || 'demo-config',
-    provider: 'GEMINI',
-    model: (storedGemini && storedGemini.model) || '',
-    maskedKey: (storedGemini && storedGemini.maskedKey) || '',
-    maskedBackupKey: (storedGemini && storedGemini.maskedBackupKey) || '',
-    tested: !!(storedGemini && storedGemini.tested),
-    active: !!(storedGemini && storedGemini.active),
-    ...(storedGemini && storedGemini.activeModel ? { activeModel: storedGemini.activeModel } : {}),
+function restoreSettings(provider: AiProvider): AiSettings {
+  const stored =
+    Array.isArray(storedSettings) && storedSettings.find((setting) => setting?.provider === provider);
+  return {
+    id: (stored && stored.id) || (provider === 'GEMINI' ? 'demo-config' : ''),
+    provider,
+    model: (stored && stored.model) || '',
+    maskedKey: (stored && stored.maskedKey) || '',
+    maskedBackupKey: (stored && stored.maskedBackupKey) || '',
+    tested: !!(stored && stored.tested),
+    active: !!(stored && stored.active),
+    ...(stored && stored.activeModel ? { activeModel: stored.activeModel } : {}),
     backupKeys:
-      storedGemini && Array.isArray(storedGemini.backupKeys)
-        ? storedGemini.backupKeys.map((key, priority) => ({
+      stored && Array.isArray(stored.backupKeys)
+        ? stored.backupKeys.map((key, priority) => ({
             id: key.id,
             name: key.name,
             maskedKey: key.maskedKey,
@@ -103,12 +105,12 @@ let settings: AiSettings[] = [
             lastFailureReason: key.lastFailureReason || null,
             lastCheckedAt: key.lastCheckedAt || null,
           }))
-        : storedGemini && storedGemini.maskedBackupKey
+        : stored && stored.maskedBackupKey
           ? [
               {
                 id: 'demo-legacy-backup',
                 name: 'Key dự phòng 1',
-                maskedKey: storedGemini.maskedBackupKey,
+                maskedKey: stored.maskedBackupKey,
                 priority: 1,
                 lastStatus: 'UNKNOWN',
                 lastFailureReason: null,
@@ -116,8 +118,9 @@ let settings: AiSettings[] = [
               },
             ]
           : [],
-  },
-];
+  };
+}
+let settings: AiSettings[] = AI_PROVIDERS.map(restoreSettings);
 write('settings', settings);
 function notifications(): AiNotifications {
   const current = read<AiKeyAlert | null>('ai-key-alert', null);
@@ -795,7 +798,7 @@ export const mockApi: Api = {
       backupKeys,
       maskedBackupKey: backupKeys[0]?.maskedKey || '',
     };
-    settings = [saved];
+    settings = settings.map((setting) => (setting.provider === saved.provider ? saved : setting));
     save();
     return delay(saved);
   },

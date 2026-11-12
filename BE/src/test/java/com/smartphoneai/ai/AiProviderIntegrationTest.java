@@ -217,4 +217,38 @@ class AiProviderIntegrationTest {
         org.junit.jupiter.api.Assertions.assertEquals(count, configs.count());
         verifyNoInteractions(provider);
     }
+    @Test void adminCanSwitchActiveChatPlatformBetweenGeminiGroqAndDeepSeek() throws Exception {
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"aiadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
+                .andExpect(status().isOk());
+        when(provider.chat(anyString(), anyString(), anyString(), anyString())).thenReturn("OK");
+        String[][] platforms = {{"GEMINI", "gemini-model", "gemini-secret"}, {"GROQ", "llama-3.3-70b-versatile", "gsk-secret"},
+                {"DEEPSEEK", "deepseek-chat", "sk-deepseek-secret"}};
+        for (String[] platform : platforms) {
+            String body = "{\"provider\":\"" + platform[0] + "\",\"model\":\"" + platform[1] + "\"";
+            mvc.perform(put("/api/admin/ai-settings").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                    .content(body + ",\"apiKey\":\"" + platform[2] + "\",\"backupKeys\":[{\"name\":\"Dự phòng\",\"apiKey\":\"" + platform[2] + "-backup\"}]}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.provider").value(platform[0]))
+                    .andExpect(content().string(not(containsString(platform[2]))));
+            mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                    .content(body + "}")).andExpect(status().isOk());
+            verify(provider).chat(eq(platform[0]), eq(platform[1]), eq(platform[2]), anyString());
+            verify(provider).chat(eq(platform[0]), eq(platform[1]), eq(platform[2] + "-backup"), anyString());
+        }
+        mvc.perform(get("/api/admin/ai-settings").with(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].provider", containsInAnyOrder("GEMINI", "GROQ", "DEEPSEEK")));
+        for (String[] platform : platforms) {
+            mvc.perform(post("/api/admin/ai-settings/activate").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"provider\":\"" + platform[0] + "\"}")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.active == true)].provider").value(platform[0]));
+            assertEquals(1, configs.findAllByActiveTrue().size());
+            assertEquals(platform[0], configs.findAllByActiveTrue().getFirst().getProvider());
+            clearInvocations(provider);
+            when(provider.chat(eq(platform[0]), eq(platform[1]), eq(platform[2]), anyString())).thenReturn("answer from " + platform[0]);
+            assertEquals("answer from " + platform[0], ai.chat("question"));
+            verify(provider).chat(eq(platform[0]), eq(platform[1]), eq(platform[2]), anyString());
+            verify(provider, times(1)).chat(anyString(), anyString(), anyString(), anyString());
+        }
+    }
 }

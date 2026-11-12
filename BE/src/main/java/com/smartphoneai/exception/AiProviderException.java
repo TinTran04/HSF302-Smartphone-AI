@@ -34,6 +34,8 @@ public class AiProviderException extends RuntimeException {
                 || detail.contains("api key expired") || detail.contains("api key not valid"))) {
             return new AiProviderException(401);
         }
+        // DeepSeek trả 402 khi tài khoản hết số dư: xử lý như hết quota để chuyển sang key dự phòng.
+        if (status == 402) return new AiProviderException(429);
         return new AiProviderException(status);
     }
 

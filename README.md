@@ -6,7 +6,7 @@ Hệ thống chỉ sử dụng hai vai trò **CUSTOMER** và **ADMIN**. Admin đ
 
 Xác thực dùng access JWT 15 phút và refresh token xoay vòng 7 ngày trong cookie HttpOnly, kèm CSRF. Mỗi thiết bị có thể bị thu hồi khi đăng xuất hoặc khi thông tin tài khoản thay đổi. Khi khởi động, BE áp dụng migration V26 để bổ sung ảnh dataset và V27 để lưu vị trí bản đồ cho hồ sơ, bản xem trước và đơn hàng.
 
-Hướng dẫn đầy đủ về setup, cấu hình Gemini, sử dụng, giải thích code và kịch bản demo nằm trong [User Guide](USER_GUIDE.md).
+Hướng dẫn đầy đủ về setup, cấu hình nền tảng AI (Gemini, Groq, DeepSeek), sử dụng, giải thích code và kịch bản demo nằm trong [User Guide](USER_GUIDE.md).
 
 ## Chức năng chính
 
@@ -38,7 +38,7 @@ Dự án không xử lý tồn kho thực tế, thanh toán trực tuyến hoặ
 | Frontend | React, TypeScript, Vite, React Router, TanStack Query |
 | Backend | Java 21, Spring Boot, Spring Security, Spring Data JPA, Flyway |
 | Dữ liệu | PostgreSQL và extension pgvector |
-| AI | Google Gemini; truy xuất tài liệu PDF/TXT bằng RAG |
+| AI | Chat hoán chuyển giữa Google Gemini, Groq và DeepSeek; embedding Gemini và RAG cho tài liệu PDF/TXT |
 | Kiểm thử | Vitest, Playwright, JUnit, H2 |
 
 ```text
@@ -57,7 +57,7 @@ Backend tổ chức theo luồng Controller → Service interface → ServiceImp
 - Node.js 22.12 trở lên và npm.
 - PostgreSQL đã cài extension **pgvector**. Tạo database `smartphone_ai`; tài khoản database cần quyền tạo extension khi Flyway chạy lần đầu.
 - Tài khoản Gmail và mật khẩu ứng dụng để gửi OTP và lời mời kích hoạt tài khoản. Các tính năng này cần SMTP hoạt động.
-- API key của Google Gemini nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
+- API key của Google Gemini cho embedding, và API key Chat của ít nhất một nền tảng Gemini, Groq hoặc DeepSeek nếu muốn sử dụng AI thật. Cấu hình Chat Model và Embedding Model riêng trong trang quản trị.
 
 **Nếu database đã có dữ liệu:** sao lưu và thử trên bản sao trước khi khởi động BE. Migration V20 xóa các tài khoản STAFF/MANAGER cũ cùng dữ liệu liên quan của chính các tài khoản đó. Chi tiết tại [README backend](BE/README.md).
 
@@ -119,7 +119,7 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 
 ## Cấu hình AI và RAG
 
-1. Đăng nhập Admin, mở **Cấu hình AI**, lưu cấu hình Google Gemini, kiểm tra kết nối rồi kích hoạt chat model.
+1. Đăng nhập Admin, mở **Cấu hình AI**, chọn thẻ Google Gemini, Groq hoặc DeepSeek, lưu model và API key, kiểm tra kết nối rồi kích hoạt. Kích hoạt nền tảng khác để hoán chuyển nền tảng Chat.
 2. Mở **Cấu hình embedding**. Hệ thống đặt sẵn Gemini `gemini-embedding-001` với 768 chiều cho cấu hình mới. Nhập API key Gemini rồi bấm **Kiểm tra và lưu**.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.

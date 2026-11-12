@@ -2,6 +2,7 @@ import type { Api } from './contracts';
 import { ApiError, http, jsonBody, setAuthAccount } from './httpClient';
 import type { Cart, CartEntry, CartItem, Product, Order, OrderPreview, User } from '../types/models';
 import { guestCartMergeId } from '../utils/guestCartMerge';
+import { AI_PROVIDERS } from '../constants/aiProviders';
 
 type ServerCart = { items: (CartEntry & { product: Product | null; variant: CartItem['variant'] | null; unavailable: boolean; priceAtAdd: number })[]; total: number };
 function mapCart(cart: ServerCart): Cart {
@@ -161,7 +162,7 @@ export const realApi: Api = {
   testBackupKey: (configId, keyId) => http('/admin/ai-settings/' + encodeURIComponent(configId) + '/backup-keys/' + encodeURIComponent(keyId) + '/test', { method: 'POST', signal: AbortSignal.timeout(130000) }),
   aiSettings: async () => {
     const configs = await http<import('../types/models').AiSettings[]>('/admin/ai-settings');
-    return (['GEMINI'] as const).map(provider => {
+    return AI_PROVIDERS.map(provider => {
       const latest = configs.find(c => c.provider === provider) ?? { id: '', backupKeys: [], provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false };
       const active = configs.find(c => c.provider === provider && c.active);
       return { ...latest, backupKeys: latest.backupKeys ?? [], ...(active ? { activeModel: active.model } : {}) };
