@@ -16,7 +16,7 @@ class ServiceLayerStructureTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "AdminManagementService", "AdminProductService", "AiChatService", "AiProviderService",
+            "AdminManagementService", "AdminProductService", "AiModelCatalogService", "AiChatService", "AiProviderService",
             "BrandService", "CartService", "ChatResponder", "DocumentProcessingService",
             "EmbeddingSettingsService", "GuestSessionCleanup", "KnowledgeIndexWorker", "KnowledgeService",
             "LoginService", "MaintenanceService", "OrderService", "OtpChallengeService",

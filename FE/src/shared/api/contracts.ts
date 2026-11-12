@@ -2,6 +2,7 @@ import type {
   AddressSuggestion,
   AiProvider,
   AiKeyAlert,
+  AiModelOptions,
   AiNotifications,
   AiSettings,
   Brand,
@@ -87,4 +88,6 @@ export interface Api {
     removeBackupKey?: boolean;
   }): Promise<{ message: string }>;
   activateProvider(provider: AiProvider, configId?: string): Promise<AiSettings[]>;
+  /** Tối đa 3 model chat có hạn mức miễn phí lớn nhất; để trống apiKey thì BE dùng key đã lưu. */
+  aiModelOptions(provider: AiProvider, apiKey?: string): Promise<AiModelOptions>;
 }

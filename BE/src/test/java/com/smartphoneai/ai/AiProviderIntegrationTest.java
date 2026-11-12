@@ -51,6 +51,7 @@ class AiProviderIntegrationTest {
     @Autowired com.smartphoneai.service.AuthTokenService tokens;
     @MockitoBean OtpSender otpSender;
     @MockitoBean ChatProviderClient provider;
+    @MockitoBean com.smartphoneai.service.AiModelDirectory modelDirectory;
     @BeforeEach void clearConfigurations() { configs.deleteAll(); }
 
     @Test void geminiCallDoesNotRunInsideADatabaseTransaction() throws Exception {
@@ -250,5 +251,34 @@ class AiProviderIntegrationTest {
             verify(provider).chat(eq(platform[0]), eq(platform[1]), eq(platform[2]), anyString());
             verify(provider, times(1)).chat(anyString(), anyString(), anyString(), anyString());
         }
+    }
+    @Test void adminFetchesTopFreeModelsWithTheSavedKeyWithoutExposingIt() throws Exception {
+        mvc.perform(post("/api/admin/ai-settings/models").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"GROQ\"}")).andExpect(status().is4xxClientError());
+        var session = new JwtTestClient();
+        mvc.perform(post("/api/auth/login").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"identifier\":\"aiadmin@example.com\",\"password\":\"TestRootPassword123!\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/admin/ai-settings/models").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"GROQ\"}")).andExpect(status().isConflict());
+        ai.save(new AiSettingsRequest("GROQ", "llama-3.3-70b-versatile", "gsk-saved-secret", null, false));
+        when(modelDirectory.listChatModels("GROQ", "gsk-saved-secret")).thenReturn(java.util.List.of(
+                new com.smartphoneai.service.AiModelDirectory.ListedModel("llama-3.1-8b-instant", "llama-3.1-8b-instant"),
+                new com.smartphoneai.service.AiModelDirectory.ListedModel("llama-3.3-70b-versatile", "llama-3.3-70b-versatile")));
+        when(modelDirectory.probeLimits("GROQ", "llama-3.1-8b-instant", "gsk-saved-secret"))
+                .thenReturn(java.util.Optional.of(new com.smartphoneai.service.AiModelDirectory.RateLimits(14_400L, 6_000L)));
+        when(modelDirectory.probeLimits("GROQ", "llama-3.3-70b-versatile", "gsk-saved-secret"))
+                .thenReturn(java.util.Optional.of(new com.smartphoneai.service.AiModelDirectory.RateLimits(1_000L, 12_000L)));
+        mvc.perform(post("/api/admin/ai-settings/models").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"GROQ\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("LIVE"))
+                .andExpect(jsonPath("$.models[0].id").value("llama-3.1-8b-instant"))
+                .andExpect(jsonPath("$.models[0].requestsPerDay").value(14400))
+                .andExpect(jsonPath("$.models[1].id").value("llama-3.3-70b-versatile"))
+                .andExpect(content().string(not(containsString("gsk-saved-secret"))));
+        mvc.perform(post("/api/admin/ai-settings/models").with(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"provider\":\"OPENAI\",\"apiKey\":\"x\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

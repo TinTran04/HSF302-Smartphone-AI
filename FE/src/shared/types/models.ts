@@ -169,6 +169,20 @@ export interface AiNotifications {
   unreadCount: number;
   latestId: string | null;
 }
+export interface AiModelOption {
+  id: string;
+  displayName: string;
+  requestsPerDay: number | null;
+  tokensPerMinute: number | null;
+}
+/** LIVE: hạn mức thật của tài khoản; ESTIMATE: ước tính theo dòng model; NONE: không có số liệu free. */
+export interface AiModelOptions {
+  provider: AiProvider;
+  source: 'LIVE' | 'ESTIMATE' | 'NONE';
+  note: string;
+  models: AiModelOption[];
+  fetchedAt: string;
+}
 export interface AiSettings {
   id: string;
   backupKeys: AiBackupKey[];
