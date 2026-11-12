@@ -62,18 +62,20 @@ describe('Fake backend business contracts', () => {
     expect(next.type).toBe('ANSWER');
     if (next.type === 'ANSWER') expect(next.recommendedProducts?.length).toBeGreaterThan(0);
   });
-  it('starts demo mode with a single Gemini provider and preserves backup key workflow', async () => {
+  it('starts demo mode with Gemini active and preserves backup key workflow', async () => {
     await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
     expect(await backend.aiSettings()).toEqual([
       expect.objectContaining({ provider: 'GEMINI', active: true }),
+      expect.objectContaining({ provider: 'GROQ', active: false, maskedKey: '' }),
+      expect.objectContaining({ provider: 'DEEPSEEK', active: false, maskedKey: '' }),
     ]);
     const saved = await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', apiKey: 'demo-primary', backupApiKey: 'demo-backup' });
     expect(saved).toMatchObject({ active: false, tested: false, maskedKey: '••••••••', maskedBackupKey: '••••••••' });
     await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 409 });
     await backend.testAiConnection({ provider: 'GEMINI', model: 'demo-gemini' });
-    expect(await backend.activateProvider('GEMINI')).toEqual([
+    expect((await backend.activateProvider('GEMINI'))[0]).toEqual(
       expect.objectContaining({ provider: 'GEMINI', active: true, model: 'demo-gemini' }),
-    ]);
+    );
     expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-primary');
     expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('demo-backup');
     expect(await backend.saveAiSettings({ provider: 'GEMINI', model: 'demo-gemini', removeBackupKey: true }))
@@ -143,6 +145,8 @@ describe('Fake backend business contracts', () => {
     await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
     await expect(backend.aiSettings()).resolves.toEqual([
       { id: 'demo-config', backupKeys: [], provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+      { id: '', backupKeys: [], provider: 'GROQ', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
+      { id: '', backupKeys: [], provider: 'DEEPSEEK', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
     ]);
     expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('legacy');
     await expect(async () => backend.activateProvider('GEMINI')).rejects.toMatchObject({ status: 400 });
@@ -156,7 +160,23 @@ describe('Fake backend business contracts', () => {
     vi.resetModules();
     backend = (await import('./mockApi')).mockApi;
     await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
-    await expect(backend.aiSettings()).resolves.toEqual([expect.objectContaining({ ...gemini, backupKeys: [expect.objectContaining({ name: 'Key dự phòng 1', maskedKey: 'masked-backup' })] })]);
+    const restored = await backend.aiSettings();
+    expect(restored.map((setting) => setting.provider)).toEqual(['GEMINI', 'GROQ', 'DEEPSEEK']);
+    expect(restored[0]).toEqual(expect.objectContaining({ ...gemini, backupKeys: [expect.objectContaining({ name: 'Key dự phòng 1', maskedKey: 'masked-backup' })] }));
+  });
+
+  it('switches the single active chat platform between Gemini, Groq and DeepSeek', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    for (const [provider, model] of [['GROQ', 'llama-3.3-70b-versatile'], ['DEEPSEEK', 'deepseek-chat']] as const) {
+      await expect(async () => backend.activateProvider(provider)).rejects.toMatchObject({ status: 400 });
+      const saved = await backend.saveAiSettings({ provider, model, apiKey: 'secret-' + provider, backupKeys: [] });
+      expect(saved).toMatchObject({ provider, active: false, tested: false });
+      await backend.testAiConnection({ provider, model, configId: saved.id });
+      const after = await backend.activateProvider(provider, saved.id);
+      expect(after.filter((setting) => setting.active).map((setting) => setting.provider)).toEqual([provider]);
+      expect(after.find((setting) => setting.provider === 'GEMINI')).toMatchObject({ active: false, maskedKey: '••••••••' });
+    }
+    expect(sessionStorage.getItem('smai-demo-settings')).not.toContain('secret-');
   });
 
   it('reverse lookup requires login, supports cancellation and returns a clearly marked demo address', async () => {

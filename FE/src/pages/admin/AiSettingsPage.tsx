@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, isDemo } from '../../shared/api';
 import { http } from '../../shared/api/httpClient';
-import type { AiBackupKey, AiSettings } from '../../shared/types/models';
+import type { AiBackupKey, AiProvider, AiSettings } from '../../shared/types/models';
+import { AI_PROVIDER_INFO } from '../../shared/constants/aiProviders';
 import {
   Button,
   ConfirmDialog,
@@ -24,13 +25,15 @@ export default function AiSettingsPage() {
     refetchInterval: 15_000,
     refetchOnWindowFocus: 'always',
   });
-  const provider = 'GEMINI';
+  const [chosen, setChosen] = useState<AiProvider | null>(null);
+  const activeProvider = settings.data?.find((s) => s.active || s.activeModel)?.provider;
+  const provider: AiProvider = chosen ?? activeProvider ?? 'GEMINI';
   return (
     <>
       <PageHeading
         eyebrow="Trợ lý AI"
-        title="Cấu hình Google Gemini"
-        description="Lưu model và API key, kiểm tra kết nối, sau đó kích hoạt cho Chat."
+        title="Cấu hình nền tảng Chat AI"
+        description="Chọn nền tảng Gemini, Groq hoặc DeepSeek, lưu model và API key, kiểm tra kết nối rồi kích hoạt để chuyển Chat sang nền tảng đó."
       />
       <AiMetrics />
       {settings.isPending ? (
@@ -45,15 +48,21 @@ export default function AiSettingsPage() {
       ) : (
         settings.data && (
           <>
-            <div className="provider-grid">
+            <div className="provider-grid ai-provider-grid" role="group" aria-label="Chọn nền tảng Chat AI">
               {settings.data.map((s) => (
-                <div className="card provider-card selected" key={s.provider}>
+                <button
+                  type="button"
+                  className={`card provider-card${s.provider === provider ? ' selected' : ''}`}
+                  key={s.provider}
+                  aria-pressed={s.provider === provider}
+                  onClick={() => setChosen(s.provider)}
+                >
                   <span className="flex items-center gap-4">
                     <span className="icon-tile">
-                      <Icon name="auto_awesome" />
+                      <Icon name={AI_PROVIDER_INFO[s.provider].icon} />
                     </span>
                     <span>
-                      <h2 className="!text-xl">Google Gemini</h2>
+                      <h2 className="!text-xl">{AI_PROVIDER_INFO[s.provider].label}</h2>
                       <span className="help-text block mt-2">
                         {s.model || 'Chưa cấu hình model'}
                       </span>
@@ -64,7 +73,7 @@ export default function AiSettingsPage() {
                       Đang hoạt động: {s.activeModel || s.model}
                     </span>
                   )}
-                </div>
+                </button>
               ))}
             </div>
             <ProviderForm
@@ -115,9 +124,11 @@ const statusLabels: Record<AiBackupKey['lastStatus'], string> = {
   KEY_ERROR: 'Lỗi key',
   PROVIDER_ERROR: 'Lỗi nhà cung cấp',
 };
-const defaultChatModel = 'gemini-3.6-flash';
-const initialModel = (setting: AiSettings) => setting.model || (!setting.id ? defaultChatModel : '');
+const initialModel = (setting: AiSettings) =>
+  setting.model || (!setting.id ? AI_PROVIDER_INFO[setting.provider].defaultModel : '');
 function ProviderForm({ setting }: { setting: AiSettings }) {
+  const provider = setting.provider;
+  const info = AI_PROVIDER_INFO[provider];
   const [baseline, setBaseline] = useState(setting);
   const [model, setModel] = useState(() => initialModel(setting));
   const [apiKey, setApiKey] = useState('');
@@ -152,7 +163,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     meta: { toast: { success: false } },
     mutationFn: () =>
       api.saveAiSettings({
-        provider: 'GEMINI',
+        provider,
         configId: baseline.id || undefined,
         model: model.trim(),
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
@@ -189,7 +200,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
     meta: { toast: { success: false } },
     mutationFn: () =>
       api.testAiConnection({
-        provider: 'GEMINI',
+        provider,
         model: baseline.model,
         configId: baseline.id || undefined,
       }),
@@ -207,12 +218,12 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
   });
   const activation = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.activateProvider('GEMINI', activate?.id || undefined),
+    mutationFn: () => api.activateProvider(provider, activate?.id || undefined),
     onSuccess: (data) => {
       client.setQueryData(['ai-settings'], data);
       refresh();
       setActivate(null);
-      notify('Đã kích hoạt cấu hình Google Gemini.');
+      notify(`Đã chuyển Chat sang ${info.label}.`);
     },
   });
   const busy = save.isPending || test.isPending || individualTest.isPending || activation.isPending;
@@ -236,7 +247,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           if (!busy) save.mutate();
         }}
       >
-        <h2 className="!text-xl mb-7">Cấu hình chi tiết — Google Gemini</h2>
+        <h2 className="!text-xl mb-7">Cấu hình chi tiết — {info.label}</h2>
         <div className="form-grid">
           <label className="form-field">
             Chat Model
@@ -245,10 +256,10 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
               value={model}
               onChange={(event) => setModel(event.target.value)}
               disabled={busy}
-              placeholder="Nhập mã model Gemini trong project của bạn"
+              placeholder={info.modelHint}
             />
             <span className="help-text">
-              {!baseline.id ? 'Mặc định gemini-3.6-flash; bạn có thể đổi model. ' : ''}
+              {!baseline.id ? `Mặc định ${info.defaultModel}; bạn có thể đổi model. ` : ''}
               Model hợp lệ được Backend và nhà cung cấp kiểm tra.
             </span>
           </label>
@@ -373,7 +384,7 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
         </section>
         <p className="help-text mt-4">
           Mỗi yêu cầu ưu tiên key chính, sau đó thử các key dự phòng theo thứ tự từ trên xuống với
-          cùng model. Các key Gemini cùng project dùng chung quota.
+          cùng model. {info.keyNote}
         </p>
         {setting.activeModel && !setting.active && (
           <p className="notice mt-7">
@@ -381,8 +392,9 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           </p>
         )}
         <div className="notice mt-7">
-          Model Gemini cho Chat và embedding được cấu hình riêng. Khi đổi Embedding Model, kiểm tra
-          trạng thái tài liệu và lập chỉ mục lại nếu được yêu cầu.
+          Chỉ một nền tảng Chat hoạt động tại một thời điểm. Kích hoạt nền tảng này sẽ chuyển mọi
+          yêu cầu Chat mới sang {info.label}. Embedding cho kho kiến thức RAG vẫn dùng Gemini và được
+          cấu hình riêng, nên đổi nền tảng Chat không cần lập chỉ mục lại tài liệu.
         </div>
         {save.error && <ErrorState error={save.error} />}
         {test.error && <ErrorState error={test.error} />}
@@ -416,10 +428,11 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
           </p>
         )}
       </form>
-      <AiQuotaSettings configId={baseline.id || ''} />
+      {provider === 'GEMINI' && <AiQuotaSettings configId={baseline.id || ''} />}
       {editing && (
         <BackupKeyModal
           draft={editing}
+          keyPlaceholder={info.keyPlaceholder}
           onClose={() => setEditing(null)}
           onSave={(updated) => {
             setKeys((current) =>
@@ -449,8 +462,8 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
       )}
       {activate && (
         <ConfirmDialog
-          title="Kích hoạt Google Gemini?"
-          message={`Model ${activate.model} sẽ được sử dụng cho các yêu cầu Chat mới.`}
+          title={`Kích hoạt ${info.label}?`}
+          message={`Chat sẽ chuyển sang ${info.label}, model ${activate.model} được sử dụng cho các yêu cầu Chat mới.`}
           onConfirm={() => activation.mutate()}
           onClose={() => {
             setActivate(null);
@@ -465,10 +478,12 @@ function ProviderForm({ setting }: { setting: AiSettings }) {
 }
 function BackupKeyModal({
   draft,
+  keyPlaceholder,
   onSave,
   onClose,
 }: {
   draft: BackupDraft;
+  keyPlaceholder: string;
   onSave: (key: BackupDraft) => void;
   onClose: () => void;
 }) {
@@ -503,7 +518,7 @@ function BackupKeyModal({
               autoComplete="off"
               value={secret}
               onChange={(event) => setSecret(event.target.value)}
-              placeholder={draft.id ? 'Để trống để giữ key đã lưu' : 'Nhập API key Gemini'}
+              placeholder={draft.id ? 'Để trống để giữ key đã lưu' : keyPlaceholder}
             />
             <button
               type="button"

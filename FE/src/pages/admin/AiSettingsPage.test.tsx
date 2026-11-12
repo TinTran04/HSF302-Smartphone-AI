@@ -92,6 +92,33 @@ describe('Gemini administration settings', () => {
     expect(html).not.toContain('API Key dự phòng mới');
   });
 
+  it('lists Gemini, Groq and DeepSeek as switchable chat platforms', () => {
+    const blank = (provider: string) => ({ id: '', provider, model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] });
+    const html = renderWithSettings(['ai-settings'], [blank('GEMINI'), blank('GROQ'), blank('DEEPSEEK')], <AiSettingsPage />);
+    expect(html).toContain('Cấu hình nền tảng Chat AI');
+    expect(html).toContain('Google Gemini');
+    expect(html).toContain('Groq');
+    expect(html).toContain('DeepSeek');
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html).toContain('Cấu hình chi tiết — Google Gemini');
+  });
+
+  it('opens the active platform form with its own default model and hides Gemini quota tools', () => {
+    const html = renderWithSettings(
+      ['ai-settings'],
+      [
+        { id: '', provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] },
+        { id: '7', provider: 'GROQ', model: 'llama-3.3-70b-versatile', maskedKey: 'masked', maskedBackupKey: '', active: true, tested: true, activeModel: 'llama-3.3-70b-versatile', backupKeys: [] },
+        { id: '', provider: 'DEEPSEEK', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] },
+      ],
+      <AiSettingsPage />,
+    );
+    expect(html).toContain('Cấu hình chi tiết — Groq');
+    expect(html).toContain('value="llama-3.3-70b-versatile"');
+    expect(html).toContain('Đang hoạt động: llama-3.3-70b-versatile');
+    expect(html).not.toContain('Quota Gemini theo project');
+  });
+
   it('opens the saved Gemini embedding model and dimensions', () => {
     const html = renderWithSettings(
       ['admin-ops', 'embedding'],

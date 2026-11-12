@@ -23,4 +23,10 @@ class AiProviderErrorTest {
         assertEquals("AI_PROVIDER_AUTH_ERROR", new AiProviderException(401).getCode());
         assertEquals("AI_PROVIDER_MODEL_ERROR", new AiProviderException(404).getCode());
     }
+    @Test void deepSeekInsufficientBalanceIsTreatedAsQuotaSoBackupKeysAreTried() {
+        var error = AiProviderException.fromProvider(402, "{\"error\":{\"message\":\"Insufficient Balance\"}}");
+        assertTrue(error.isKeyFailure());
+        assertTrue(error.isQuotaExceeded());
+        assertEquals("AI_PROVIDER_RATE_LIMIT", error.getCode());
+    }
 }
