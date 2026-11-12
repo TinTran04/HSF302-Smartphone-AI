@@ -145,7 +145,7 @@ export interface KnowledgeDocument {
   status: KnowledgeStatus;
   error?: string;
 }
-export type AiProvider = 'GEMINI';
+export type AiProvider = 'GEMINI' | 'GROQ' | 'DEEPSEEK';
 export interface AiKeyAlert {
   id: string;
   model: string;

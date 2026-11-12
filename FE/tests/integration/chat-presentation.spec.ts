@@ -330,7 +330,7 @@ test('admin configures only Gemini for chat and embedding with the existing save
   });
   await page.goto('/admin/ai-settings');
   await expect(
-    page.getByRole('heading', { name: 'Cấu hình Google Gemini', exact: true }),
+    page.getByRole('heading', { name: 'Cấu hình nền tảng Chat AI', exact: true }),
   ).toBeVisible();
   await expect(page.getByText('OpenAI', { exact: true })).toHaveCount(0);
   await page.getByLabel('Chat Model').fill('gemini-test-model');

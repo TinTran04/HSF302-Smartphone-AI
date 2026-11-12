@@ -11,6 +11,7 @@ import com.smartphoneai.repository.AiKeyAlertRepository;
 import com.smartphoneai.repository.AiProviderConfigRepository;
 import com.smartphoneai.repository.UserAccountRepository;
 import com.smartphoneai.service.AiKeyAlertService;
+import com.smartphoneai.service.support.AiProviders;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,7 +79,7 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
     @Override
     @Transactional(readOnly = true)
     public Optional<AiKeyAlertResponse> current() {
-        return configs.findAllByActiveTrue().stream().filter(config -> "GEMINI".equals(config.getProvider()))
+        return configs.findAllByActiveTrue().stream().filter(config -> AiProviders.isChatProvider(config.getProvider()))
                 .findFirst().flatMap(config -> alerts.findFirstByConfigIdOrderByIdDesc(config.getId())
                         .filter(alert -> !"PRIMARY".equals(alert.getStatus()))
                         .map(alert -> new AiKeyAlertResponse(alert.getId().toString(), config.getModel(), alert.getStatus(),
@@ -89,9 +90,9 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AiNotificationsResponse history(UUID userId) {
         var user = users.findById(userId).orElseThrow(InvalidCredentialsException::new);
-        var latestId = alerts.findLatestGeminiId();
+        var latestId = alerts.findLatestChatAlertId();
         if (latestId == null) return new AiNotificationsResponse(List.of(), 0, null);
-        var history = alerts.findGeminiHistory(latestId, PageRequest.of(0, 50));
+        var history = alerts.findChatAlertHistory(latestId, PageRequest.of(0, 50));
         var configIds = history.stream().map(AiKeyAlert::getConfigId).distinct().toList();
         var configurations = configs.findAllById(configIds).stream()
                 .collect(Collectors.toMap(AiProviderConfig::getId, Function.identity()));
@@ -105,7 +106,7 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
                     alert.getReason(), alert.getBackupFailureReason(), alert.getDetectedAt(), alert.getBackupKeyName(),
                     alert.getId() <= user.getAiNotificationsReadThroughId(), resolved);
         }).toList();
-        return new AiNotificationsResponse(items, alerts.countUnreadGemini(user.getAiNotificationsReadThroughId(), latestId),
+        return new AiNotificationsResponse(items, alerts.countUnreadChatAlerts(user.getAiNotificationsReadThroughId(), latestId),
                 latestId.toString());
     }
 
@@ -113,7 +114,7 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
     @Transactional
     public void markRead(UUID userId, long throughId) {
         var user = users.findLockedById(userId).orElseThrow(InvalidCredentialsException::new);
-        var latestId = alerts.findLatestGeminiId();
+        var latestId = alerts.findLatestChatAlertId();
         if (latestId != null) user.markAiNotificationsReadThrough(Math.min(throughId, latestId));
     }
 }

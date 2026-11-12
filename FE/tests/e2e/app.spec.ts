@@ -768,10 +768,36 @@ test('admin manages multiple backup keys with priority, single delete and indivi
   await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
   await expect(page.locator('.toast')).toHaveCount(0);
-  await page.getByRole('heading', { name: 'Cấu hình Google Gemini', exact: true }).click();
+  await page.getByRole('heading', { name: 'Cấu hình nền tảng Chat AI', exact: true }).click();
   await page.screenshot({ path: 'test-results/admin-ai-keys-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: 'test-results/admin-ai-keys-desktop.png', fullPage: true });
+});
+
+test('admin switches the chat platform from Gemini to Groq and back', async ({ page }) => {
+  await login(page, true);
+  await page.goto('/admin/ai-settings');
+  const platforms = page.getByRole('group', { name: 'Chọn nền tảng Chat AI' });
+  await expect(platforms.getByRole('button')).toHaveCount(3);
+  await platforms.getByRole('button', { name: /Groq/ }).click();
+  await expect(page.getByRole('heading', { name: 'Cấu hình chi tiết — Groq' })).toBeVisible();
+  await expect(page.getByLabel('Chat Model')).toHaveValue('llama-3.3-70b-versatile');
+  await expect(page.getByRole('region', { name: 'Quota Gemini theo project' })).toHaveCount(0);
+  await page.getByPlaceholder('Nhập khóa mới khi cần thay đổi').fill('gsk-demo-secret');
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Kích hoạt Groq?' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
+  await expect(platforms.getByRole('button', { name: /Groq/ })).toContainText('Đang hoạt động: llama-3.3-70b-versatile');
+  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).not.toContainText('Đang hoạt động');
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('gsk-demo-secret');
+  await platforms.getByRole('button', { name: /Google Gemini/ }).click();
+  await expect(page.getByRole('heading', { name: 'Cấu hình chi tiết — Google Gemini' })).toBeVisible();
+  await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Kích hoạt Google Gemini?' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).toContainText('Đang hoạt động');
+  await expect(platforms.getByRole('button', { name: /Groq/ })).not.toContainText('Đang hoạt động');
 });
 
 test('AI settings polling preserves unsaved model and backup drafts', async ({ page }) => {

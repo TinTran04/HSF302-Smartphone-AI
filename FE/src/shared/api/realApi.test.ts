@@ -121,19 +121,33 @@ describe('real backend contract', () => {
       { provider: 'GEMINI', model: 'active', maskedKey: '***', active: true },
     ]);
     const settings = await realApi.aiSettings();
-    expect(settings).toHaveLength(1);
+    expect(settings.map((setting) => setting.provider)).toEqual(['GEMINI', 'GROQ', 'DEEPSEEK']);
     expect(settings[0]).toMatchObject({ model: 'draft', active: false, activeModel: 'active' });
+    expect(settings[1]).not.toHaveProperty('activeModel');
   });
 
   it.each([{ configs: [] }, { configs: [{ provider: 'OPENAI', model: 'legacy-model', maskedKey: 'legacy-key', active: true }] }])(
-    'offers an empty Gemini configuration when the backend has no Gemini settings',
+    'offers empty configurations for every supported chat platform when none is saved',
     async ({ configs }) => {
       vi.mocked(http).mockResolvedValueOnce(configs);
-      await expect(realApi.aiSettings()).resolves.toEqual([
-        { id: '', backupKeys: [], provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false },
-      ]);
+      const blank = (provider: string) =>
+        ({ id: '', backupKeys: [], provider, model: '', maskedKey: '', maskedBackupKey: '', tested: false, active: false });
+      await expect(realApi.aiSettings()).resolves.toEqual([blank('GEMINI'), blank('GROQ'), blank('DEEPSEEK')]);
     },
   );
+
+  it('exposes the active Groq platform while keeping other platforms selectable', async () => {
+    vi.mocked(http).mockResolvedValueOnce([
+      { id: '9', provider: 'GROQ', model: 'llama-3.3-70b-versatile', maskedKey: '***', active: true, tested: true, backupKeys: [] },
+      { id: '3', provider: 'GEMINI', model: 'gemini-model', maskedKey: '***', active: false, tested: true, backupKeys: [] },
+    ]);
+    const settings = await realApi.aiSettings();
+    expect(settings.map((setting) => [setting.provider, setting.activeModel])).toEqual([
+      ['GEMINI', undefined],
+      ['GROQ', 'llama-3.3-70b-versatile'],
+      ['DEEPSEEK', undefined],
+    ]);
+  });
 
   it('resolves an oversized guest cart in batches so users can remove items', async () => {
     vi.mocked(http).mockResolvedValue({ items: [], total: 0 });
