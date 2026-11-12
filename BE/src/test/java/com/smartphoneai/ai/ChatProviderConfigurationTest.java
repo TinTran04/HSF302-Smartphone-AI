@@ -26,7 +26,7 @@ import org.springframework.ai.embedding.EmbeddingModel;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class GeminiOnlyConfigurationTest {
+class ChatProviderConfigurationTest {
     private final AiProviderConfigRepository chatConfigs = mock(AiProviderConfigRepository.class);
     private final EmbeddingConfigRepository embeddingConfigs = mock(EmbeddingConfigRepository.class);
     private final KnowledgeDocumentRepository documents = mock(KnowledgeDocumentRepository.class);
@@ -47,26 +47,84 @@ class GeminiOnlyConfigurationTest {
         verifyNoInteractions(chatConfigs, embeddingConfigs, settings, cipher, client, factory);
     }
 
-    @Test void chatListAlwaysProvidesGeminiWithoutExposingLegacyRows() {
+    @Test void chatListAlwaysProvidesEverySupportedPlatformWithoutExposingLegacyRows() {
         var legacy = legacyChat();
         when(chatConfigs.findAllByOrderByIdDesc()).thenReturn(List.of(legacy));
         var result = chat.list();
-        assertEquals(1, result.size());
-        assertEquals("GEMINI", result.getFirst().provider());
-        assertEquals("", result.getFirst().maskedKey());
-        assertFalse(result.getFirst().active());
-        assertFalse(result.getFirst().tested());
+        assertEquals(List.of("GEMINI", "GROQ", "DEEPSEEK"), result.stream().map(r -> r.provider()).toList());
+        for (var entry : result) {
+            assertEquals("", entry.maskedKey());
+            assertFalse(entry.active());
+            assertFalse(entry.tested());
+        }
         assertTrue(legacy.isActive());
         verifyNoInteractions(cipher, client);
     }
 
-    @Test void freshInstallProvidesUnconfiguredGemini() {
+    @Test void freshInstallProvidesUnconfiguredPlatforms() {
         when(chatConfigs.findAllByOrderByIdDesc()).thenReturn(List.of());
         var result = chat.list();
-        assertEquals(1, result.size());
-        assertEquals("GEMINI", result.getFirst().provider());
-        assertEquals("", result.getFirst().maskedKey());
-        assertFalse(result.getFirst().active());
+        assertEquals(List.of("GEMINI", "GROQ", "DEEPSEEK"), result.stream().map(r -> r.provider()).toList());
+        assertTrue(result.stream().allMatch(r -> r.maskedKey().isEmpty() && !r.active()));
+    }
+
+    @Test void configuredPlatformKeepsItsRowAndOthersStayAvailable() {
+        var groq = new AiProviderConfig("GROQ", "llama-3.3-70b-versatile", "groq-cipher", null, Instant.now());
+        when(chatConfigs.findAllByOrderByIdDesc()).thenReturn(List.of(groq));
+        var result = chat.list();
+        assertEquals(List.of("GROQ", "GEMINI", "DEEPSEEK"), result.stream().map(r -> r.provider()).toList());
+        assertEquals("llama-3.3-70b-versatile", result.getFirst().model());
+        assertEquals("••••••••", result.getFirst().maskedKey());
+    }
+
+    @Test void activatingAnotherPlatformSwitchesTheSingleActiveChatConfiguration() {
+        var gemini = new AiProviderConfig("GEMINI", "gemini-model", "gemini-cipher", null, Instant.now());
+        gemini.markTested();
+        gemini.setActive(true);
+        var deepseek = new AiProviderConfig("DEEPSEEK", "deepseek-chat", "deepseek-cipher", null, Instant.now());
+        deepseek.markTested();
+        when(settings.findLockedSingleton()).thenReturn(Optional.of(mock(SystemSetting.class)));
+        when(chatConfigs.findFirstByProviderOrderByIdDesc("DEEPSEEK")).thenReturn(Optional.of(deepseek));
+        when(chatConfigs.findAllByActiveTrue()).thenReturn(List.of(gemini));
+        when(chatConfigs.findAllByOrderByIdDesc()).thenReturn(List.of(deepseek, gemini));
+        var result = chat.activate("DEEPSEEK");
+        assertFalse(gemini.isActive());
+        assertTrue(deepseek.isActive());
+        assertEquals(List.of("DEEPSEEK"), result.stream().filter(r -> r.active()).map(r -> r.provider()).toList());
+    }
+
+    @Test void untestedPlatformCannotBeActivated() {
+        var groq = new AiProviderConfig("GROQ", "llama-3.3-70b-versatile", "groq-cipher", null, Instant.now());
+        when(settings.findLockedSingleton()).thenReturn(Optional.of(mock(SystemSetting.class)));
+        when(chatConfigs.findFirstByProviderOrderByIdDesc("GROQ")).thenReturn(Optional.of(groq));
+        assertThrows(InvalidAiConfigurationException.class, () -> chat.activate("GROQ"));
+        assertFalse(groq.isActive());
+    }
+
+    @Test void savedKeysAreBoundToTheirOwnPlatform() {
+        when(settings.findLockedSingleton()).thenReturn(Optional.of(mock(SystemSetting.class)));
+        when(chatConfigs.findFirstByProviderOrderByIdDesc("GROQ")).thenReturn(Optional.empty());
+        when(cipher.encrypt(eq("GROQ"), anyString())).thenAnswer(call -> "enc:" + call.getArgument(1));
+        when(cipher.decrypt(eq("GROQ"), anyString())).thenAnswer(call -> call.<String>getArgument(1).substring(4));
+        when(chatConfigs.save(any())).thenAnswer(call -> call.getArgument(0));
+        chat.save(new AiSettingsRequest("GROQ", "llama-3.3-70b-versatile", "gsk-primary", "gsk-backup", false));
+        verify(cipher).encrypt("GROQ", "gsk-primary");
+        verify(cipher).encrypt("GROQ", "gsk-backup");
+        verify(cipher, never()).encrypt(eq("GEMINI"), anyString());
+    }
+
+    @Test void activeGroqChatUsesItsOwnKeyAndSkipsGeminiQuotaRotation() {
+        var groq = new AiProviderConfig("GROQ", "llama-3.3-70b-versatile", "groq-cipher", null, Instant.now());
+        groq.markTested();
+        groq.setActive(true);
+        var quota = mock(com.smartphoneai.service.impl.AiQuotaTracker.class);
+        when(quota.configured()).thenReturn(true);
+        chat.setQuota(quota);
+        when(chatConfigs.findAllByActiveTrue()).thenReturn(List.of(groq));
+        when(cipher.decrypt("GROQ", "groq-cipher")).thenReturn("gsk-primary");
+        when(client.chat("GROQ", "llama-3.3-70b-versatile", "gsk-primary", "question")).thenReturn("answer");
+        assertEquals("answer", chat.chat("question"));
+        verify(quota, never()).reserve(any(), any(), any(), any());
     }
 
     @Test void legacyActiveChatCannotDecryptOrInvokeProvider() {
@@ -86,7 +144,7 @@ class GeminiOnlyConfigurationTest {
         var result = chat.activate("GEMINI");
         assertFalse(legacy.isActive());
         assertTrue(gemini.isActive());
-        assertEquals(1, result.size());
+        assertEquals(3, result.size());
         assertEquals("GEMINI", result.getFirst().provider());
     }
 

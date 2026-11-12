@@ -1,6 +1,6 @@
 # SmartPhone AI — User Guide
 
-Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 10/11/2026 sử dụng Google Gemini cho Chat Model và Embedding Model.
+Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 12/11/2026 cho phép Admin hoán chuyển nền tảng Chat giữa Google Gemini, Groq và DeepSeek bằng API key; Embedding Model cho RAG dùng Google Gemini.
 
 ## 1. Phạm vi và tài khoản
 
@@ -10,7 +10,7 @@ Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo 
 | --- | --- |
 | Guest | Xem, tìm kiếm, so sánh điện thoại, dùng giỏ hàng, đăng ký và đăng nhập |
 | CUSTOMER | Đặt hàng, theo dõi đơn, sửa thông tin liên hệ, chat AI và xóa hội thoại của mình |
-| ADMIN | Quản lý sản phẩm, thương hiệu, tài khoản, đơn hàng, bảo trì, tài liệu và cấu hình Gemini |
+| ADMIN | Quản lý sản phẩm, thương hiệu, tài khoản, đơn hàng, bảo trì, tài liệu, chọn nền tảng Chat AI và cấu hình embedding |
 
 Đăng nhập dùng email và mật khẩu. OTP dùng cho đăng ký và quên mật khẩu. Admin tạo tài khoản bằng email mời người nhận tự đặt mật khẩu. Admin gốc được tạo bằng cấu hình khởi tạo trong `BE/.env`.
 
@@ -23,7 +23,7 @@ Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo 
 | Node.js | 22.12 trở lên, kèm npm |
 | Database | PostgreSQL có extension pgvector |
 | Email | Gmail gửi thư và App Password cho OTP, lời mời |
-| AI | Gemini API key và model tài khoản được phép sử dụng |
+| AI | Gemini API key cho embedding; API key Chat của ít nhất một nền tảng: Gemini, Groq hoặc DeepSeek |
 | Bản đồ | Internet, Geoapify API key nếu sử dụng gợi ý địa chỉ |
 
 Kiểm tra các công cụ trong terminal.
@@ -89,7 +89,7 @@ Giữ ổn định `AI_CONFIG_ENCRYPTION_KEY` theo database để giải mã API
 
 Gmail gửi thư cần bật xác minh hai bước, tạo App Password rồi điền vào `SMTP_PASSWORD`. Khách đăng ký dùng email của họ để nhận OTP từ Gmail gửi thư này. Xem hướng dẫn Google khi tạo App Password. [Hỗ trợ Google](https://support.google.com/accounts/answer/185833)
 
-Các file `.env` được chia sẻ riêng. Gemini API key được nhập trong Admin và mã hóa trong DB. Các giá trị `VITE_*` là cấu hình công khai của trình duyệt.
+Các file `.env` được chia sẻ riêng. API key của Gemini, Groq và DeepSeek được nhập trong Admin và mã hóa trong DB. Các giá trị `VITE_*` là cấu hình công khai của trình duyệt.
 
 ### 2.3. Chạy backend
 
@@ -131,17 +131,30 @@ psql -h localhost -U postgres -d smartphone_ai -f datasets/phones/import.sql
 
 Dataset đã chuẩn hóa 138 điện thoại, giá VNĐ minh họa và ảnh trong `FE/public/images/phones`. Đọc quy tắc nhập và nguồn dữ liệu trước khi nhập vào DB có sản phẩm hiện hữu. [Hướng dẫn dataset](datasets/phones/README.md)
 
-## 3. Cấu hình Gemini
+## 3. Cấu hình AI
 
-### 3.1. Chat Model
+### 3.1. Chat Model và hoán chuyển nền tảng
 
-1. Tạo API key trong Google AI Studio bằng tài khoản Google của bạn. Kiểm tra model được project hỗ trợ. [Google AI Studio](https://aistudio.google.com/apikey)
+Trang **Cấu hình AI** tại `/admin/ai-settings` có ba thẻ nền tảng: **Google Gemini**, **Groq** và **DeepSeek**. Mỗi nền tảng lưu model, API key chính và key dự phòng riêng. Tại mỗi thời điểm chỉ một nền tảng hoạt động. Kích hoạt nền tảng khác sẽ chuyển ngay mọi yêu cầu Chat mới sang nền tảng đó, không cần khởi động lại BE.
+
+| Nền tảng | Lấy API key | Model gợi ý sẵn | Ghi chú |
+| --- | --- | --- | --- |
+| Google Gemini | [Google AI Studio](https://aistudio.google.com/apikey) | `gemini-3.6-flash` | Có thêm phần quota theo Google Cloud Project |
+| Groq | [Groq Console](https://console.groq.com/keys), key dạng `gsk_...` | `llama-3.3-70b-versatile` | API tương thích OpenAI tại `api.groq.com/openai` |
+| DeepSeek | [DeepSeek Platform](https://platform.deepseek.com/api_keys), key dạng `sk-...` | `deepseek-chat` | API tương thích OpenAI tại `api.deepseek.com`; tài khoản cần còn số dư |
+
+Model gợi ý chỉ là giá trị điền sẵn cho cấu hình mới. Kiểm tra danh sách model đang được cấp trong tài khoản của bạn trước khi lưu. [Model Groq](https://console.groq.com/docs/models), [Model DeepSeek](https://api-docs.deepseek.com/quick_start/pricing), [Model Gemini](https://ai.google.dev/gemini-api/docs/models)
+
+1. Tạo API key ở trang của nền tảng muốn dùng theo bảng trên.
 2. Đăng nhập Admin bằng `ROOT_ADMIN_EMAIL` và mật khẩu khởi tạo, mở **Cấu hình AI** tại `/admin/ai-settings`.
-3. Điền Chat Model bằng đúng mã model trong tài khoản, nhập API key vào ô key mới.
-4. Bấm **Lưu cấu hình**, sau đó **Kiểm tra kết nối**. BE gửi một yêu cầu thử tới Gemini.
-5. Khi kiểm tra thành công, bấm **Kích hoạt** và xác nhận. Yêu cầu chat mới sử dụng cấu hình đã kích hoạt.
+3. Bấm thẻ nền tảng cần cấu hình. Form bên dưới đổi sang nền tảng đó.
+4. Điền Chat Model bằng đúng mã model trong tài khoản, nhập API key vào ô key mới.
+5. Bấm **Lưu cấu hình**, sau đó **Kiểm tra kết nối**. BE gửi một yêu cầu thử tới nền tảng đã chọn bằng key chính và từng key dự phòng.
+6. Khi kiểm tra thành công, bấm **Kích hoạt** và xác nhận. Thẻ nền tảng hiển thị **Đang hoạt động** và các yêu cầu chat mới dùng nền tảng này.
 
-Để trống ô key mới khi muốn dùng key đã lưu. Ô key đã lưu hiển thị giá trị che. Key dự phòng là tùy chọn, dùng cùng model. Khi key chính trả HTTP 429, BE thử key dự phòng một lần. Các key Gemini trong cùng project dùng chung hạn mức. [Tài liệu API key](https://ai.google.dev/gemini-api/docs/api-key), [Model Gemini](https://ai.google.dev/gemini-api/docs/models), [Giới hạn sử dụng](https://ai.google.dev/gemini-api/docs/rate-limits)
+Để đổi nền tảng khi demo, chọn thẻ nền tảng khác đã được kiểm tra rồi bấm **Kích hoạt**. Cấu hình của nền tảng cũ vẫn được giữ, có thể kích hoạt lại bất cứ lúc nào. Embedding cho kho kiến thức RAG vẫn dùng Gemini nên đổi nền tảng Chat không cần lập chỉ mục lại tài liệu.
+
+Để trống ô key mới khi muốn dùng key đã lưu. Ô key đã lưu hiển thị giá trị che. Key dự phòng là tùy chọn, dùng cùng model. Khi key chính trả HTTP 401/403/429, BE thử các key dự phòng của cùng nền tảng theo thứ tự. DeepSeek trả HTTP 402 khi tài khoản hết số dư, BE xử lý như hết hạn mức và chuyển sang key dự phòng. Các key Gemini trong cùng project dùng chung hạn mức, các key Groq trong cùng tổ chức cũng dùng chung giới hạn yêu cầu. [Tài liệu API key](https://ai.google.dev/gemini-api/docs/api-key), [Model Gemini](https://ai.google.dev/gemini-api/docs/models), [Giới hạn sử dụng](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 ### 3.2. Embedding Model
 
@@ -173,7 +186,7 @@ Có file mẫu `FE/public/demo/Chinh-sach-minh-hoa.txt` để thử luồng tả
 
 | Chủ đề | Cách dùng | Nguồn câu trả lời |
 | --- | --- | --- |
-| Tư vấn mua điện thoại | Hỏi chọn máy, so sánh hoặc kiến thức công nghệ | Catalog, tài liệu liên quan và kiến thức Gemini |
+| Tư vấn mua điện thoại | Hỏi chọn máy, so sánh hoặc kiến thức công nghệ | Catalog, tài liệu liên quan và kiến thức của nền tảng Chat đang hoạt động |
 | Hỗ trợ cửa hàng | Hỏi chính sách bảo hành, giao hàng, đổi trả hoặc trạng thái đơn hàng | RAG từ tài liệu đang bật và `READY`, hoặc đơn hàng của khách đang đăng nhập |
 
 Ví dụ hỏi tư vấn “Tôi có 10 triệu, cần điện thoại pin tốt để học và chụp ảnh”. Hệ thống ưu tiên máy trong mức tiền. Máy vượt tối đa 10% được ghi số tiền và tỷ lệ vượt. Giá tại shop được lấy từ catalog.
@@ -226,7 +239,7 @@ Quên mật khẩu gồm ba bước. Nhập email để nhận mã, nhập OTP v
 | Đơn hàng | Xem thông tin giao hàng, cập nhật trạng thái theo luồng cho phép |
 | Bảo trì | Bật/tắt màn hình Shop đang bảo trì, tiếp tục sử dụng dashboard |
 | Kho kiến thức | Tải/thay nội dung, bật/tắt, lập chỉ mục lại và xóa tài liệu |
-| Cấu hình AI | Lưu, kiểm tra, kích hoạt Gemini và key dự phòng |
+| Cấu hình AI | Chọn Gemini, Groq hoặc DeepSeek; lưu, kiểm tra, kích hoạt nền tảng Chat và key dự phòng |
 | Cấu hình embedding | Nhập API key, kiểm tra và lưu cấu hình Gemini đã thiết lập sẵn |
 
 Ảnh PNG/JPEG/WebP tối đa 5 MiB mỗi file. Chọn ảnh từ máy, chờ tải xong rồi lưu sản phẩm. File ảnh lưu ở thư mục uploads theo cấu hình. Khi sao lưu/chuyển máy, giữ cả database, khóa mã hóa và thư mục ảnh. Xóa sản phẩm giữ snapshot đơn đã đặt, gỡ sản phẩm khỏi giỏ và vô hiệu bản kiểm tra đơn liên quan. File ảnh có thể còn được tham chiếu nên tồn tại độc lập trên đĩa.
@@ -254,14 +267,14 @@ FE/src/
   mocks/             Backend giả cho chế độ demo
 ```
 
-### 6.2. Chat qua Gemini
+### 6.2. Chat qua nền tảng AI đang hoạt động
 
 ```mermaid
 sequenceDiagram
     participant U as Customer
     participant F as React
     participant B as Spring Boot
-    participant G as Gemini
+    participant G as Gemini / Groq / DeepSeek
     U->>F: Gửi câu hỏi
     F->>F: Hiện tin nhắn và ba chấm chờ
     F->>B: POST messages
@@ -275,7 +288,18 @@ sequenceDiagram
 
 Các điểm đọc code chính nằm tại `FE/src/features/ai-chat/hooks/useChat.ts`, `FE/src/pages/ai/ChatPage.tsx`, `BE/.../controller/AiChatController.java` và `BE/.../service/impl/AiChatServiceImpl.java`.
 
-`TopicRouterImpl` xác định cùng chủ đề, khác chủ đề hoặc cần hỏi rõ. `ChatResponderImpl` chuyển Hỗ trợ cửa hàng vào RAG và Tư vấn mua điện thoại vào `PhoneAssistanceServiceImpl`. `AiProviderServiceImpl` lấy cấu hình Gemini hoạt động, giải mã key tại BE và điều phối retry. `SpringAiProviderClient` gọi Gemini thông qua Spring AI.
+`TopicRouterImpl` xác định cùng chủ đề, khác chủ đề hoặc cần hỏi rõ. `ChatResponderImpl` chuyển Hỗ trợ cửa hàng vào RAG và Tư vấn mua điện thoại vào `PhoneAssistanceServiceImpl`. `AiProviderServiceImpl` lấy cấu hình Chat đang hoạt động (chỉ một cấu hình có `active = true`), giải mã key tại BE và điều phối retry, key dự phòng. `SpringAiProviderClient` chọn client theo nền tảng: Gemini dùng `GoogleGenAiChatModel`, Groq và DeepSeek dùng `OpenAiChatModel` của Spring AI trỏ tới base URL tương thích OpenAI của từng nền tảng.
+
+Danh sách nền tảng nằm ở `BE/.../service/support/AiProviders.java` và `FE/src/shared/constants/aiProviders.ts`. Muốn thêm một nền tảng tương thích OpenAI khác, bổ sung mã nền tảng và base URL ở hai file này, thêm vào `CHAT_PATTERN` rồi viết test tương ứng.
+
+```mermaid
+flowchart LR
+    A[Admin chọn thẻ Groq] --> B[PUT /admin/ai-settings provider=GROQ]
+    B --> C[Mã hóa key AES-GCM, gắn với GROQ]
+    C --> D[POST /test gọi Groq bằng từng key]
+    D --> E[POST /activate tắt cấu hình cũ, bật GROQ]
+    E --> F[Chat mới: SpringAiProviderClient gọi api.groq.com]
+```
 
 ### 6.3. RAG
 
@@ -288,7 +312,7 @@ flowchart LR
     Q[Câu hỏi] --> F[Embedding câu hỏi]
     F --> E
     E --> H[Đoạn phù hợp và nguồn]
-    H --> G[Gemini sinh câu trả lời]
+    H --> G[Nền tảng Chat đang hoạt động sinh câu trả lời]
     G --> R[Câu trả lời cho khách hàng]
 ```
 
@@ -304,9 +328,9 @@ flowchart LR
 | `POST /api/ai/conversations/{id}/messages` | Gửi câu hỏi |
 | `POST /api/ai/topic-switches/{id}/confirm` | Xác nhận chuyển chủ đề |
 | `DELETE /api/ai/conversations/{id}` | Xóa hội thoại của mình |
-| `GET/PUT /api/admin/ai-settings` | Xem/lưu cấu hình Gemini |
+| `GET/PUT /api/admin/ai-settings` | Xem/lưu cấu hình Chat của `GEMINI`, `GROQ` hoặc `DEEPSEEK` |
 | `POST /api/admin/ai-settings/test` | Kiểm tra key và model |
-| `POST /api/admin/ai-settings/activate` | Kích hoạt cấu hình đã kiểm tra |
+| `POST /api/admin/ai-settings/activate` | Kích hoạt cấu hình đã kiểm tra, chuyển Chat sang nền tảng đó |
 | `GET/PUT /api/admin/embedding-settings` | Xem/kiểm tra/lưu embedding |
 | `POST /api/admin/knowledge/documents` | Tải tài liệu RAG |
 | `POST /api/orders/preview` | Kiểm tra đơn trước khi đặt |
@@ -320,6 +344,7 @@ Access JWT hạn 15 phút, refresh token xoay vòng hạn 7 ngày trong cookie H
 | --- | --- | --- |
 | 1 | Chạy BE và FE, đăng nhập Admin | Dashboard và danh mục hiện dữ liệu |
 | 2 | Lưu Gemini, kiểm tra và kích hoạt | Toast thành công, cấu hình hoạt động, key đã che |
+| 2b | Chọn thẻ Groq hoặc DeepSeek, nhập model và API key, lưu, kiểm tra, kích hoạt | Thẻ nền tảng mới hiển thị Đang hoạt động, thẻ cũ không còn; chat tiếp theo trả lời bằng nền tảng mới |
 | 3 | Cấu hình embedding, tải tài liệu của nhóm | Tài liệu chuyển PROCESSING sang READY |
 | 4 | Đăng nhập Customer, hỏi tư vấn hoặc kiến thức điện thoại | Tin nhắn hiện ngay, ba chấm chờ, câu trả lời hiện dần |
 | 5 | Hỏi Hỗ trợ cửa hàng đúng nội dung tài liệu | Câu trả lời khớp nội dung, giao diện và API Customer ẩn metadata nguồn |
@@ -327,7 +352,7 @@ Access JWT hạn 15 phút, refresh token xoay vòng hạn 7 ngày trong cookie H
 | 7 | Hỏi khác chủ đề, xác nhận chuyển | Hội thoại mới, câu hỏi được xử lý |
 | 8 | Đặt một đơn COD, mở lịch sử | Giá được kiểm tra ở BE, đơn được tạo và xem lại được |
 
-Phiên bản theo yêu cầu hiện tại chỉ triển khai Gemini. Tiêu chí trong ảnh đề bài yêu cầu hoán chuyển nền tảng chat giữa các nhà cung cấp cần được trao đổi lại với giảng viên khi chốt phạm vi nộp. Thay model hoặc key trong Gemini là thay cấu hình cùng nền tảng.
+Bước 2b trình bày tiêu chí cấu hình API key để hoán chuyển nền tảng Chat. Có thể kích hoạt lại Gemini sau đó để cho thấy cấu hình từng nền tảng được giữ riêng.
 
 ## 8. Kiểm thử và xử lý lỗi
 
@@ -352,8 +377,9 @@ E2E demo dùng Chrome và dữ liệu giả. `npm run test:integration` cần BE
 | FE không kết nối được | BE có chạy 8080, `VITE_API_TARGET`, quyền mạng, khởi động lại Vite |
 | Đăng nhập thất bại | Email, mật khẩu, trạng thái tài khoản, cấu hình Admin chỉ khởi tạo lần đầu |
 | Đăng ký/quên mật khẩu lỗi gửi mail | SMTP_USERNAME, App Password, quyền mạng tới smtp.gmail.com, terminal BE |
-| AI chưa được cấu hình | Lưu Gemini, kiểm tra kết nối và kích hoạt |
-| Model không hợp lệ/không có quyền | Mã model và quyền project trong AI Studio |
+| AI chưa được cấu hình | Chọn một nền tảng, lưu, kiểm tra kết nối và kích hoạt |
+| Model không hợp lệ/không có quyền | Mã model và quyền của key trong AI Studio, Groq Console hoặc DeepSeek Platform |
+| HTTP 402 từ DeepSeek | Tài khoản DeepSeek hết số dư, nạp thêm hoặc dùng key dự phòng/nền tảng khác |
 | HTTP 429 | Hạn mức project/model, chờ phục hồi hoặc dùng key dự phòng thuộc project có hạn mức phù hợp |
 | HTTP 503 từ AI | Theo dõi lỗi provider, chờ rồi thử lại |
 | RAG chưa có nguồn | Embedding hợp lệ, tài liệu READY đang bật, câu hỏi liên quan nội dung |

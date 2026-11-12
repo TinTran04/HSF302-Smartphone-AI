@@ -1,6 +1,7 @@
 package com.smartphoneai.service.impl;
 
 import com.smartphoneai.service.support.ConfigSecretCipher;
+import com.smartphoneai.service.support.AiProviders;
 
 import com.smartphoneai.service.AiProviderService;
 import com.smartphoneai.service.ChatProviderClient;
@@ -56,15 +57,19 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Transactional(readOnly=true)
     public List<AiSettingsResponse> list() {
         var configured = configs.findAllByOrderByIdDesc().stream()
-                .filter(config -> "GEMINI".equals(config.getProvider()))
+                .filter(config -> AiProviders.isChatProvider(config.getProvider()))
                 .map(this::response).toList();
-        return configured.isEmpty()
-                ? List.of(new AiSettingsResponse("GEMINI", "", "", "", false, false)) : configured;
+        var result = new ArrayList<>(configured);
+        for (String provider : AiProviders.CHAT) {
+            if (configured.stream().noneMatch(config -> provider.equals(config.provider())))
+                result.add(new AiSettingsResponse(provider, "", "", "", false, false));
+        }
+        return List.copyOf(result);
     }
     @Override
     @Transactional
     public AiSettingsResponse save(AiSettingsRequest input) {
-        requireGemini(input.provider());
+        requireSupported(input.provider());
         settings.findLockedSingleton().orElseThrow();
         var old = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElse(null);
         requireCurrentVersion(input, old);
@@ -96,7 +101,7 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Transactional
     public void test(AiSettingsRequest input) {
         var deadline = clock.instant().plusSeconds(60);
-        requireGemini(input.provider());
+        requireSupported(input.provider());
         settings.findLockedSingleton().orElseThrow();
         var config = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElseThrow(InvalidAiConfigurationException::new);
         requireCurrentVersion(input, config);
@@ -138,7 +143,7 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Transactional(readOnly = true)
     public void testBackupKey(Long configId, Long keyId) {
         var config = configs.findById(configId).orElseThrow(InvalidAiConfigurationException::new);
-        requireGemini(config.getProvider());
+        requireSupported(config.getProvider());
         var key = backups.findById(keyId).filter(candidate -> candidate.getConfigId().equals(configId))
                 .orElseThrow(InvalidAiConfigurationException::new);
         callBackup(config, key, "Reply with OK.");
@@ -151,7 +156,7 @@ public class AiProviderServiceImpl implements AiProviderService {
     @Override
     @Transactional
     public List<AiSettingsResponse> activate(String provider, Long configId) {
-        requireGemini(provider);
+        requireSupported(provider);
         settings.findLockedSingleton().orElseThrow();
         var selected = configs.findFirstByProviderOrderByIdDesc(provider).orElseThrow(InvalidAiConfigurationException::new);
         if (configId != null && !configId.equals(selected.getId())) throw new InvalidAiConfigurationException();
@@ -163,12 +168,14 @@ public class AiProviderServiceImpl implements AiProviderService {
     }
     @Override
     public String chat(String prompt) {
-        if (quota!=null && quota.configured()) return chatWithRotation(prompt);
         var deadline = clock.instant().plusSeconds(60);
         var active = configs.findAllByActiveTrue();
         if (active.size() != 1) throw new AiProviderException();
         var config = active.getFirst();
-        requireGemini(config.getProvider());
+        requireSupported(config.getProvider());
+        // Quota theo project chỉ áp dụng cho Gemini; Groq và DeepSeek dùng luồng key chính rồi key dự phòng.
+        if (AiProviders.GEMINI.equals(config.getProvider()) && quota!=null && quota.configured())
+            return chatWithRotation(prompt);
         String answer;
         try {
             answer = call(config, cipher.decrypt(config.getProvider(), config.getKeyCipher()), prompt);
@@ -206,7 +213,7 @@ public class AiProviderServiceImpl implements AiProviderService {
         var active=configs.findAllByActiveTrue();
         if (active.size()!=1) throw new AiProviderException();
         var config=active.getFirst();
-        requireGemini(config.getProvider());
+        if (!AiProviders.GEMINI.equals(config.getProvider())) throw new InvalidAiConfigurationException();
         var remaining=new ArrayList<RotationKey>();
         remaining.add(new RotationKey("PRIMARY",cipher.decrypt("GEMINI",config.getKeyCipher()),null));
         for (var backup:backups.findAllByConfigIdOrderByPriorityAsc(config.getId()))
@@ -264,8 +271,8 @@ public class AiProviderServiceImpl implements AiProviderService {
         return result;
     }
 
-    private void requireGemini(String provider) {
-        if (!"GEMINI".equals(provider)) throw new InvalidAiConfigurationException();
+    private void requireSupported(String provider) {
+        if (!AiProviders.isChatProvider(provider)) throw new InvalidAiConfigurationException();
     }
 
     private String callBackup(AiProviderConfig config, AiBackupKey backup, String prompt) {
@@ -304,7 +311,7 @@ public class AiProviderServiceImpl implements AiProviderService {
             }
             if (hasLegacyKey) {
                 if (stored.size() > 1) throw new InvalidAiConfigurationException();
-                return List.of(newBackup("Dự phòng 1", input.backupApiKey().trim()));
+                return List.of(newBackup(input.provider(), "Dự phòng 1", input.backupApiKey().trim()));
             }
             return stored.stream().map(key -> new BackupDraft(key.getName(), key.getKeyCipher(), key.getMaskedKey())).toList();
         }
@@ -321,17 +328,17 @@ public class AiProviderServiceImpl implements AiProviderService {
                         .orElseThrow(InvalidAiConfigurationException::new);
             }
             String secret = request.apiKey();
-            if (secret != null && !secret.isBlank()) result.add(newBackup(request.name().trim(), secret.trim()));
+            if (secret != null && !secret.isBlank()) result.add(newBackup(input.provider(), request.name().trim(), secret.trim()));
             else if (existing != null) result.add(new BackupDraft(request.name().trim(), existing.getKeyCipher(), existing.getMaskedKey()));
             else throw new InvalidAiConfigurationException();
         }
         return result;
     }
 
-    private BackupDraft newBackup(String name, String secret) {
+    private BackupDraft newBackup(String provider, String name, String secret) {
         if (secret.length() > 2048) throw new InvalidAiConfigurationException();
         String mask = secret.length() >= 8 ? "••••" + secret.substring(secret.length() - 4) : "••••••••";
-        return new BackupDraft(name, cipher.encrypt("GEMINI", secret), mask);
+        return new BackupDraft(name, cipher.encrypt(provider, secret), mask);
     }
 
     private boolean sameKey(String first, String second) {
