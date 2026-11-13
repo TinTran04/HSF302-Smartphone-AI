@@ -6,7 +6,7 @@ public class AiProviderConfig {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @Column(nullable=false) private String provider;
     @Column(nullable=false) private String model;
-    @Column(name="key_cipher", columnDefinition="text", nullable=false) private String keyCipher;
+    @Column(name="key_cipher", columnDefinition="text") private String keyCipher;
     @Column(name="backup_key_cipher", columnDefinition="text") private String backupKeyCipher;
     @Column(nullable=false) private boolean tested;
     @Column(nullable=false) private boolean active;
@@ -18,7 +18,9 @@ public class AiProviderConfig {
     }
     public Long getId() { return id; } public String getProvider() { return provider; }
     public String getModel() { return model; } public String getKeyCipher() { return keyCipher; }
+    public boolean hasKeys() { return keyCipher != null; }
     public String getBackupKeyCipher() { return backupKeyCipher; }
+    public void setBackupKeyCipher(String value) { backupKeyCipher = value; }
     public boolean isTested() { return tested; } public boolean isActive() { return active; }
     public void markTested() { tested=true; } public void setActive(boolean active) { this.active=active; }
 }

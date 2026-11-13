@@ -63,19 +63,22 @@ class AiProviderIntegrationTest {
         assertEquals("OK",ai.chat("question"));
     }
 
-    @Test void concurrentChatsReturnWithoutReservingAnotherDatabaseConnectionForAlerts() throws Exception {
+    @Test void concurrentChatsReserveQuotaAndCallProviderOutsideDatabaseTransactions() throws Exception {
         assertNotSame(context.getBean("applicationTaskExecutor"), context.getBean("aiKeyAlertExecutor"));
         configureKeys(true);
+        when(provider.chat(anyString(),anyString(),anyString(),anyString())).thenAnswer(call -> {
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+            return "OK";
+        });
         var ready = new CyclicBarrier(10);
         try (var executor = Executors.newFixedThreadPool(10)) {
             var answers = new ArrayList<Future<String>>();
             for (int i = 0; i < 10; i++) {
-                answers.add(executor.submit(() -> new TransactionTemplate(transactions).execute(tx -> {
-                    configs.findAllByActiveTrue();
+                answers.add(executor.submit(() -> {
                     try { ready.await(5, TimeUnit.SECONDS); }
                     catch (Exception error) { throw new IllegalStateException(error); }
                     return ai.chat("question");
-                })));
+                }));
             }
             for (var answer : answers) assertEquals("OK", answer.get(5, TimeUnit.SECONDS));
         }
@@ -102,6 +105,7 @@ class AiProviderIntegrationTest {
         mvc.perform(get("/api/admin/ai-settings/key-alert").with(admin))
                 .andExpect(content().json(firstAlert));
         when(provider.chat(eq("GEMINI"), eq("alert-model"), eq("primary-private"), anyString())).thenReturn("recovered");
+        ai.test(new AiSettingsRequest("GEMINI", "alert-model", null, null, false));
         assertEquals("recovered", ai.chat("question"));
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> mvc.perform(get("/api/admin/ai-settings/key-alert").with(admin))
                 .andExpect(jsonPath("$.alert").isEmpty()));
@@ -137,14 +141,14 @@ class AiProviderIntegrationTest {
         mvc.perform(get("/api/admin/ai-settings/key-alert").with(admin)).andExpect(jsonPath("$.alert").isEmpty());
     }
 
-    @Test void modelErrorDoesNotSwitchKeysAndMonitoringRequiresAdmin() throws Exception {
+    @Test void modelPermissionErrorTriesBackupAndMonitoringRequiresAdmin() throws Exception {
         configureKeys(true);
         when(provider.chat(eq("GEMINI"), eq("alert-model"), eq("primary-private"), anyString()))
                 .thenThrow(new AiProviderException(404));
-        assertThrows(AiProviderException.class, () -> ai.chat("question"));
-        verify(provider, never()).chat(eq("GEMINI"), eq("alert-model"), eq("backup-private"), anyString());
+        assertEquals("OK", ai.chat("question"));
+        verify(provider).chat(eq("GEMINI"), eq("alert-model"), eq("backup-private"), anyString());
         mvc.perform(get("/api/admin/ai-settings/key-alert").with(adminSession()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.alert").isEmpty());
+                .andExpect(status().isOk());
         mvc.perform(get("/api/admin/ai-settings/key-alert")).andExpect(status().isUnauthorized());
         var customer = com.smartphoneai.entity.UserAccount.pendingCustomer(java.util.UUID.randomUUID() + "@example.test",
                 "Customer", "0900000000", "unused-test-hash");

@@ -46,6 +46,15 @@ public class AiProviderServiceImpl implements AiProviderService {
     private final AiKeyAlertService alerts;
     private final AiBackupKeyRepository backups;
     private AiQuotaTracker quota;
+    private AiKeyManagementService keyManagement;
+    private AiActivityLogService activity;
+    private AiDailyQuotaService dailyQuota;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDailyQuota(AiDailyQuotaService dailyQuota) { this.dailyQuota = dailyQuota; }
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setActivity(AiActivityLogService activity) { this.activity = activity; }
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setKeyManagement(AiKeyManagementService keyManagement) { this.keyManagement = keyManagement; }
     @org.springframework.beans.factory.annotation.Autowired
     public void setQuota(AiQuotaTracker quota) { this.quota=quota; }
     public AiProviderServiceImpl(AiProviderConfigRepository configs, SystemSettingRepository settings,
@@ -75,7 +84,7 @@ public class AiProviderServiceImpl implements AiProviderService {
         requireCurrentVersion(input, old);
         String key = input.apiKey();
         if (key == null || key.isBlank()) {
-            if (old == null) throw new InvalidAiConfigurationException();
+            if (old == null || !old.hasKeys()) throw new InvalidAiConfigurationException();
             key = cipher.decrypt(old.getProvider(), old.getKeyCipher());
         } else {
             key = key.trim();
@@ -95,16 +104,16 @@ public class AiProviderServiceImpl implements AiProviderService {
             var draft = draftKeys.get(index);
             backups.save(new AiBackupKey(config.getId(), draft.name(), index + 1, draft.keyCipher(), draft.maskedKey()));
         }
+        if (keyManagement != null) keyManagement.remember(config);
         return response(config);
     }
     @Override
-    @Transactional
     public void test(AiSettingsRequest input) {
         var deadline = clock.instant().plusSeconds(60);
         requireSupported(input.provider());
-        settings.findLockedSingleton().orElseThrow();
         var config = configs.findFirstByProviderOrderByIdDesc(input.provider()).orElseThrow(InvalidAiConfigurationException::new);
         requireCurrentVersion(input, config);
+        if (!config.hasKeys()) throw new InvalidAiConfigurationException();
         if (!config.getModel().equals(input.model().trim())) throw new InvalidAiConfigurationException();
         String key = cipher.decrypt(config.getProvider(), config.getKeyCipher());
         if (input.apiKey() != null && !input.apiKey().isBlank() &&
@@ -125,25 +134,33 @@ public class AiProviderServiceImpl implements AiProviderService {
                                 cipher.decrypt(config.getProvider(), storedBackups.get(index).getKeyCipher()))) throw new InvalidAiConfigurationException();
             }
         }
+        boolean usable = false;
+        AiProviderException lastFailure = null;
         try {
             call(config, key, "Reply with OK.");
+            usable = true;
         } catch (AiProviderException exception) {
-            if (!exception.isKeyFailure() || backupKey == null) throw exception;
+            if (!exception.isKeyFailure()) throw exception;
+            lastFailure = exception;
         }
-        AiProviderException backupFailure = null;
         for (var stored : storedBackups) {
             if (!clock.instant().isBefore(deadline)) throw new AiProviderException();
-            try { callBackup(config, stored, "Reply with OK."); }
-            catch (AiProviderException failure) { backupFailure = failure; }
+            try { callBackup(config, stored, "Reply with OK."); usable = true; }
+            catch (AiProviderException failure) {
+                if (!failure.isKeyFailure()) throw failure;
+                lastFailure = failure;
+            }
         }
-        if (backupFailure != null) throw backupFailure;
-        config.markTested();
+        if (!usable) throw lastFailure == null ? new AiProviderException() : lastFailure;
+        if (keyManagement != null) keyManagement.markTested(config.getId());
+        else { config.markTested(); configs.save(config); }
     }
     @Override
-    @Transactional(readOnly = true)
     public void testBackupKey(Long configId, Long keyId) {
         var config = configs.findById(configId).orElseThrow(InvalidAiConfigurationException::new);
         requireSupported(config.getProvider());
+        if (!config.hasKeys() || !configs.findFirstByProviderOrderByIdDesc(config.getProvider()).orElseThrow().getId().equals(configId))
+            throw new InvalidAiConfigurationException();
         var key = backups.findById(keyId).filter(candidate -> candidate.getConfigId().equals(configId))
                 .orElseThrow(InvalidAiConfigurationException::new);
         callBackup(config, key, "Reply with OK.");
@@ -160,8 +177,11 @@ public class AiProviderServiceImpl implements AiProviderService {
         settings.findLockedSingleton().orElseThrow();
         var selected = configs.findFirstByProviderOrderByIdDesc(provider).orElseThrow(InvalidAiConfigurationException::new);
         if (configId != null && !configId.equals(selected.getId())) throw new InvalidAiConfigurationException();
-        if (!selected.isTested()) throw new InvalidAiConfigurationException();
-        configs.findAllByActiveTrue().forEach(c -> c.setActive(false));
+        if (!selected.hasKeys() || !selected.isTested()) throw new InvalidAiConfigurationException();
+        var active = configs.findAllByActiveTrue();
+        var previous = active.stream().filter(c -> c.getProvider().equals(provider)).findFirst().orElse(null);
+        if (keyManagement != null) keyManagement.recordActivation(previous, selected);
+        active.forEach(c -> c.setActive(false));
         selected.setActive(true);
         configs.flush();
         return list();
@@ -173,9 +193,7 @@ public class AiProviderServiceImpl implements AiProviderService {
         if (active.size() != 1) throw new AiProviderException();
         var config = active.getFirst();
         requireSupported(config.getProvider());
-        // Quota theo project chỉ áp dụng cho Gemini; Groq và DeepSeek dùng luồng key chính rồi key dự phòng.
-        if (AiProviders.GEMINI.equals(config.getProvider()) && quota!=null && quota.configured())
-            return chatWithRotation(prompt);
+        if (quota != null) return chatWithRotation(config, prompt);
         String answer;
         try {
             answer = call(config, cipher.decrypt(config.getProvider(), config.getKeyCipher()), prompt);
@@ -208,54 +226,62 @@ public class AiProviderServiceImpl implements AiProviderService {
     }
 
     private record RotationKey(String ref, String secret, AiBackupKey backup) {}
-    private String chatWithRotation(String prompt) {
+    private String chatWithRotation(AiProviderConfig config, String prompt) {
         var deadline=clock.instant().plusSeconds(60);
-        var active=configs.findAllByActiveTrue();
-        if (active.size()!=1) throw new AiProviderException();
-        var config=active.getFirst();
-        if (!AiProviders.GEMINI.equals(config.getProvider())) throw new InvalidAiConfigurationException();
+        String provider = config.getProvider();
         var remaining=new ArrayList<RotationKey>();
-        remaining.add(new RotationKey("PRIMARY",cipher.decrypt("GEMINI",config.getKeyCipher()),null));
+        remaining.add(new RotationKey("PRIMARY",cipher.decrypt(provider,config.getKeyCipher()),null));
         for (var backup:backups.findAllByConfigIdOrderByPriorityAsc(config.getId()))
-            remaining.add(new RotationKey(backup.getId().toString(),cipher.decrypt("GEMINI",backup.getKeyCipher()),backup));
+            remaining.add(new RotationKey(backup.getId().toString(),cipher.decrypt(provider,backup.getKeyCipher()),backup));
         var excludedProjects=new HashSet<String>();
         AiProviderException last=null;
         String trigger="AI_QUOTA_NEAR_LIMIT";
+        var primaryState = quota.state(provider,config.getModel(),AiQuotaTracker.fingerprint(remaining.getFirst().secret()));
+        if (primaryState != null && primaryState.blocked() && primaryState.reason() != null) trigger=primaryState.reason();
         String lastName=null;
         while (!remaining.isEmpty() && clock.instant().isBefore(deadline)) {
             var keys=remaining.stream().map(key->new AiQuotaTracker.Key(key.ref(),AiQuotaTracker.fingerprint(key.secret()))).toList();
-            var reservation=quota.reserve(keys,config.getModel(),prompt,excludedProjects);
+            var reservation=reserve(provider,keys,config.getModel(),prompt,excludedProjects);
             if (reservation==null) break;
             var chosen=remaining.stream().filter(key->key.ref().equals(reservation.reference())).findFirst().orElseThrow();
             remaining.remove(chosen);
             try {
                 String result=availabilityRetry.execute(context -> {
-                    var attempt=context.getRetryCount()==0 ? reservation : quota.reserve(
+                    var attempt=context.getRetryCount()==0 ? reservation : reserve(provider,
                             List.of(new AiQuotaTracker.Key(chosen.ref(),AiQuotaTracker.fingerprint(chosen.secret()))),
                             config.getModel(),prompt,Set.of());
+                    if (attempt == null) throw new AiProviderException(429);
+                    if (dailyQuota != null) dailyQuota.recordRequest(provider, config.getModel(), chosen.secret());
                     if (client instanceof com.smartphoneai.service.UsageAwareChatProviderClient usageClient) {
-                        var reply=usageClient.chatWithUsage("GEMINI",config.getModel(),chosen.secret(),prompt);
+                        var reply=usageClient.chatWithUsage(provider,config.getModel(),chosen.secret(),prompt);
                         if (reply==null || reply.text()==null || reply.text().isBlank()) throw new AiProviderException();
-                        quota.finish(attempt.usageId(),reply.inputTokens());
+                        Integer consumedTokens="GROQ".equals(provider)&&reply.totalTokens()!=null?reply.totalTokens():reply.inputTokens();
+                        quota.finish(attempt.usageId(),consumedTokens);
+                        quota.observeLimit(provider,AiQuotaTracker.fingerprint(chosen.secret()),config.getModel(),reply.tokensPerMinute());
+                        if (dailyQuota != null) dailyQuota.observeLimit(provider, config.getModel(), chosen.secret(), reply.requestsPerDay());
                         return reply.text();
                     }
-                    var answer=client.chat("GEMINI",config.getModel(),chosen.secret(),prompt);
+                    var answer=client.chat(provider,config.getModel(),chosen.secret(),prompt);
                     if (answer==null || answer.isBlank()) throw new AiProviderException();
                     return answer;
                 });
+                quota.recordSuccess(provider,config.getModel(),AiQuotaTracker.fingerprint(chosen.secret()),true);
                 if (chosen.backup()!=null) {
                     alerts.recordBackupAttempt(chosen.backup().getId(),null);
                     alerts.record(config.getId(),"USING_BACKUP",trigger,null,chosen.backup().getName());
+                    log(config,"USING_BACKUP",chosen.secret(),chosen.backup().getName(),trigger);
                 } else alerts.record(config.getId(),"PRIMARY",null,null);
                 return result;
             } catch (AiProviderException failure) {
+                quota.recordFailure(provider,config.getModel(),AiQuotaTracker.fingerprint(chosen.secret()),failure);
+                log(config,"KEY_FAILED",chosen.secret(),chosen.backup()==null?"Key chính":chosen.backup().getName(),failure.getCode());
                 last=failure; lastName=chosen.backup()==null?null:chosen.backup().getName();
                 if (chosen.backup()!=null) alerts.recordBackupAttempt(chosen.backup().getId(),failure.getCode());
                 if (!failure.isKeyFailure()) {
                     if (chosen.backup()!=null) alerts.record(config.getId(),"BACKUP_FAILED",trigger,failure.getCode(),lastName);
                     throw failure;
                 }
-                if ("AI_QUOTA_NEAR_LIMIT".equals(trigger)) trigger=failure.getCode();
+                if ("AI_QUOTA_NEAR_LIMIT".equals(trigger)) trigger=failure.isBalanceFailure()?"AI_PROVIDER_BALANCE_ERROR":failure.getCode();
                 if (failure.isQuotaExceeded() && reservation.project()!=null) excludedProjects.add(reservation.project());
             }
         }
@@ -265,10 +291,34 @@ public class AiProviderServiceImpl implements AiProviderService {
     }
 
     private String call(AiProviderConfig config, String key, String prompt) {
-        String result = availabilityRetry.execute(context ->
-                client.chat(config.getProvider(), config.getModel(), key, prompt));
-        if (result == null || result.isBlank()) throw new AiProviderException();
-        return result;
+        try {
+            String result = availabilityRetry.execute(context -> {
+                if (dailyQuota != null) dailyQuota.recordRequest(config.getProvider(), config.getModel(), key);
+                if (client instanceof com.smartphoneai.service.UsageAwareChatProviderClient usageClient) {
+                    var reply = usageClient.chatWithUsage(config.getProvider(),config.getModel(),key,prompt);
+                    if (reply == null) throw new AiProviderException();
+                    if (quota != null) quota.observeLimit(config.getProvider(),AiQuotaTracker.fingerprint(key),config.getModel(),reply.tokensPerMinute());
+                    if (dailyQuota != null) dailyQuota.observeLimit(config.getProvider(), config.getModel(), key, reply.requestsPerDay());
+                    return reply.text();
+                }
+                return client.chat(config.getProvider(), config.getModel(), key, prompt);
+            });
+            if (result == null || result.isBlank()) throw new AiProviderException();
+            if (quota != null) quota.recordSuccess(config.getProvider(),config.getModel(),AiQuotaTracker.fingerprint(key),false);
+            return result;
+        } catch (AiProviderException failure) {
+            if (quota != null) quota.recordFailure(config.getProvider(),config.getModel(),AiQuotaTracker.fingerprint(key),failure);
+            throw failure;
+        }
+    }
+
+    private AiQuotaTracker.Reservation reserve(String provider,List<AiQuotaTracker.Key> keys,String model,String prompt,Set<String> excluded) {
+        return "GEMINI".equals(provider) ? quota.reserve(keys,model,prompt,excluded) : quota.reserve(provider,keys,model,prompt,excluded);
+    }
+
+    private void log(AiProviderConfig config,String type,String secret,String name,String reason) {
+        if (activity != null) activity.record(config.getProvider(),config.getModel(),type,name,
+                secret.length()>=8?"••••"+secret.substring(secret.length()-4):"••••••••",reason,"SYSTEM");
     }
 
     private void requireSupported(String provider) {
@@ -288,7 +338,7 @@ public class AiProviderServiceImpl implements AiProviderService {
 
     private AiSettingsResponse response(AiProviderConfig config) {
         var stored = backups.findAllByConfigIdOrderByPriorityAsc(config.getId()).stream().map(AiBackupKeyResponse::from).toList();
-        return new AiSettingsResponse(config.getProvider(), config.getModel(), "••••••••",
+        return new AiSettingsResponse(config.getProvider(), config.getModel(), config.hasKeys() ? "••••••••" : "",
                 stored.isEmpty() ? "" : "••••••••", config.isActive(), config.isTested(),
                 config.getId() == null ? null : config.getId().toString(), stored);
     }

@@ -152,7 +152,7 @@ class CustomerChatAccessDeletionIntegrationTest {
         assertEquals(0, count("ai_conversations", id));
     }
 
-    @Test void deletionWaitsForInFlightSendThenRemovesAllMessages() throws Exception {
+    @Test void deletionFinishesWhileProviderIsStillWaitingAndLateAnswerCannotRestoreChat() throws Exception {
         when(router.route(anyString(), anyString(), anyList())).thenReturn(new TopicRouter.Decision("SAME_TOPIC", null));
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
@@ -167,15 +167,81 @@ class CustomerChatAccessDeletionIntegrationTest {
             var send = pool.submit(() -> mvc.perform(message(id).with(customer)).andReturn().getResponse().getStatus());
             assertTrue(entered.await(10, TimeUnit.SECONDS));
             var deletion = pool.submit(() -> mvc.perform(delete("/api/ai/conversations/" + id).with(customer).with(csrf())).andReturn().getResponse().getStatus());
-            release.countDown();
-            assertEquals(200, send.get(15, TimeUnit.SECONDS));
-            assertEquals(204, deletion.get(15, TimeUnit.SECONDS));
+            try {
+                assertEquals(204, deletion.get(2, TimeUnit.SECONDS));
+                assertFalse(send.isDone());
+                assertEquals(0, count("ai_conversations", id));
+            } finally { release.countDown(); }
+            assertEquals(404, send.get(15, TimeUnit.SECONDS));
         } finally {
             release.countDown();
         }
         assertEquals(0, count("ai_conversations", id));
         assertEquals(0, messageCount(id));
         mvc.perform(message(id).with(customer)).andExpect(status().isNotFound());
+    }
+
+    @Test void abandonedProcessingLeaseDoesNotDelayDeletion() throws Exception {
+        var customer = customer();
+        String id = create(customer);
+        jdbc.update("UPDATE ai_conversations SET processing_token=?,processing_until=? WHERE id=?",
+                UUID.randomUUID(), Timestamp.from(Instant.now().plusSeconds(600)), UUID.fromString(id));
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var deletion = pool.submit(() -> mvc.perform(delete("/api/ai/conversations/" + id)
+                    .with(customer).with(csrf())).andReturn().getResponse().getStatus());
+            try {
+                assertEquals(204, deletion.get(2, TimeUnit.SECONDS));
+            } finally { deletion.cancel(true); }
+        }
+        assertEquals(0, count("ai_conversations", id));
+    }
+
+    @Test void deletingCompletedChatAlsoRemovesItsRequestReceipts() throws Exception {
+        when(router.route(anyString(), anyString(), anyList())).thenReturn(new TopicRouter.Decision("SAME_TOPIC", null));
+        when(responder.answer(anyString(), anyString(), anyList(), anyList()))
+                .thenReturn(new ChatResponder.Answer("Answer", List.of()));
+        var customer = customer();
+        String id = create(customer);
+        mvc.perform(post("/api/ai/conversations/" + id + "/messages").with(customer).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("content", "Question", "requestId", UUID.randomUUID()))))
+                .andExpect(status().isOk());
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM ai_chat_receipts WHERE conversation_id=?",
+                Integer.class, UUID.fromString(id)));
+        mvc.perform(delete("/api/ai/conversations/" + id).with(customer).with(csrf()))
+                .andExpect(status().isNoContent());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM ai_chat_receipts WHERE conversation_id=?",
+                Integer.class, UUID.fromString(id)));
+        assertEquals(0, messageCount(id));
+    }
+
+    @Test void deletionDuringTopicSwitchCannotCreateNewConversationAfterProviderReturns() throws Exception {
+        switchingAnswers();
+        var customer = customer();
+        String id = create(customer);
+        String switchId = suggest(customer, id);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(responder.answer(anyString(), anyString(), anyList(), anyList())).thenAnswer(invocation -> {
+            entered.countDown();
+            assertTrue(release.await(10, TimeUnit.SECONDS));
+            return new ChatResponder.Answer("Answer", List.of());
+        });
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var confirmation = pool.submit(() -> mvc.perform(post("/api/ai/topic-switches/" + switchId + "/confirm")
+                    .with(customer).with(csrf())).andReturn().getResponse().getStatus());
+            try {
+                assertTrue(entered.await(10, TimeUnit.SECONDS));
+                var deletion = pool.submit(() -> mvc.perform(delete("/api/ai/conversations/" + id)
+                        .with(customer).with(csrf())).andReturn().getResponse().getStatus());
+                assertEquals(204, deletion.get(2, TimeUnit.SECONDS));
+                assertFalse(confirmation.isDone());
+            } finally { release.countDown(); }
+            assertEquals(404, confirmation.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(0, count("ai_conversations", id));
+        mvc.perform(get("/api/ai/conversations").with(customer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test void concurrentConfirmedRetryAndTargetDeletionCannotRestoreDeletedChat() throws Exception {

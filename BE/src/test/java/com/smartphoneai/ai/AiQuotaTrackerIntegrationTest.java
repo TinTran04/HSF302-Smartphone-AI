@@ -26,7 +26,9 @@ class AiQuotaTrackerIntegrationTest {
     static class Config {
         @Bean DataSource dataSource() {
             var ds = new DriverManagerDataSource("jdbc:h2:mem:quota;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
-            new ResourceDatabasePopulator(new ClassPathResource("db/migration/V34__ai_project_quota.sql")).execute(ds);
+            new ResourceDatabasePopulator(new ClassPathResource("db/migration/V34__ai_project_quota.sql"),
+                    new ClassPathResource("db/migration/V36__provider_model_quota_state.sql"),
+                    new ClassPathResource("db/migration/V37__daily_ai_request_quota.sql")).execute(ds);
             return ds;
         }
         @Bean JdbcTemplate jdbc(DataSource ds) { return new JdbcTemplate(ds); }
@@ -93,6 +95,77 @@ class AiQuotaTrackerIntegrationTest {
             assertEquals(8, selected.stream().filter("primary"::equals).count());
             assertEquals(2, selected.stream().filter("other"::equals).count());
         } finally { pool.shutdownNow(); }
+    }
+
+    @Test void continuesUsingAvailableKeysWhenEveryGroupIsAboveEightyPercent() {
+        usage(projectA, "gemini", 90, NOW);
+        usage(projectB, "gemini", 95, NOW);
+        assertEquals("primary", tracker.reserve(keys, "gemini", "hello", Set.of()).reference());
+    }
+
+    @Test void remembersSharedGroupQuotaFailureAcrossModelChanges() {
+        tracker.recordFailure("GEMINI", "gemini", keys.getFirst().fingerprint(),
+                new com.smartphoneai.exception.AiProviderException(429));
+        assertEquals("other", tracker.reserve("GEMINI", keys, "gemini", "hello", Set.of()).reference());
+        assertEquals("primary", tracker.reserve("GEMINI", keys, "another-model", "hello", Set.of()).reference());
+        assertEquals("other", tracker.reserve("GEMINI", keys, "gemini", "hello", Set.of()).reference());
+        assertEquals("RATE_LIMIT", tracker.state("GEMINI", "gemini", keys.get(1).fingerprint()).status());
+        assertNull(tracker.state("GEMINI", "gemini", keys.getFirst().fingerprint()).retryAt());
+        tracker.recordSuccess("GEMINI", "gemini", keys.getFirst().fingerprint(), false);
+        assertEquals("primary", tracker.reserve("GEMINI", keys, "gemini", "hello", Set.of()).reference());
+    }
+
+    @Test void modelPermissionFailureSkipsOnlyThatKeyAndModel() {
+        tracker.recordFailure("GEMINI", "gemini", keys.getFirst().fingerprint(),
+                new com.smartphoneai.exception.AiProviderException(404));
+        assertEquals("same", tracker.reserve("GEMINI", keys, "gemini", "hello", Set.of()).reference());
+        assertEquals("primary", tracker.reserve("GEMINI", keys, "another-model", "hello", Set.of()).reference());
+    }
+
+    @Test void dailyQuotaFailuresAreRecognizableAfterTheMinuteCounterExpires() {
+        var failure = com.smartphoneai.exception.AiProviderException.fromProvider(429,
+                "{\"quotaId\":\"GenerateRequestsPerDayPerProjectPerModel-FreeTier\"}");
+        tracker.recordFailure("GEMINI", "gemini", keys.getFirst().fingerprint(), failure);
+        assertEquals("AI_PROVIDER_DAILY_LIMIT", tracker.state("GEMINI", "gemini", keys.getFirst().fingerprint()).reason());
+        assertTrue(tracker.state("GEMINI", "gemini", keys.getFirst().fingerprint()).blocked());
+    }
+
+    @Test void isolatesProvidersEvenWhenTheSameRawKeyIsConfigured() {
+        tracker.recordFailure("GROQ", "model", keys.getFirst().fingerprint(),
+                new com.smartphoneai.exception.AiProviderException(429));
+        assertEquals("primary", tracker.reserve("GEMINI", keys, "model", "hello", Set.of()).reference());
+        assertEquals("UNKNOWN", tracker.state("GEMINI", "model", keys.getFirst().fingerprint()).status());
+    }
+
+    @Test void usesProviderRetryDelayAndReleasesQuotaBlockAfterThatTime() {
+        var failure = com.smartphoneai.exception.AiProviderException.fromProvider(429,
+                "{\"error\":{\"details\":[{\"retryDelay\":\"12.5s\"}]}}");
+        assertEquals(13L,failure.getRetryAfterSeconds());
+        tracker.recordFailure("GEMINI","gemini",keys.getFirst().fingerprint(),failure);
+        assertEquals(NOW.plusSeconds(13),tracker.state("GEMINI","gemini",keys.getFirst().fingerprint()).retryAt());
+        var later = new AiQuotaTracker(jdbc,Clock.fixed(NOW.plusSeconds(14),ZoneOffset.UTC));
+        assertEquals("RETRY_READY",later.state("GEMINI","gemini",keys.getFirst().fingerprint()).status());
+    }
+
+    @Test void lateChatSuccessCannotClearANewerQuotaFailure() {
+        tracker.reserve("GEMINI",keys,"gemini","first in flight",Set.of());
+        tracker.recordFailure("GEMINI","gemini",keys.getFirst().fingerprint(),new com.smartphoneai.exception.AiProviderException(429));
+        tracker.recordSuccess("GEMINI","gemini",keys.getFirst().fingerprint(),true);
+        assertEquals("RATE_LIMIT",tracker.state("GEMINI","gemini",keys.getFirst().fingerprint()).status());
+        assertEquals("other",tracker.reserve("GEMINI",keys,"gemini","next",Set.of()).reference());
+    }
+
+    @Test void failedTransientRecheckDoesNotMakeBlockedKeyAvailable() {
+        tracker.recordFailure("GEMINI","gemini",keys.getFirst().fingerprint(),new com.smartphoneai.exception.AiProviderException(404));
+        tracker.recordFailure("GEMINI","gemini",keys.getFirst().fingerprint(),new com.smartphoneai.exception.AiProviderException(503));
+        assertEquals("MODEL_ERROR",tracker.state("GEMINI","gemini",keys.getFirst().fingerprint()).status());
+    }
+
+    @Test void storesObservedLimitEvenWhileManualLimitIsSelected() {
+        tracker.observeLimit("GEMINI",keys.getFirst().fingerprint(),"gemini",1000L);
+        assertEquals(100L,tracker.group("GEMINI",keys.getFirst().fingerprint(),"gemini",false).limit());
+        assertEquals(1000L,tracker.observedLimit("GEMINI",keys.getFirst().fingerprint(),"gemini"));
+        assertEquals(1000L,tracker.observedLimit("GEMINI",keys.get(1).fingerprint(),"gemini"));
     }
 }
 

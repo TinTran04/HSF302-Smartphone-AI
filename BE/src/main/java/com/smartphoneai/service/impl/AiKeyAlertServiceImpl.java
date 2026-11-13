@@ -83,7 +83,7 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
                 .findFirst().flatMap(config -> alerts.findFirstByConfigIdOrderByIdDesc(config.getId())
                         .filter(alert -> !"PRIMARY".equals(alert.getStatus()))
                         .map(alert -> new AiKeyAlertResponse(alert.getId().toString(), config.getModel(), alert.getStatus(),
-                                alert.getReason(), alert.getBackupFailureReason(), alert.getDetectedAt(), alert.getBackupKeyName())));
+                                alert.getReason(), alert.getBackupFailureReason(), alert.getDetectedAt(), alert.getBackupKeyName(),config.getProvider())));
     }
 
     @Override
@@ -104,7 +104,7 @@ public class AiKeyAlertServiceImpl implements AiKeyAlertService {
                     || alert.getId() <= recoveredThroughIds.getOrDefault(alert.getConfigId(), 0L);
             return new AiNotificationItemResponse(alert.getId().toString(), configuration.getModel(), alert.getStatus(),
                     alert.getReason(), alert.getBackupFailureReason(), alert.getDetectedAt(), alert.getBackupKeyName(),
-                    alert.getId() <= user.getAiNotificationsReadThroughId(), resolved);
+                    alert.getId() <= user.getAiNotificationsReadThroughId(), resolved,configuration.getProvider());
         }).toList();
         return new AiNotificationsResponse(items, alerts.countUnreadChatAlerts(user.getAiNotificationsReadThroughId(), latestId),
                 latestId.toString());

@@ -32,6 +32,12 @@ public class AiBackupKey {
         else lastStatus = "PROVIDER_ERROR";
     }
     public Long getId() { return id; }
+    public void rename(String value) { name = value; }
+    public void copyOutcome(AiBackupKey previous) {
+        lastStatus = previous.lastStatus;
+        lastFailureReason = previous.lastFailureReason;
+        lastCheckedAt = previous.lastCheckedAt;
+    }
     public Long getConfigId() { return configId; }
     public String getName() { return name; }
     public int getPriority() { return priority; }

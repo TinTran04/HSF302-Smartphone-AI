@@ -103,7 +103,7 @@ class AiKeyFailoverIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {400, 404, 502, 504})
+    @ValueSource(ints = {400, 502, 504})
     void otherProviderErrorsAreReturnedImmediately(int status) throws Exception {
         saveWithBackup();
         testConnection().andExpect(status().isOk());
@@ -217,7 +217,7 @@ class AiKeyFailoverIntegrationTest {
         assertEquals("OK", ai.chat("question"));
     }
 
-    @Test void failedBackupTestKeepsExistingActiveConfiguration() throws Exception {
+    @Test void failedBackupCanBeSkippedWhenThePrimaryIsUsable() throws Exception {
         save(Map.of("provider", "GEMINI", "model", "old-model", "apiKey", "old-secret"))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/admin/ai-settings/test").with(session).with(csrf())
@@ -227,9 +227,10 @@ class AiKeyFailoverIntegrationTest {
         saveWithBackup();
         when(provider.chat(eq("GEMINI"), anyString(), eq("backup-secret"), anyString()))
                 .thenThrow(new AiProviderException(401));
-        testConnection().andExpect(status().isServiceUnavailable());
-        activate().andExpect(status().isConflict());
-        assertEquals("old-model", configs.findAllByActiveTrue().getFirst().getModel());
+        testConnection().andExpect(status().isOk());
+        activate().andExpect(status().isOk());
+        assertEquals("demo-model", configs.findAllByActiveTrue().getFirst().getModel());
+        assertEquals("OK",ai.chat("question"));
     }
 
     @Test void blankFieldsRetainKeysAndExplicitRemovalDisablesFallback() throws Exception {

@@ -33,7 +33,7 @@ public class AiProviderController {
     }
     @PutMapping public AiSettingsResponse save(@Valid @RequestBody AiSettingsRequest input) { return providers.save(input); }
     @PostMapping("/test") public Map<String,String> test(@Valid @RequestBody AiSettingsRequest input) {
-        providers.test(input); return Map.of("message", "Kết nối thành công");
+        providers.test(input); return Map.of("message", "Đã kiểm tra kết nối. Xem trạng thái từng key trong mục API key.");
     }
     @PostMapping("/activate") public List<AiSettingsResponse> activate(@Valid @RequestBody ActivateProviderRequest input) { return providers.activate(input.provider(), input.configId()); }
 }

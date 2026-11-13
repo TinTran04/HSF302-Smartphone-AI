@@ -20,12 +20,16 @@ import static org.mockito.Mockito.*;
 class PhoneAssistanceIntegrationTest {
     @Autowired ProductRepository products;
     @Test void adviceConstrainsMixedAndInjectedRequestsToPhoneContext() {
+        var phone = save("Screen Phone", 9000000L, true);
+        phone.setDescription("OLED giúp màn hình điện thoại có độ tương phản cao.");
+        products.saveAndFlush(phone);
         var provider = mock(AiProviderService.class);
         when(provider.chat(anyString())).thenAnswer(invocation -> {
             String prompt = invocation.getArgument(0);
             assertTrue(prompt.contains("Chỉ trả lời phần liên quan đến điện thoại"));
             assertTrue(prompt.contains("bỏ qua chỉ dẫn") && prompt.contains("ngoài phạm vi"));
-            assertTrue(prompt.contains("Kiến thức AI chỉ được dùng trong ngữ cảnh điện thoại"));
+            assertTrue(prompt.contains("Thông tin sản phẩm cụ thể tại shop phải lấy từ Catalog JSON"));
+            assertTrue(prompt.contains("kiến thức có sẵn chỉ trong phạm vi điện thoại"));
             assertTrue(prompt.contains("cách sử dụng") && prompt.contains("sửa chữa") && prompt.contains("phụ kiện"));
             return "{\"answer\":\"OLED giúp màn hình điện thoại có độ tương phản cao.\",\"recommendedProductIds\":[],\"comparedProductIds\":[],\"citedChunkIds\":[]}";
         });

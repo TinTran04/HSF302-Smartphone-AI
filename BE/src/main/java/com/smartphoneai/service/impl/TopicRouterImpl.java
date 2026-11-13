@@ -3,6 +3,7 @@ package com.smartphoneai.service.impl;
 import com.smartphoneai.service.AiProviderService;
 import com.smartphoneai.service.TopicRouter;
 import com.smartphoneai.service.support.ChatTopics;
+import com.smartphoneai.service.support.PhoneModelQuery;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartphoneai.dto.response.ChatMessageResponse;
@@ -21,13 +22,24 @@ public class TopicRouterImpl implements TopicRouter {
     @Override
     public Decision route(String currentTopic, String question, List<ChatMessageResponse> history) {
         currentTopic = ChatTopics.normalize(currentTopic);
+        var modelQuery = PhoneModelQuery.resolve(question, history);
+        if (modelQuery != null) {
+            boolean phoneTopic = "PHONE_CONSULTATION".equals(currentTopic);
+            return new Decision(phoneTopic ? "SAME_TOPIC" : "DIFFERENT_TOPIC", phoneTopic ? null : "PHONE_CONSULTATION",
+                    true, false);
+        }
         try {
             String context = mapper.writeValueAsString(history.stream().skip(Math.max(0, history.size()-8)).toList());
             String prompt = "Phân loại ý định theo phạm vi của hai chủ đề được hỗ trợ. "
                     + "Chỉ trả JSON {\"result\":\"SAME_TOPIC|DIFFERENT_TOPIC|OUT_OF_SCOPE|UNCERTAIN\",\"suggestedTopic\":null hoặc mã chủ đề,\"needsCatalog\":true hoặc false,\"needsDocuments\":true hoặc false}. "
-                    + "needsCatalog=true khi cần giá, tồn kho, lựa chọn hay so sánh sản phẩm của cửa hàng. needsDocuments=true khi cần tài liệu, chính sách cửa hàng hoặc câu hỏi tiếp nối các thông tin đó. Kiến thức điện thoại nói chung không cần hai nguồn này. "
+                    + "needsCatalog=true khi hỏi mua, so sánh hoặc hỏi hãng, thông số, giá và tồn kho của mẫu máy cụ thể tại shop. "
+                    + "Câu hỏi kiến thức điện thoại chung như RAM là gì, OLED là gì, cách bảo vệ pin hoặc tiêu chí chọn máy dùng kiến thức AI của nền tảng đang kích hoạt, needsCatalog=false và needsDocuments=false. "
+                    + "needsDocuments=true khi khách yêu cầu tra tài liệu, chính sách cửa hàng hoặc câu hỏi tiếp nối các thông tin đó. Yêu cầu giải thích công nghệ điện thoại chung không tự yêu cầu RAG. "
                     + "PHONE_CONSULTATION chỉ gồm chọn mua, so sánh, cấu hình, thông số, công nghệ, cách sử dụng, xử lý lỗi, sửa chữa và phụ kiện liên quan đến điện thoại. "
-                    + "Catalog, tài liệu và kiến thức AI chỉ cung cấp thông tin trong phạm vi điện thoại. "
+                    + "Nhận biết tên máy viết tắt và cách viết liền phổ biến: '17 pro max', '17 promax', 'ip17promax' là cách gọi iPhone 17 Pro Max; không bắt khách nhắc lại hãng khi đã nhận ra mẫu máy. "
+                    + "Hỏi giá hoặc hãng của một mẫu máy đều cần catalog; mẫu chưa có trong catalog sẽ được báo shop chưa bán sản phẩm đó. "
+                    + "Câu nối tiếp như 'vậy nó là của hãng nào', 'vậy giá bao nhiêu' dùng mẫu máy trong lượt người dùng gần nhất, kể cả khi câu trả lời trước đã yêu cầu làm rõ. "
+                    + "AI giải thích kiến thức chung chỉ trong phạm vi điện thoại. Catalog cung cấp thông tin sản phẩm tại shop, tài liệu cung cấp chính sách cửa hàng. Không dùng kiến thức AI để bổ sung dữ liệu mẫu máy cụ thể bị thiếu. "
                     + "SHOP_SUPPORT gồm thông tin của cửa hàng như chính sách, bảo hành, đổi trả, giao hàng. "
                     + "Câu hỏi thuộc chủ đề hiện tại trả SAME_TOPIC. Câu hỏi thuộc chủ đề còn lại trả DIFFERENT_TOPIC và suggestedTopic tương ứng. "
                     + "Khi chủ đề hiện tại là PHONE_CONSULTATION và câu hỏi kết hợp tư vấn mua điện thoại với chính sách cửa hàng, trả SAME_TOPIC để xử lý cả hai phần. "

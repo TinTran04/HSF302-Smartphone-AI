@@ -35,6 +35,7 @@ class AiQuotaSettingsIntegrationTest {
         var cipher = context.getBean(ConfigSecretCipher.class);
         var config = mock(AiProviderConfig.class);
         when(config.getId()).thenReturn(1L);
+        when(config.hasKeys()).thenReturn(true);
         when(config.getModel()).thenReturn("gemini");
         when(config.getKeyCipher()).thenReturn(cipher.encrypt("GEMINI", "primary-secret"));
         var backup = mock(AiBackupKey.class);
@@ -73,6 +74,38 @@ class AiQuotaSettingsIntegrationTest {
         assertThrows(InvalidAiConfigurationException.class, () -> settings.save(new AiQuotaSettingsService.SaveInput(1L, List.of(key("PRIMARY", "b", 1L), key("unknown", "b", 1L)))));
         assertThrows(InvalidAiConfigurationException.class, () -> settings.save(new AiQuotaSettingsService.SaveInput(1L, List.of(key("PRIMARY", "a", 100L), key("2", "a", 200L)))));
         assertEquals(List.of("a", "a"), settings.get().keys().stream().map(AiQuotaSettingsService.KeyView::projectName).toList());
+    }
+
+    @Test void showsDefaultGeminiLimitBeforeManualConfiguration() {
+        var config = context.getBean(AiProviderConfigRepository.class).findFirstByProviderOrderByIdDesc("GEMINI").orElseThrow();
+        when(config.getModel()).thenReturn("gemini-3.1-flash-lite");
+        var result = settings.get();
+        assertEquals(250000L, result.keys().getFirst().tpmLimit());
+        assertEquals("DEFAULT", result.keys().getFirst().limitSource());
+        assertNull(result.keys().getFirst().projectName());
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .valueToTree(result.keys().getFirst());
+        assertEquals(1000L, json.path("dailyRequestLimit").asLong());
+        assertEquals(0L, json.path("requestsToday").asLong());
+        assertEquals("DEFAULT", json.path("dailyLimitSource").asText());
+        assertEquals("2026-01-02T08:00:00Z", json.path("dailyResetAt").asText());
+    }
+
+    @Test void scopesQuotaAndDefaultsToTheSelectedProviderAndModel() {
+        var configs = context.getBean(AiProviderConfigRepository.class);
+        var cipher = context.getBean(ConfigSecretCipher.class);
+        var groq = mock(AiProviderConfig.class);
+        when(groq.getId()).thenReturn(3L);
+        when(groq.hasKeys()).thenReturn(true);
+        when(groq.getModel()).thenReturn("llama-3.3-70b-versatile");
+        when(groq.getKeyCipher()).thenReturn(cipher.encrypt("GROQ", "primary-secret"));
+        when(configs.findFirstByProviderOrderByIdDesc("GROQ")).thenReturn(Optional.of(groq));
+        settings.save(new AiQuotaSettingsService.SaveInput(3L, List.of(key("PRIMARY", "a", 6000L)), "GROQ"));
+        settings.save(new AiQuotaSettingsService.SaveInput(1L, List.of(key("PRIMARY", "a", 100L), key("2", "a", 100L))));
+        assertEquals(6000L, settings.get("GROQ", null).keys().getFirst().tpmLimit());
+        assertEquals(100L, settings.get().keys().getFirst().tpmLimit());
+        assertNull(settings.get("GROQ", "another-model").keys().getFirst().tpmLimit());
     }
 }
 

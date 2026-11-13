@@ -78,21 +78,14 @@ public class AiChatServiceImpl implements AiChatService {
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public void delete(Authentication auth, UUID id) {
         var actor=actor(auth);
-        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
-        for (;;) {
-            boolean deleted=Boolean.TRUE.equals(transaction.execute(status -> {
-                var conversation=owned(actor,id);
-                if (conversation.processingAt(clock.instant())) return false;
-                switches.deleteConversationReferences(id);
-                messages.deleteConversationMessages(id);
-                conversations.delete(conversation);
-                return true;
-            }));
-            if (deleted) return;
-            if (System.nanoTime()>=deadline) throw new ChatBusyException();
-            try { Thread.sleep(100); }
-            catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new ChatBusyException(); }
-        }
+        transaction.executeWithoutResult(status -> {
+            var conversation=owned(actor,id);
+            // Completion paths lock and recheck this row before saving AI results.
+            // Removing it also invalidates the lease of any request still waiting on the provider.
+            switches.deleteConversationReferences(id);
+            messages.deleteConversationMessages(id);
+            conversations.delete(conversation);
+        });
     }
     @Override
     @Transactional(propagation=Propagation.NOT_SUPPORTED)

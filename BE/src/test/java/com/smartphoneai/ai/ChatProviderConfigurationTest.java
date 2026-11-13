@@ -22,6 +22,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.embedding.EmbeddingModel;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,6 +38,27 @@ class ChatProviderConfigurationTest {
     private final EmbeddingModelFactory factory = mock(EmbeddingModelFactory.class);
     private final AiProviderServiceImpl chat = new AiProviderServiceImpl(chatConfigs, settings, cipher, client, Clock.systemUTC(), mock(com.smartphoneai.service.AiKeyAlertService.class), mock(com.smartphoneai.repository.AiBackupKeyRepository.class));
     private final EmbeddingSettingsServiceImpl embedding = new EmbeddingSettingsServiceImpl(embeddingConfigs, documents, settings, cipher, factory);
+
+    @ParameterizedTest
+    @ValueSource(strings={"GEMINI","GROQ","DEEPSEEK"})
+    void directPhoneKnowledgeUsesTheActivePlatformModelAndSavedKey(String platform) {
+        var configured = new AiProviderConfig(platform, "configured-model", "saved-cipher", null, Instant.now());
+        configured.setActive(true);
+        when(chatConfigs.findAllByActiveTrue()).thenReturn(List.of(configured));
+        when(cipher.decrypt(platform, "saved-cipher")).thenReturn("saved-private-key");
+        when(client.chat(eq(platform), eq("configured-model"), eq("saved-private-key"), anyString()))
+                .thenReturn("{\"answer\":\"Hạn chế nhiệt độ cao khi sử dụng điện thoại.\",\"recommendedProductIds\":[],\"comparedProductIds\":[],\"citedChunkIds\":[]}");
+        var products = mock(com.smartphoneai.repository.ProductRepository.class);
+        var rag = mock(com.smartphoneai.service.RagService.class);
+        var phones = new com.smartphoneai.service.impl.PhoneAssistanceServiceImpl(products, chat,
+                new com.fasterxml.jackson.databind.ObjectMapper(), rag);
+        var answer = phones.advise("Cách bảo vệ pin điện thoại?", List.of(), List.of(),
+                new com.smartphoneai.service.TopicRouter.Decision("SAME_TOPIC", null, false, false));
+        assertEquals("Hạn chế nhiệt độ cao khi sử dụng điện thoại.", answer.text());
+        verify(client).chat(eq(platform), eq("configured-model"), eq("saved-private-key"),
+                argThat(prompt -> prompt.contains("chỉ trong phạm vi điện thoại")));
+        verifyNoInteractions(products, rag);
+    }
 
     @Test void directServiceCallsRejectUnsupportedProviderBeforeReadingOrWritingConfiguration() {
         var request = new AiSettingsRequest("OPENAI", "legacy-model", "legacy-key", null, false);
@@ -113,12 +136,14 @@ class ChatProviderConfigurationTest {
         verify(cipher, never()).encrypt(eq("GEMINI"), anyString());
     }
 
-    @Test void activeGroqChatUsesItsOwnKeyAndSkipsGeminiQuotaRotation() {
+    @Test void activeGroqChatUsesItsOwnKeyAndProviderSpecificQuotaRotation() {
         var groq = new AiProviderConfig("GROQ", "llama-3.3-70b-versatile", "groq-cipher", null, Instant.now());
         groq.markTested();
         groq.setActive(true);
         var quota = mock(com.smartphoneai.service.impl.AiQuotaTracker.class);
         when(quota.configured()).thenReturn(true);
+        when(quota.reserve(eq("GROQ"),anyList(),eq("llama-3.3-70b-versatile"),eq("question"),anySet()))
+                .thenReturn(new com.smartphoneai.service.impl.AiQuotaTracker.Reservation("PRIMARY",java.util.UUID.randomUUID(),"groq-group",false));
         chat.setQuota(quota);
         when(chatConfigs.findAllByActiveTrue()).thenReturn(List.of(groq));
         when(cipher.decrypt("GROQ", "groq-cipher")).thenReturn("gsk-primary");

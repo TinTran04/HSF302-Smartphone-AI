@@ -74,19 +74,35 @@ public class SpringAiProviderClient implements UsageAwareChatProviderClient {
 
     private Reply callOpenAiCompatible(String provider, String model, String apiKey, String prompt) {
         try {
+            var tokenLimit = new java.util.concurrent.atomic.AtomicReference<Long>();
+            var requestLimit = new java.util.concurrent.atomic.AtomicReference<Long>();
             var requestFactory = new SimpleClientHttpRequestFactory();
             requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
             requestFactory.setReadTimeout(READ_TIMEOUT_MS);
             var api = OpenAiApi.builder()
                     .baseUrl(openAiCompatibleBaseUrls.apply(provider))
                     .apiKey(apiKey)
-                    .restClientBuilder(RestClient.builder().requestFactory(requestFactory))
+                    .restClientBuilder(RestClient.builder().requestFactory(requestFactory).requestInterceptor((request, body, execution) -> {
+                        var response = execution.execute(request, body);
+                        String header = response.getHeaders().getFirst("x-ratelimit-limit-tokens");
+                        if (header != null) {
+                            try { tokenLimit.set(Long.parseLong(header)); }
+                            catch (NumberFormatException ignored) { /* No usable limit was supplied. */ }
+                        }
+                        String requestHeader = response.getHeaders().getFirst("x-ratelimit-limit-requests");
+                        if (requestHeader != null) {
+                            try { requestLimit.set(Long.parseLong(requestHeader)); }
+                            catch (NumberFormatException ignored) { /* No usable daily request limit was supplied. */ }
+                        }
+                        return response;
+                    }))
                     .responseErrorHandler(new ProviderErrorHandler())
                     .build();
             var client = OpenAiChatModel.builder().openAiApi(api)
                     .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                     .defaultOptions(OpenAiChatOptions.builder().model(model).build()).build();
-            return reply(client.call(new Prompt(prompt)));
+            var result = reply(client.call(new Prompt(prompt)));
+            return new Reply(result.text(), result.inputTokens(), tokenLimit.get(), result.totalTokens(), requestLimit.get());
         } catch (Exception exception) {
             throw translate(exception);
         }
@@ -96,7 +112,8 @@ public class SpringAiProviderClient implements UsageAwareChatProviderClient {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null)
             throw new AiProviderException();
         var usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
-        return new Reply(response.getResult().getOutput().getText(), usage == null ? null : usage.getPromptTokens());
+        return new Reply(response.getResult().getOutput().getText(), usage == null ? null : usage.getPromptTokens(),null,
+                usage == null ? null : usage.getTotalTokens());
     }
 
     private static AiProviderException translate(Exception exception) {
@@ -122,7 +139,8 @@ public class SpringAiProviderClient implements UsageAwareChatProviderClient {
             String body;
             try { body = StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8); }
             catch (IOException ignored) { body = ""; }
-            throw AiProviderException.fromProvider(response.getStatusCode().value(), body);
+            throw AiProviderException.fromProvider(response.getStatusCode().value(), body)
+                    .withRetryAfter(response.getHeaders().getFirst("Retry-After"));
         }
     }
 }

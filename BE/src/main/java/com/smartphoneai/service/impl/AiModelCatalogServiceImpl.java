@@ -60,6 +60,12 @@ public class AiModelCatalogServiceImpl implements AiModelCatalogService {
     private final AiModelDirectory directory;
     private final Clock clock;
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private AiQuotaTracker quota;
+    private AiDailyQuotaService dailyQuota;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDailyQuota(AiDailyQuotaService dailyQuota) { this.dailyQuota = dailyQuota; }
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setQuota(AiQuotaTracker quota) { this.quota = quota; }
 
     public AiModelCatalogServiceImpl(AiProviderConfigRepository configs, ConfigSecretCipher cipher,
                                      AiModelDirectory directory, Clock clock) {
@@ -73,7 +79,7 @@ public class AiModelCatalogServiceImpl implements AiModelCatalogService {
         String key = resolveKey(provider, input.apiKey());
         String cacheKey = provider + ":" + AiQuotaTracker.fingerprint(key);
         var cached = cache.get(cacheKey);
-        if (cached != null && clock.instant().isBefore(cached.expiresAt())) return cached.response();
+        if (cached != null && clock.instant().isBefore(cached.expiresAt())) return withSavedModels(cached.response());
 
         var models = directory.listChatModels(provider, key);
         var response = switch (provider) {
@@ -82,12 +88,25 @@ public class AiModelCatalogServiceImpl implements AiModelCatalogService {
             default -> deepseek(models);
         };
         cache.put(cacheKey, new CacheEntry(response, clock.instant().plus(CACHE_TTL)));
-        return response;
+        if (quota != null && "LIVE".equals(response.source()))
+            for (var option : response.models())
+                quota.observeLimit(provider, AiQuotaTracker.fingerprint(key), option.id(), option.tokensPerMinute());
+        if (dailyQuota != null && "LIVE".equals(response.source()))
+            for (var option : response.models())
+                dailyQuota.observeLimit(provider, option.id(), key, option.requestsPerDay());
+        return withSavedModels(response);
+    }
+
+    private AiModelOptionsResponse withSavedModels(AiModelOptionsResponse response) {
+        var saved = configs.findAllByOrderByIdDesc().stream().filter(config -> response.provider().equals(config.getProvider()))
+                .map(config -> config.getModel()).distinct().toList();
+        return new AiModelOptionsResponse(response.provider(), response.source(), response.note(), response.models(), response.fetchedAt(), saved);
     }
 
     private String resolveKey(String provider, String apiKey) {
         if (apiKey != null && !apiKey.isBlank()) return apiKey.trim();
         var saved = configs.findFirstByProviderOrderByIdDesc(provider).orElseThrow(InvalidAiConfigurationException::new);
+        if (!saved.hasKeys()) throw new InvalidAiConfigurationException();
         return cipher.decrypt(saved.getProvider(), saved.getKeyCipher());
     }
 
@@ -97,14 +116,17 @@ public class AiModelCatalogServiceImpl implements AiModelCatalogService {
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var probes = new ArrayList<Future<Optional<RateLimits>>>();
             for (var model : candidates)
-                probes.add(executor.submit(() -> directory.probeLimits(AiProviders.GROQ, model.id(), key)));
+                probes.add(executor.submit(() -> {
+                    if (dailyQuota != null) dailyQuota.recordRequest(AiProviders.GROQ, model.id(), key);
+                    return directory.probeLimits(AiProviders.GROQ, model.id(), key);
+                }));
             for (int i = 0; i < candidates.size(); i++) {
                 var model = candidates.get(i);
                 try {
                     probes.get(i).get(20, TimeUnit.SECONDS).ifPresent(limits -> ranked.add(new Ranked(model, limits)));
                 } catch (ExecutionException failure) {
                     // Key sai thì dừng hẳn; model lỗi riêng lẻ (chưa chấp nhận điều khoản, ngừng hỗ trợ) thì bỏ qua.
-                    if (failure.getCause() instanceof AiProviderException error && error.isKeyFailure() && !error.isQuotaExceeded())
+                    if (failure.getCause() instanceof AiProviderException error && error.isAuthenticationFailure())
                         throw error;
                 } catch (TimeoutException exception) {
                     probes.get(i).cancel(true);

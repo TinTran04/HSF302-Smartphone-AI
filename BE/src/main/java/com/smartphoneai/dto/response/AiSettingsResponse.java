@@ -7,7 +7,7 @@ public record AiSettingsResponse(String provider, String model, String maskedKey
         this(provider, model, maskedKey, maskedBackupKey, active, tested, null, List.of());
     }
     public static AiSettingsResponse from(AiProviderConfig config) {
-        return new AiSettingsResponse(config.getProvider(), config.getModel(), "••••••••",
+        return new AiSettingsResponse(config.getProvider(), config.getModel(), config.hasKeys() ? "••••••••" : "",
                 config.getBackupKeyCipher() == null ? "" : "••••••••", config.isActive(), config.isTested());
     }
 }

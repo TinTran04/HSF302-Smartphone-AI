@@ -15,6 +15,38 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class AiQuotaProviderTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"GROQ", "DEEPSEEK"})
+    void proactivelyRotatesOtherProvidersWithoutChangingModel(String provider) {
+        var configs = mock(AiProviderConfigRepository.class);
+        var backups = mock(AiBackupKeyRepository.class);
+        var cipher = mock(ConfigSecretCipher.class);
+        var client = mock(UsageAwareChatProviderClient.class);
+        var quota = mock(AiQuotaTracker.class);
+        var config = mock(AiProviderConfig.class);
+        var backup = mock(AiBackupKey.class);
+        when(config.getId()).thenReturn(1L);
+        when(config.getProvider()).thenReturn(provider);
+        when(config.getModel()).thenReturn("selected-model");
+        when(config.getKeyCipher()).thenReturn("primary");
+        when(backup.getId()).thenReturn(2L);
+        when(backup.getKeyCipher()).thenReturn("backup");
+        when(backup.getName()).thenReturn("B");
+        when(configs.findAllByActiveTrue()).thenReturn(List.of(config));
+        when(backups.findAllByConfigIdOrderByPriorityAsc(1L)).thenReturn(List.of(backup));
+        when(cipher.decrypt(eq(provider), anyString())).thenAnswer(call -> call.getArgument(1));
+        UUID usageId = UUID.randomUUID();
+        when(quota.reserve(eq(provider), anyList(), eq("selected-model"), eq("question"), anySet()))
+                .thenReturn(new AiQuotaTracker.Reservation("2", usageId, "b", true));
+        when(client.chatWithUsage(provider, "selected-model", "backup", "question"))
+                .thenReturn(new UsageAwareChatProviderClient.Reply("answer", 15));
+        var service = new AiProviderServiceImpl(configs, mock(SystemSettingRepository.class), cipher, client,
+                Clock.systemUTC(), mock(AiKeyAlertService.class), backups);
+        service.setQuota(quota);
+        assertEquals("answer", service.chat("question"));
+        verify(quota).finish(usageId, 15);
+        verify(quota).recordSuccess(provider, "selected-model", AiQuotaTracker.fingerprint("backup"), true);
+    }
     @Test void nearQuotaChoosesBackupAndRecordsProviderUsage() {
         var configs=mock(AiProviderConfigRepository.class); var backups=mock(AiBackupKeyRepository.class);
         var cipher=mock(ConfigSecretCipher.class); var client=mock(UsageAwareChatProviderClient.class);

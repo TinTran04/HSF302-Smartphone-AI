@@ -34,6 +34,9 @@ class OpenAiCompatibleProviderClientTest {
             requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add("x-ratelimit-limit-tokens", "500000");
+            exchange.getResponseHeaders().add("x-ratelimit-limit-requests", "1000");
+            exchange.getResponseHeaders().add("Retry-After", "17");
             exchange.sendResponseHeaders(status, bytes.length);
             exchange.getResponseBody().write(bytes);
             exchange.close();
@@ -53,6 +56,9 @@ class OpenAiCompatibleProviderClientTest {
         var reply = client().chatWithUsage(provider, "demo-model", "secret-key", "Câu hỏi");
         assertEquals("Xin chào", reply.text());
         assertEquals(12, reply.inputTokens());
+        assertEquals(15, reply.totalTokens());
+        assertEquals(500000L, reply.tokensPerMinute());
+        assertEquals(1000L, reply.requestsPerDay());
         assertEquals("/v1/chat/completions", path.get());
         assertEquals("Bearer secret-key", authorization.get());
         assertTrue(requestBody.get().contains("\"model\":\"demo-model\""));
@@ -77,6 +83,14 @@ class OpenAiCompatibleProviderClientTest {
         responseBody = "{\"error\":{\"message\":\"Insufficient Balance\"}}";
         assertTrue(assertThrows(AiProviderException.class,
                 () -> client().chat("DEEPSEEK", "demo-model", "key", "question")).isQuotaExceeded());
+    }
+
+    @Test void preservesProviderRetryHeaderAndBalanceClassification() {
+        status=429;
+        var rate=assertThrows(AiProviderException.class,()->client().chat("GROQ","model","key","question"));
+        assertEquals(17L,rate.getRetryAfterSeconds());
+        status=402;
+        assertTrue(assertThrows(AiProviderException.class,()->client().chat("DEEPSEEK","model","key","question")).isBalanceFailure());
     }
 
     @Test void unknownModelMapsToModelError() {

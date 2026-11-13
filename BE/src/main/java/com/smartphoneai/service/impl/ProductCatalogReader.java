@@ -20,7 +20,7 @@ public class ProductCatalogReader {
         int page=0;
         org.springframework.data.domain.Page<com.smartphoneai.entity.Product> batch;
         do {
-            batch=products.findByActiveTrueAndNameContainingIgnoreCase("",PageRequest.of(page++,100,Sort.by("id")));
+            batch=products.findByNameContainingIgnoreCase("",PageRequest.of(page++,100,Sort.by("id")));
             batch.getContent().stream().map(ProductMapper::toResponse).forEach(result::add);
         } while (batch.hasNext());
         return List.copyOf(result);
