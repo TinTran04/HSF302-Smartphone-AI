@@ -8,6 +8,9 @@ import type {
   AiNotifications,
   AiProvider,
   AiSettings,
+  AiKeyManagementState,
+  AiQuotaKey,
+  AiActivityPage,
   Cart,
   CartEntry,
   CartItem,
@@ -772,6 +775,378 @@ export const mockApi: Api = {
     write('ai-notifications-' + user?.id, items);
     await delay(undefined);
   },
+  aiKeyManagement: (provider, before) => {
+    admin();
+    const current = settings.find(setting => setting.provider === provider)!;
+    const data = read<AiKeyManagementState>(`key-management-${provider}`, {
+      configId: current.id,
+      active: current.active,
+      keys: [],
+      history: [],
+    });
+    const primary = data.keys.find((key) => key.keyRef === 'PRIMARY');
+    data.keys = [
+      ...(current.maskedKey
+        ? [
+            {
+              keyRef: 'PRIMARY',
+              identity: primary?.identity ?? uid('key'),
+              name: primary?.name ?? 'Key demo',
+              maskedKey: current.maskedKey,
+              priority: 0,
+              lastPrimaryAt: primary?.lastPrimaryAt ?? null,
+            },
+          ]
+        : []),
+      ...current.backupKeys.map((backup) => {
+        const old = data.keys.find((key) => key.keyRef === backup.id || key.name === backup.name);
+        return {
+          keyRef: backup.id,
+          identity: old?.identity ?? uid('key'),
+          name: backup.name,
+          maskedKey: backup.maskedKey,
+          priority: backup.priority,
+          lastPrimaryAt: old?.lastPrimaryAt ?? null,
+        };
+      }),
+    ];
+    data.configId = current.id;
+    data.active = current.active;
+    write(`key-management-${provider}`, data);
+    return delay({
+      ...data,
+      history: data.history
+        .filter((entry) => before === undefined || entry.id < before)
+        .slice(0, 50),
+    });
+  },
+  renameAiKey: async (configId, keyRef, name) => {
+    admin();
+    const current = settings
+      .find((setting) => setting.id === configId);
+    if (!current)
+      throw new ApiError(409, 'Cấu hình đã thay đổi. Hãy tải lại.');
+    const data = await mockApi.aiKeyManagement(current.provider);
+    const key = data.keys.find((entry) => entry.keyRef === keyRef);
+    if (
+      !key ||
+      !name.trim() ||
+      name.trim().length > 80 ||
+      data.keys.some(
+        (entry) => entry !== key && entry.name.toLowerCase() === name.trim().toLowerCase(),
+      )
+    )
+      throw new ApiError(400, 'Tên key không hợp lệ hoặc đã được sử dụng.');
+    key.name = name.trim();
+    const backup = current.backupKeys.find((entry) => entry.id === keyRef);
+    if (backup) backup.name = key.name;
+    write(`key-management-${current.provider}`, data);
+    save();
+  },
+  promoteAiKey: async (configId, keyId) => {
+    admin();
+    const current = settings
+      .find((setting) => setting.id === configId);
+    if (!current || !current.active || !current.tested)
+      throw new ApiError(409, 'Kích hoạt cấu hình mới nhất trước khi hoán đổi key.');
+    const data = await mockApi.aiKeyManagement(current.provider);
+    const primary = data.keys.find((key) => key.keyRef === 'PRIMARY')!;
+    const selected = data.keys.find((key) => key.keyRef === keyId);
+    const backup = current.backupKeys.find((key) => key.id === keyId);
+    if (!selected || !backup) throw new ApiError(409, 'Key dự phòng đã thay đổi.');
+    const now = new Date().toISOString();
+    data.history.unshift({
+      id: (data.history[0]?.id ?? 0) + 1,
+      fromName: primary.name,
+      fromMaskedKey: primary.maskedKey,
+      toName: selected.name,
+      toMaskedKey: selected.maskedKey,
+      actor: user!.fullName,
+      changedAt: now,
+    });
+    data.keys = data.keys.map((key) =>
+      key === primary
+        ? { ...selected, keyRef: 'PRIMARY', priority: 0, lastPrimaryAt: now }
+        : key === selected
+          ? { ...primary, keyRef: keyId, priority: selected.priority }
+          : key,
+    );
+    current.maskedKey = selected.maskedKey;
+    backup.name = primary.name;
+    backup.maskedKey = primary.maskedKey;
+    current.id = uid('config');
+    data.configId = current.id;
+    write(`key-management-${current.provider}`, data);
+    save();
+  },
+  aiSavedModels: (provider) => {
+    admin();
+    const current = settings.find(setting => setting.provider === provider);
+    return delay([
+      ...new Set(
+        [current?.model, ...read<string[]>('saved-models-' + provider, [])].filter(
+          (model): model is string => !!model,
+        ),
+      ),
+    ]);
+  },
+  aiQuota: async (provider, model) => {
+    admin();
+    const current = settings.find(setting => setting.provider === provider)!;
+    const selectedModel = model || current.model;
+    const identities = await mockApi.aiKeyManagement(provider);
+    const stored = read<Record<string, AiQuotaKey>>(`quota-${provider}-${selectedModel}`, {});
+    return {
+      configId: current.id,
+      provider,
+      model: selectedModel,
+      keys: identities.keys.map((key) => {
+        const previous = stored[key.identity];
+        const fallback = provider === 'GEMINI' && /flash|pro/.test(selectedModel) ? 250000 : null;
+        return {
+          keyRef: key.keyRef,
+          name: key.name,
+          maskedKey: key.maskedKey,
+          projectName: previous?.projectName ?? null,
+          tpmLimit: previous?.tpmLimit ?? fallback,
+          estimatedInputTokens: previous?.estimatedInputTokens ?? 0,
+          requestsToday: previous?.requestsToday ?? 0,
+          dailyRequestLimit: previous?.dailyRequestLimit ?? null,
+          dailyLimitSource: previous?.dailyLimitSource ?? 'NONE',
+          dailyResetAt: previous?.dailyResetAt ?? null,
+          dailyTrackingSince: previous?.dailyTrackingSince ?? null,
+          limitSource: previous?.limitSource ?? (fallback ? 'DEFAULT' : 'NONE'),
+          status: previous?.status ?? 'UNKNOWN',
+          checkedAt: previous?.checkedAt ?? null,
+          retryAt: previous?.retryAt ?? null,
+          reason: previous?.reason ?? null,
+          lastUsedAt: previous?.lastUsedAt ?? null,
+        };
+      }),
+    };
+  },
+  aiActivity: async (provider, page) => {
+    admin();
+    const state = await mockApi.aiKeyManagement(provider);
+    const events = read<AiActivityPage['items']>('ai-activity-' + provider, []);
+    const history: AiActivityPage['items'] = state.history.map((entry) => ({
+      id: 'SWAP-' + entry.id,
+      type: 'PRIMARY_CHANGED',
+      model: '',
+      keyName: entry.toName,
+      maskedKey: entry.toMaskedKey,
+      reason: `${entry.fromName} (${entry.fromMaskedKey}) → ${entry.toName} (${entry.toMaskedKey})`,
+      actor: entry.actor,
+      createdAt: entry.changedAt,
+    }));
+    const items = [...events, ...history].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return delay({
+      items: items.slice(page * 10, page * 10 + 10),
+      total: items.length,
+      page,
+      size: 10,
+    });
+  },
+  saveAiKey: async (input) => {
+    admin();
+    const current = settings.find((setting) => setting.provider === input.provider)!;
+    if ((input.configId || '') !== (current.id || ''))
+      throw new ApiError(409, 'Cấu hình đã thay đổi. Hãy tải lại.');
+    const data = await mockApi.aiKeyManagement(input.provider);
+    const initial = !current.maskedKey;
+    const primary = initial || input.keyRef === 'PRIMARY';
+    const old = primary ? data.keys[0] : data.keys.find((key) => key.keyRef === input.keyRef);
+    if (!input.name.trim() || (!old?.maskedKey && !input.apiKey?.trim()))
+          throw new ApiError(400, 'Nhập tên và API key.');
+    const masked = input.apiKey?.trim()
+      ? '••••' + input.apiKey.trim().slice(-4)
+      : old?.maskedKey || '';
+    let ref = input.keyRef || 'PRIMARY';
+    if (primary) current.maskedKey = masked;
+    else if (!input.keyRef) {
+      if (current.backupKeys.length >= 10) throw new ApiError(400, 'Tối đa 10 key dự phòng.');
+      ref = uid('backup');
+      current.backupKeys.push({
+        id: ref,
+        name: input.name.trim(),
+        maskedKey: masked,
+        priority: current.backupKeys.length + 1,
+        lastStatus: 'WORKING',
+        lastFailureReason: null,
+        lastCheckedAt: new Date().toISOString(),
+      });
+    } else {
+      const backup = current.backupKeys.find((key) => key.id === ref);
+      if (!backup) throw new ApiError(409, 'Key đã thay đổi.');
+      backup.name = input.name.trim();
+      backup.maskedKey = masked;
+    }
+    const identity = input.apiKey?.trim() ? uid('key') : old?.identity || uid('key');
+    data.keys = data.keys.filter((key) => key.keyRef !== ref);
+    data.keys.push({
+      keyRef: ref,
+      identity,
+      name: input.name.trim(),
+      maskedKey: masked,
+      priority: primary ? 0 : current.backupKeys.find((key) => key.id === ref)!.priority,
+      lastPrimaryAt: old?.lastPrimaryAt || null,
+    });
+    current.id = uid('config');
+    current.model = input.model;
+    current.tested = true;
+    data.configId = current.id;
+    write('key-management-' + input.provider, data);
+    const fallback = input.provider === 'GEMINI' && /flash|pro/.test(input.model) ? 250000 : null;
+    const stored = read<Record<string, AiQuotaKey>>(`quota-${input.provider}-${input.model}`, {});
+    stored[identity] = {
+      keyRef: ref,
+      name: input.name,
+      maskedKey: masked,
+      projectName: input.projectName || null,
+      tpmLimit: input.useDefault ? fallback : input.tpmLimit || null,
+      estimatedInputTokens: 0,
+      requestsToday: stored[identity]?.requestsToday ?? 0,
+      dailyRequestLimit:
+        input.useDefaultDaily === undefined
+          ? (stored[identity]?.dailyRequestLimit ?? null)
+          : input.useDefaultDaily
+            ? null
+            : (input.dailyRequestLimit ?? null),
+      dailyLimitSource:
+        input.useDefaultDaily === undefined
+          ? (stored[identity]?.dailyLimitSource ?? 'NONE')
+          : input.useDefaultDaily
+            ? 'NONE'
+            : 'MANUAL',
+      dailyResetAt: stored[identity]?.dailyResetAt ?? null,
+      dailyTrackingSince: stored[identity]?.dailyTrackingSince ?? null,
+      limitSource: input.useDefault ? (fallback ? 'DEFAULT' : 'NONE') : 'MANUAL',
+      status: 'WORKING',
+      checkedAt: new Date().toISOString(),
+    };
+    write(`quota-${input.provider}-${input.model}`, stored);
+    const events = read<AiActivityPage['items']>('ai-activity-' + input.provider, []);
+    events.unshift({
+      id: uid('event'),
+      type: input.keyRef ? 'KEY_EDITED' : 'KEY_ADDED',
+      model: input.model,
+      keyName: input.name.trim(),
+      maskedKey: masked,
+      reason: null,
+      actor: user!.fullName,
+      createdAt: new Date().toISOString(),
+    });
+    write('ai-activity-' + input.provider, events);
+    write('saved-models-' + input.provider, [
+      ...new Set([input.model, ...read<string[]>('saved-models-' + input.provider, [])]),
+    ]);
+    save();
+    return delay({ ...current });
+  },
+  checkAiKey: async (configId, keyRef) => {
+    admin();
+    const current = settings
+      .find((setting) => setting.id === configId);
+    if (!current) throw new ApiError(409, 'Cấu hình đã thay đổi.');
+    const data = await mockApi.aiKeyManagement(current.provider);
+    const key = data.keys.find((item) => item.keyRef === keyRef);
+    if (!key) throw new ApiError(404, 'Không tìm thấy key.');
+    const quota = await mockApi.aiQuota(current.provider, current.model);
+    const stored = read<Record<string, AiQuotaKey>>(
+      `quota-${current.provider}-${current.model}`,
+      {},
+    );
+    stored[key.identity] = {
+      ...quota.keys.find((item) => item.keyRef === keyRef)!,
+      status: 'WORKING',
+      reason: null,
+      retryAt: null,
+      checkedAt: new Date().toISOString(),
+    };
+    write(`quota-${current.provider}-${current.model}`, stored);
+  },
+  removeAiKey: async (configId, keyRef, replacementKeyRef) => {
+    admin();
+    const current = settings
+      .find((setting) => setting.id === configId);
+    if (!current) throw new ApiError(409, 'Key đã thay đổi.');
+    const data = await mockApi.aiKeyManagement(current.provider);
+    const removed = data.keys.find((key) => key.keyRef === keyRef);
+    if (!removed) throw new ApiError(409, 'Key đã thay đổi.');
+    if (keyRef === 'PRIMARY') {
+      if (current.backupKeys.length) {
+        const backup = current.backupKeys.find((key) => key.id === replacementKeyRef);
+        const replacement = data.keys.find((key) => key.keyRef === replacementKeyRef);
+        if (!backup || !replacement) throw new ApiError(400, 'Chọn key dự phòng thay thế.');
+        current.maskedKey = backup.maskedKey;
+        current.backupKeys = current.backupKeys.filter((key) => key.id !== replacementKeyRef);
+        data.keys = data.keys
+          .filter((key) => key !== removed)
+          .map((key) =>
+            key === replacement
+              ? { ...key, keyRef: 'PRIMARY', priority: 0, lastPrimaryAt: new Date().toISOString() }
+              : key,
+          );
+      } else {
+        current.maskedKey = '';
+        current.active = false;
+        current.tested = false;
+        data.keys = [];
+      }
+    } else {
+      current.backupKeys = current.backupKeys.filter((key) => key.id !== keyRef);
+      data.keys = data.keys.filter((key) => key !== removed);
+    }
+    current.backupKeys = current.backupKeys.map((key, index) => ({ ...key, priority: index + 1 }));
+    current.maskedBackupKey = current.backupKeys[0]?.maskedKey || '';
+    data.keys = data.keys.map((key) =>
+      key.keyRef === 'PRIMARY'
+        ? key
+        : {
+            ...key,
+            priority: current.backupKeys.find((backup) => backup.id === key.keyRef)!.priority,
+          },
+    );
+    current.id = uid('config');
+    data.configId = current.id;
+    data.active = current.active;
+    write('key-management-' + current.provider, data);
+    const events = read<AiActivityPage['items']>('ai-activity-' + current.provider, []);
+    events.unshift({
+      id: uid('event'),
+      type: 'KEY_REMOVED',
+      model: current.model,
+      keyName: removed.name,
+      maskedKey: removed.maskedKey,
+      reason: null,
+      actor: user!.fullName,
+      createdAt: new Date().toISOString(),
+    });
+    write('ai-activity-' + current.provider, events);
+    save();
+    return delay({ ...current });
+  },
+  moveAiKey: async (configId, keyRef, direction) => {
+    admin();
+    const current = settings
+      .find((setting) => setting.id === configId);
+    const index = current?.backupKeys.findIndex((key) => key.id === keyRef) ?? -1;
+    if (
+      !current ||
+      index < 0 ||
+      index + direction < 0 ||
+      index + direction >= current.backupKeys.length
+    )
+      throw new ApiError(409, 'Thứ tự đã thay đổi.');
+    [current.backupKeys[index], current.backupKeys[index + direction]] = [
+      current.backupKeys[index + direction],
+      current.backupKeys[index],
+    ];
+    current.backupKeys.forEach((key, position) => (key.priority = position + 1));
+    current.id = uid('config');
+    save();
+    return delay({ ...current });
+  },
   aiSettings: () => {
     admin();
     return delay(settings);
@@ -831,6 +1206,9 @@ export const mockApi: Api = {
       maskedBackupKey: backupKeys[0]?.maskedKey || '',
     };
     settings = settings.map((setting) => (setting.provider === saved.provider ? saved : setting));
+    write('saved-models-' + data.provider, [
+      ...new Set([data.model, ...read<string[]>('saved-models-' + data.provider, [])]),
+    ]);
     save();
     return delay(saved);
   },

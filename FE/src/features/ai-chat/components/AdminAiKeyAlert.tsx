@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { api } from '../../../shared/api';
 import { Icon } from '../../../shared/components/Icon';
 import { formatDate } from '../../../shared/utils/format';
+import { providerLabel } from '../../../shared/constants/aiProviders';
 import './AdminAiKeyAlert.css';
 
 export const outcomes = {
@@ -16,11 +17,13 @@ export const outcomes = {
 export function reasonMessage(reason: string | null) {
   switch (reason) {
     case 'AI_QUOTA_NEAR_LIMIT':
-      return 'Mức sử dụng input token ước tính của project đã đạt ngưỡng 80% TPM. Hệ thống chủ động chuyển key.';
+      return 'Mức sử dụng token ước tính của nhóm đã đạt 80% giới hạn mỗi phút. Hệ thống ưu tiên key khác.';
     case 'AI_PROVIDER_AUTH_ERROR':
       return 'Key hết hiệu lực hoặc không có quyền truy cập.';
     case 'AI_PROVIDER_RATE_LIMIT':
       return 'Đã chạm quota hoặc giới hạn sử dụng.';
+    case 'AI_PROVIDER_BALANCE_ERROR':
+      return 'Tài khoản của key không đủ số dư sử dụng.';
     case 'AI_PROVIDER_MODEL_ERROR':
       return 'Model chưa khả dụng với key này.';
     case 'AI_PROVIDER_BUSY':
@@ -65,11 +68,11 @@ export function AdminAiKeyAlert() {
           <p>Lỗi key dự phòng. {reasonMessage(alert.backupFailureReason)}</p>
         )}
         <p className="help-text">
-          Model {alert.model} · Phát hiện lúc {formatDate(alert.detectedAt)}
+          {alert.provider && `${providerLabel(alert.provider)} · `}Model {alert.model} · Phát hiện lúc {formatDate(alert.detectedAt)}
         </p>
         <p>
           {alert.reason === 'AI_QUOTA_NEAR_LIMIT'
-            ? 'Theo dõi mức sử dụng và quota của từng project trong cấu hình Gemini.'
+            ? 'Theo dõi mức sử dụng và hạn mức của từng nhóm trong cấu hình AI.'
             : 'Hãy kiểm tra và bổ sung API key, kiểm tra kết nối rồi kích hoạt cấu hình.'}
         </p>
         <Link to="/admin/ai-settings">

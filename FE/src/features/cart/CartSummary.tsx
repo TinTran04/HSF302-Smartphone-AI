@@ -26,7 +26,7 @@ export function CartSummary({
         <strong>{formatVnd(total)}</strong>
       </div>
       <p className="help-text mb-5">
-        Tổng thanh toán được máy chủ kiểm tra lại trước khi xác nhận đơn hàng.
+        Tổng thanh toán được máy chủ kiểm tra lại khi đặt mua.
       </p>
       {children}
       <div className="flex items-center justify-center gap-2 mt-6 text-xs muted">

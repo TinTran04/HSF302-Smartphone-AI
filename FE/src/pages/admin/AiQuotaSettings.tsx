@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isDemo } from '../../shared/api';
+import { api, isDemo } from '../../shared/api';
+import type { AiProvider, AiQuotaKey } from '../../shared/types/models';
 import { http, jsonBody } from '../../shared/api/httpClient';
 import { Button, ErrorState, Skeleton, useToast } from '../../shared/components/Ui';
 
-type QuotaKey = {
-  keyRef: string;
-  name: string;
-  maskedKey: string;
-  projectName: string | null;
-  tpmLimit: number | null;
-  estimatedInputTokens: number;
-};
+export type QuotaKey = AiQuotaKey;
 type QuotaSettings = { configId: string; model: string; keys: QuotaKey[] };
 type QuotaDraft = { keyRef: string; projectName: string; tpmLimit: string };
 
@@ -30,13 +24,13 @@ export function quotaPayload(configId: string, drafts: QuotaDraft[]) {
       tpmLimit !== null &&
       (!Number.isSafeInteger(tpmLimit) || tpmLimit <= 0 || tpmLimit > 1_000_000_000)
     )
-      throw new Error('Giới hạn input TPM phải là số nguyên từ 1 đến 1.000.000.000.');
+      throw new Error('Giới hạn mỗi phút phải là số nguyên từ 1 đến 1.000.000.000.');
     if ((projectName === null) !== (tpmLimit === null))
-      throw new Error('Nhập cả Project ID và giới hạn input TPM, hoặc xóa cả hai.');
+      throw new Error('Nhập cả Project ID và giới hạn mỗi phút, hoặc xóa cả hai.');
     if (projectName && tpmLimit !== null) {
       const previous = limits.get(projectName);
       if (previous !== undefined && previous !== tpmLimit)
-        throw new Error('Các key cùng Project ID phải dùng cùng giới hạn input TPM.');
+        throw new Error('Các key cùng Project ID phải dùng cùng giới hạn mỗi phút.');
       limits.set(projectName, tpmLimit);
     }
     return { keyRef: draft.keyRef, projectName, tpmLimit };
@@ -44,20 +38,64 @@ export function quotaPayload(configId: string, drafts: QuotaDraft[]) {
   return { configId: id, keys };
 }
 
-export function AiQuotaSettings({ configId }: { configId: string }) {
-  const query = useQuery({
+export function useAiQuota(configId: string) {
+  return useQuery({
     queryKey: ['ai-quota'],
     queryFn: () => http<QuotaSettings>('/admin/ai-settings/quota'),
     enabled: !isDemo && !!configId,
     refetchInterval: 15_000,
   });
+}
+
+export function useProviderQuota(provider: AiProvider, configId: string, model: string) {
+  return useQuery({
+    queryKey: ['ai-quota', provider, configId, model],
+    queryFn: () => api.aiQuota(provider, model),
+    enabled: !!configId && !!model.trim(),
+    refetchInterval: 15_000,
+  });
+}
+
+export function QuotaUsage({ usage, onConfigure }: { usage?: QuotaKey; onConfigure?: () => void }) {
+  if (!usage) return <p className="help-text">Ước tính yêu cầu/ngày · Chưa có số liệu</p>;
+  const dailyLimit = usage.dailyRequestLimit;
+  const hasDailyEstimate =
+    typeof dailyLimit === 'number' &&
+    dailyLimit > 0 &&
+    typeof usage.requestsToday === 'number' &&
+    Number.isFinite(usage.requestsToday);
+  const remaining = hasDailyEstimate
+    ? Math.max(0, dailyLimit - Math.max(0, usage.requestsToday!))
+    : null;
+  return (
+    <div className="ai-quota-usage">
+      <p className="text-sm">
+        {remaining === null
+          ? 'Ước tính còn lại/ngày · Chưa xác định'
+          : 'Ước tính còn ' +
+            remaining.toLocaleString('vi-VN') +
+            ' / ' +
+            dailyLimit!.toLocaleString('vi-VN') +
+            ' yêu cầu/ngày'}
+      </p>
+      {onConfigure && !hasDailyEstimate && (
+        <Button variant="ghost" onClick={onConfigure}>
+          Cấu hình giới hạn
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function AiQuotaSettings({ configId }: { configId: string }) {
+  const query = useAiQuota(configId);
   return (
     <section className="card panel max-w-4xl mt-7" aria-label="Quota Gemini theo project">
       <h2 className="!text-xl">Tự chuyển key theo quota project</h2>
       <p className="help-text mt-4">
-        Các key Gemini cùng Google Cloud Project ID dùng chung quota cho model. Nhập giới hạn input
-        tokens/phút (TPM) của project cho model đang dùng. Hệ thống ưu tiên chuyển sang project khác
-        khi mức sử dụng ước tính đạt 80% giới hạn.
+        Các key cùng Project ID dùng chung hạn mức cho model. Nhập giới hạn token đầu vào mỗi phút
+        từ nhà cung cấp. Hệ thống ưu tiên chuyển sang project khác khi mức sử dụng ước tính đạt 80%
+        giới hạn.
       </p>
       <p className="help-text mt-4">
         Mức sử dụng là ước tính input token của Chat trong 60 giây gần nhất do backend này ghi nhận,
@@ -144,12 +182,7 @@ function QuotaForm({ settings }: { settings: QuotaSettings }) {
               <legend>{key.name}</legend>
               <div className="ai-backup-summary">
                 <span className="help-text">{key.maskedKey}</span>
-                <span className="help-text">
-                  Ước tính input trong 60 giây · {key.estimatedInputTokens} token
-                </span>
-                {(!key.projectName || !key.tpmLimit) && (
-                  <span className="help-text">Chưa thiết lập dự toán quota</span>
-                )}
+                <QuotaUsage usage={key} />
               </div>
               <div className="form-grid flex-1 min-w-0">
                 <label className="form-field">
@@ -162,7 +195,7 @@ function QuotaForm({ settings }: { settings: QuotaSettings }) {
                   />
                 </label>
                 <label className="form-field">
-                  Input TPM · {key.name}
+                  Giới hạn mỗi phút · {key.name}
                   <input
                     type="number"
                     min="1"
@@ -172,6 +205,7 @@ function QuotaForm({ settings }: { settings: QuotaSettings }) {
                     onChange={(event) => update(key.keyRef, 'tpmLimit', event.target.value)}
                     placeholder="Ví dụ 1000000"
                   />
+                  <span className="help-text">Số token đầu vào được phép dùng trong một phút.</span>
                 </label>
               </div>
             </fieldset>

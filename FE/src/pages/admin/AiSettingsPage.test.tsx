@@ -14,6 +14,18 @@ vi.mock('../../shared/api', async (importOriginal) => ({
 function renderWithSettings(key: string[], settings: unknown, content: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(key, settings);
+  if (key[0] === 'ai-settings' && Array.isArray(settings)) {
+    for (const setting of settings) {
+      client.setQueryData(['ai-key-management', setting.provider, setting.id], {
+        configId: setting.id, active: setting.active, history: [], keys: [
+          { keyRef: 'PRIMARY', identity: 'primary', name: 'Key chính', maskedKey: setting.maskedKey, priority: 0, lastPrimaryAt: null },
+          ...(setting.backupKeys || []).map((backup: { id: string; name: string; maskedKey: string }, index: number) => ({
+            keyRef: backup.id, identity: backup.id, name: backup.name, maskedKey: backup.maskedKey, priority: index + 1, lastPrimaryAt: null,
+          })),
+        ],
+      });
+    }
+  }
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <ToastProvider>{content}</ToastProvider>
@@ -22,9 +34,10 @@ function renderWithSettings(key: string[], settings: unknown, content: ReactNode
 }
 
 describe('Gemini administration settings', () => {
-  it('suggests Gemini 3.6 Flash for the first chat configuration', () => {
+  it('waits for the provider model list before offering a selection', () => {
     const html = renderWithSettings(['ai-settings'], [{ provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false }], <AiSettingsPage />);
-    expect(html).toContain('value="gemini-3.6-flash"');
+    expect(html).toContain('Chưa có danh sách model');
+    expect(html).not.toContain('<option value="gemini-3.6-flash"');
   });
   it('shows operational metrics since backend startup', async () => {
     const { AiMetrics } = await import('./AiSettingsPage');
@@ -49,7 +62,8 @@ describe('Gemini administration settings', () => {
       <AiSettingsPage />,
     );
     expect(html).toContain('Google Gemini');
-    expect(html).toContain('value="gemini-2.5-flash"');
+    expect(html).toContain('gemini-2.5-flash');
+    expect(html).not.toContain('<option value="gemini-2.5-flash"');
     expect(html).toContain('Lưu cấu hình');
     expect(html).toContain('Kiểm tra kết nối');
     expect(html).toContain('Kích hoạt');
@@ -84,12 +98,16 @@ describe('Gemini administration settings', () => {
       <AiSettingsPage />,
     );
     expect(html).toContain('Key dự phòng (1/10)');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('Thao tác Project A');
     expect(html).toContain('Project A');
     expect(html).toContain('Kiểm tra Project A');
-    expect(html).toContain('Thay Project A');
+    expect(html).toContain('Sửa Project A');
     expect(html).toContain('Xóa Project A');
     expect(html).toContain('Tăng ưu tiên Project A');
     expect(html).not.toContain('API Key dự phòng mới');
+    expect(html).not.toContain('Thay API key chính');
+    expect(html).not.toContain('>Quota<');
   });
 
   it('lists Gemini, Groq and DeepSeek as switchable chat platforms', () => {
@@ -114,12 +132,12 @@ describe('Gemini administration settings', () => {
       <AiSettingsPage />,
     );
     expect(html).toContain('Cấu hình chi tiết — Groq');
-    expect(html).toContain('value="llama-3.3-70b-versatile"');
-    expect(html).toContain('Đang hoạt động: llama-3.3-70b-versatile');
+    expect(html).toContain('llama-3.3-70b-versatile');
+    expect(html).toContain('Đang dùng');
     expect(html).not.toContain('Quota Gemini theo project');
   });
 
-  it('turns the chat model into a dropdown of the top free models and keeps the saved model selectable', () => {
+  it('offers the provider suggestions and keeps the active model visible in the summary', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(['ai-settings'], [
       { id: '', provider: 'GEMINI', model: '', maskedKey: '', maskedBackupKey: '', active: false, tested: false, backupKeys: [] },
@@ -147,7 +165,7 @@ describe('Gemini administration settings', () => {
     expect(html).not.toContain('placeholder="Nhập mã model Groq');
     expect(html).toContain('1. llama-3.1-8b-instant — 14.400 lượt/ngày · 6.000 token/phút');
     expect(html).toContain('2. llama-3.3-70b-versatile — 1.000 lượt/ngày · 12.000 token/phút');
-    expect(html).toMatch(/<option value="qwen\/qwen3-32b" selected="">qwen\/qwen3-32b \(đang lưu\)<\/option>/);
+    expect(html).not.toContain('<option value="qwen/qwen3-32b"');
     expect(html).toContain('Top 2 model có hạn mức miễn phí lớn nhất.');
     expect(html).toContain('Tải danh sách model');
   });
@@ -158,6 +176,65 @@ describe('Gemini administration settings', () => {
       .toBe('1. gemini-3.6-flash-lite — ~1.000 lượt/ngày · 250.000 token/phút (ước tính)');
     expect(modelOptionLabel({ id: 'deepseek-chat', displayName: '', requestsPerDay: null, tokensPerMinute: null }, 'NONE', 2))
       .toBe('2. deepseek-chat');
+  });
+
+  it('offers only the three provider suggestions even when saved model history exists', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['ai-settings'], [{
+      id: 'model-history', provider: 'GEMINI', model: 'gemini-3.5-flash-lite',
+      maskedKey: 'masked', active: true, tested: true, backupKeys: [],
+    }]);
+    client.setQueryData(['ai-models', 'GEMINI', 'model-history', 0], {
+      provider: 'GEMINI', source: 'ESTIMATE', note: '', models: [
+        { id: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash Lite', requestsPerDay: 1000, tokensPerMinute: 250000 },
+        { id: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash Lite', requestsPerDay: 1000, tokensPerMinute: 250000 },
+        { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite Preview', requestsPerDay: 1000, tokensPerMinute: 250000 },
+      ],
+      savedModels: ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-embedding-001'],
+    });
+    client.setQueryData(['ai-saved-models', 'GEMINI'], [
+      'Gemini 3.6 Flash', 'Gemini 3.8 Flash', 'Gemini Embedding 1',
+      'gemini-embedding-001', ' gemini-3.6-flash ', 'GEMINI-3.8-FLASH',
+      'custom-phone-model',
+    ]);
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}><ToastProvider><AiSettingsPage /></ToastProvider></QueryClientProvider>,
+    );
+    const options = [...html.matchAll(/<option value="([^"]*)"/g)].map((match) => match[1]);
+    expect(options).toEqual([
+      'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview',
+    ]);
+    expect(html).not.toContain('label="Model đã lưu"');
+    expect(html).not.toContain('Khác — Nhập tên model');
+  });
+
+  it('shows the active legacy model in the summary and disables saving until a suggestion is selected', () => {
+    const html = renderWithSettings(['ai-settings'], [{
+      id: 'legacy-model', provider: 'GEMINI', model: 'Gemini 3.6 Flash',
+      maskedKey: 'masked', active: true, tested: false, backupKeys: [],
+    }], <AiSettingsPage />);
+    expect(html).toContain('Gemini 3.6 Flash');
+    expect(html).not.toContain('<option value="Gemini 3.6 Flash"');
+    const saveButton = html.match(/<button[^>]*>Lưu cấu hình<\/button>/)?.[0];
+    expect(saveButton).toContain('disabled=""');
+  });
+
+  it('requires explicit selection when the current model differs from the provider suggestions', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['ai-settings'], [{
+      id: 'case-model', provider: 'GEMINI', model: 'GEMINI-3.6-FLASH',
+      maskedKey: 'masked', active: true, tested: false, backupKeys: [],
+    }]);
+    client.setQueryData(['ai-models', 'GEMINI', 'case-model', 0], {
+      provider: 'GEMINI', source: 'ESTIMATE', note: '', models: [
+        { id: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', requestsPerDay: 250, tokensPerMinute: 250000 },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}><ToastProvider><AiSettingsPage /></ToastProvider></QueryClientProvider>,
+    );
+    expect(html).not.toContain('<option value="GEMINI-3.6-FLASH"');
+    expect(html).toContain('Chọn model gợi ý');
   });
 
   it('opens the saved Gemini embedding model and dimensions', () => {

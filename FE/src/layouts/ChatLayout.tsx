@@ -42,7 +42,7 @@ export function ChatLayout() {
         history?.filter((conversation) => conversation.id !== id),
       );
       setPendingDelete(null);
-      await client.invalidateQueries({ queryKey: historyKey, exact: true });
+      void client.invalidateQueries({ queryKey: historyKey, exact: true });
     },
   });
   const deleteIsDisabled = chatIsBusy || remove.isPending;

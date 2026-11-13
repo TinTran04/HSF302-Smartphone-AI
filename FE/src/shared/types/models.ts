@@ -90,7 +90,13 @@ export interface Order {
 export interface OrderPreview {
   previewId: string;
   total: number;
-  items: (CartEntry & { product?: Product; variant?: ProductVariant; oldUnitPrice?: number; currentUnitPrice?: number; priceChanged?: boolean })[];
+  items: (CartEntry & {
+    product?: Product;
+    variant?: ProductVariant;
+    oldUnitPrice?: number;
+    currentUnitPrice?: number;
+    priceChanged?: boolean;
+  })[];
   priceChanged: boolean;
 }
 export type ChatTopic = 'PHONE_CONSULTATION' | 'PHONE_COMPARISON' | 'SHOP_SUPPORT' | 'GENERAL_CHAT';
@@ -147,6 +153,7 @@ export interface KnowledgeDocument {
 }
 export type AiProvider = 'GEMINI' | 'GROQ' | 'DEEPSEEK';
 export interface AiKeyAlert {
+  provider?: AiProvider;
   id: string;
   model: string;
   status: 'PRIMARY' | 'USING_BACKUP' | 'BACKUP_FAILED' | 'MISSING_BACKUP';
@@ -177,11 +184,95 @@ export interface AiModelOption {
 }
 /** LIVE: hạn mức thật của tài khoản; ESTIMATE: ước tính theo dòng model; NONE: không có số liệu free. */
 export interface AiModelOptions {
+  savedModels?: string[];
   provider: AiProvider;
   source: 'LIVE' | 'ESTIMATE' | 'NONE';
   note: string;
   models: AiModelOption[];
   fetchedAt: string;
+}
+export interface AiKeyIdentity {
+  keyRef: string;
+  identity: string;
+  name: string;
+  maskedKey: string;
+  priority: number;
+  lastPrimaryAt: string | null;
+}
+export interface AiKeyManagementState {
+  configId: string | null;
+  active: boolean;
+  keys: AiKeyIdentity[];
+  history: {
+    id: number;
+    fromName: string | null;
+    fromMaskedKey: string | null;
+    toName: string;
+    toMaskedKey: string;
+    actor: string;
+    changedAt: string;
+  }[];
+}
+export interface AiQuotaKey {
+  keyRef: string;
+  name: string;
+  maskedKey: string;
+  projectName: string | null;
+  tpmLimit: number | null;
+  estimatedInputTokens: number;
+  requestsToday?: number;
+  dailyRequestLimit?: number | null;
+  dailyLimitSource?: 'DEFAULT' | 'PROVIDER' | 'MANUAL' | 'NONE';
+  dailyResetAt?: string | null;
+  dailyTrackingSince?: string | null;
+  limitSource?: 'MANUAL' | 'DEFAULT' | 'PROVIDER' | 'NONE';
+  status?:
+    | 'UNKNOWN'
+    | 'WORKING'
+    | 'RATE_LIMIT'
+    | 'BALANCE_ERROR'
+    | 'AUTH_ERROR'
+    | 'MODEL_ERROR'
+    | 'PROVIDER_ERROR'
+    | 'RETRY_READY';
+  reason?: string | null;
+  checkedAt?: string | null;
+  retryAt?: string | null;
+  lastUsedAt?: string | null;
+}
+export interface AiQuotaSettings {
+  configId: string;
+  provider?: AiProvider;
+  model: string;
+  keys: AiQuotaKey[];
+}
+export interface AiKeyEditInput {
+  provider: AiProvider;
+  configId?: string;
+  model: string;
+  keyRef?: string;
+  name: string;
+  apiKey?: string;
+  projectName?: string | null;
+  tpmLimit?: number | null;
+  useDefault: boolean;
+  dailyRequestLimit?: number | null;
+  useDefaultDaily?: boolean;
+}
+export interface AiActivityPage {
+  items: {
+    id: string;
+    type: string;
+    model: string;
+    keyName: string;
+    maskedKey: string;
+    reason: string | null;
+    actor: string;
+    createdAt: string;
+  }[];
+  total: number;
+  page: number;
+  size: number;
 }
 export interface AiSettings {
   id: string;

@@ -168,6 +168,48 @@ export const realApi: Api = {
       return { ...latest, backupKeys: latest.backupKeys ?? [], ...(active ? { activeModel: active.model } : {}) };
     });
   },
+  aiKeyManagement: (provider, before) =>
+    http(
+      `/admin/ai-settings/key-management?${new URLSearchParams({ provider, ...(before !== undefined ? { before: String(before) } : {}) })}`,
+    ),
+  renameAiKey: (configId, keyRef, name) =>
+    http(`/admin/ai-settings/key-management/${encodeURIComponent(configId)}/name`, {
+      method: 'PUT',
+      body: jsonBody({ keyRef, name }),
+    }),
+  promoteAiKey: (configId, keyId) =>
+    post(
+      `/admin/ai-settings/key-management/${encodeURIComponent(configId)}/promote/${encodeURIComponent(keyId)}`,
+    ),
+  saveAiKey: (input) =>
+    http('/admin/ai-settings/key-management/key', {
+      method: 'POST',
+      body: jsonBody(input),
+      signal: AbortSignal.timeout(60000),
+    }),
+  checkAiKey: (configId, keyRef) =>
+    post(
+      `/admin/ai-settings/key-management/${encodeURIComponent(configId)}/check/${encodeURIComponent(keyRef)}`,
+    ),
+  removeAiKey: (configId, keyRef, replacementKeyRef) =>
+    http(
+      `/admin/ai-settings/key-management/${encodeURIComponent(configId)}/key/${encodeURIComponent(keyRef)}${replacementKeyRef ? `?replacementKeyRef=${encodeURIComponent(replacementKeyRef)}` : ''}`,
+      { method: 'DELETE' },
+    ),
+  moveAiKey: (configId, keyRef, direction) =>
+    post(
+      `/admin/ai-settings/key-management/${encodeURIComponent(configId)}/key/${encodeURIComponent(keyRef)}/move?direction=${direction}`,
+    ),
+  aiQuota: (provider, model) =>
+    http(
+      `/admin/ai-settings/quota?${new URLSearchParams({ provider, ...(model ? { model } : {}) })}`,
+    ),
+  aiActivity: (provider, page) =>
+    http(
+      `/admin/ai-settings/key-management/activity?${new URLSearchParams({ provider, page: String(page), size: '10' })}`,
+    ),
+  aiSavedModels: (provider) =>
+    http(`/admin/ai-settings/key-management/models?${new URLSearchParams({ provider })}`),
   saveAiSettings: (data) => http('/admin/ai-settings', { method: 'PUT', body: jsonBody(data) }),
   aiModelOptions: (provider, apiKey) => http('/admin/ai-settings/models', { method: 'POST', body: jsonBody({ provider, ...(apiKey ? { apiKey } : {}) }), signal: AbortSignal.timeout(60000) }),
   testAiConnection: (data) => http('/admin/ai-settings/test', { method: 'POST', body: jsonBody(data), signal: AbortSignal.timeout(130000) }),

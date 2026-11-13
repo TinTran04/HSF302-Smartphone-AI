@@ -13,6 +13,78 @@ beforeEach(async () => {
   backend = (await import('./mockApi')).mockApi;
 });
 describe('Fake backend business contracts', () => {
+  it('requires replacement for primary deletion and preserves the selected identity', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const saved = await backend.saveAiSettings({
+      provider: 'GEMINI',
+      model: 'demo-model',
+      apiKey: 'primary',
+      backupKeys: [{ name: 'Replacement', apiKey: 'backup' }],
+    });
+    const before = await backend.aiKeyManagement('GEMINI');
+    await expect(backend.removeAiKey(saved.id, 'PRIMARY')).rejects.toMatchObject({ status: 400 });
+    const replacement = before.keys.find((key) => key.priority > 0)!;
+    const result = await backend.removeAiKey(saved.id, 'PRIMARY', replacement.keyRef);
+    expect(result.backupKeys).toEqual([]);
+    expect((await backend.aiKeyManagement('GEMINI')).keys).toEqual([
+      expect.objectContaining({
+        keyRef: 'PRIMARY',
+        identity: replacement.identity,
+        name: 'Replacement',
+      }),
+    ]);
+  });
+  it('deletes the last key and accepts a new primary on the retained configuration', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const saved = await backend.saveAiSettings({
+      provider: 'GROQ',
+      model: 'llama-3.3-70b-versatile',
+      apiKey: 'last-key',
+    });
+    const empty = await backend.removeAiKey(saved.id, 'PRIMARY');
+    expect(empty).toMatchObject({ maskedKey: '', active: false, tested: false, backupKeys: [] });
+    expect(empty.id).toBeTruthy();
+    expect((await backend.aiKeyManagement('GROQ')).keys).toEqual([]);
+    const added = await backend.saveAiKey({
+      provider: 'GROQ',
+      model: empty.model,
+      configId: empty.id,
+      name: 'New primary',
+      apiKey: 'new-key',
+      useDefault: true,
+      useDefaultDaily: false,
+      dailyRequestLimit: 500,
+    });
+    expect(added.maskedKey).toBeTruthy();
+    expect((await backend.aiKeyManagement('GROQ')).keys).toHaveLength(1);
+    expect((await backend.aiQuota('GROQ', empty.model)).keys[0]).toMatchObject({
+      dailyRequestLimit: 500,
+      dailyLimitSource: 'MANUAL',
+    });
+  });
+  it('keeps fixed key names and identities through repeated promotions', async () => {
+    await backend.login({ email: 'admin@demo.vn', password: 'Demo123!', guestCart: [] });
+    const saved = await backend.saveAiSettings({
+      provider: 'GEMINI',
+      model: 'demo-model',
+      apiKey: 'private-primary',
+      backupKeys: [{ name: 'Project B', apiKey: 'private-backup' }],
+    });
+    await backend.renameAiKey(saved.id, 'PRIMARY', 'Project A');
+    await backend.testAiConnection({ provider: 'GEMINI', model: 'demo-model', configId: saved.id });
+    await backend.activateProvider('GEMINI', saved.id);
+    const original = await backend.aiKeyManagement('GEMINI');
+    await backend.promoteAiKey(saved.id, original.keys[1].keyRef);
+    const next = await backend.aiKeyManagement('GEMINI');
+    expect(next.keys.map((key) => key.name)).toEqual(['Project B', 'Project A']);
+    expect(next.keys[0].identity).toBe(original.keys[1].identity);
+    expect(next.history[0]).toMatchObject({ fromName: 'Project A', toName: 'Project B' });
+    await backend.promoteAiKey(next.configId!, next.keys[1].keyRef);
+    const repeated = await backend.aiKeyManagement('GEMINI');
+    expect(repeated.keys[0].identity).toBe(original.keys[0].identity);
+    expect(repeated.keys[0].name).toBe('Project A');
+    expect(repeated.history).toHaveLength(2);
+  });
   it('replays the same chat request without saving a duplicate message', async () => {
     await backend.login({ email: 'customer@demo.vn', password: 'Demo123!', guestCart: [] });
     const conversation = await backend.createConversation('PHONE_CONSULTATION');

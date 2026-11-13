@@ -11,14 +11,14 @@ export const chatTopics: {
     title: 'Tư vấn mua điện thoại',
     icon: 'smartphone',
     description:
-      'Chọn, so sánh và tìm hiểu cách sử dụng điện thoại từ danh mục, tài liệu và kiến thức AI về điện thoại.',
+      'Chat với AI về kiến thức điện thoại. Tư vấn mua và so sánh máy theo dữ liệu sản phẩm của shop.',
     prompt: 'Tư vấn điện thoại khoảng 25–30 triệu, chụp ảnh đẹp và pin tốt.',
   },
   {
     id: 'SHOP_SUPPORT',
     title: 'Hỗ trợ cửa hàng',
     icon: 'support_agent',
-    description: 'Hỏi chính sách cửa hàng và tra cứu trạng thái đơn hàng của bạn.',
+    description: 'Hỏi chính sách từ tài liệu cửa hàng qua RAG và tra cứu trạng thái đơn hàng của bạn.',
     prompt: 'Chính sách bảo hành của cửa hàng như thế nào?',
   },
 ];

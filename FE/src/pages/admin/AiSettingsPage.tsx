@@ -2,22 +2,25 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, isDemo } from '../../shared/api';
 import { http } from '../../shared/api/httpClient';
-import type { AiBackupKey, AiModelOption, AiModelOptions, AiProvider, AiSettings } from '../../shared/types/models';
+import type {
+  AiModelOption,
+  AiModelOptions,
+  AiProvider,
+  AiSettings,
+} from '../../shared/types/models';
 import { AI_PROVIDER_INFO } from '../../shared/constants/aiProviders';
 import {
   Button,
   ConfirmDialog,
-  Modal,
   ErrorState,
   PageHeading,
   Skeleton,
   useToast,
 } from '../../shared/components/Ui';
 import { Icon } from '../../shared/components/Icon';
-import { formatDate } from '../../shared/utils/format';
-import { reasonMessage } from '../../features/ai-chat/components/AdminAiKeyAlert';
-import { AiQuotaSettings } from './AiQuotaSettings';
+import { AiKeyManagement } from './AiKeyManagement';
 import './AiSettingsPage.css';
+
 export default function AiSettingsPage() {
   const settings = useQuery({
     queryKey: ['ai-settings'],
@@ -26,59 +29,60 @@ export default function AiSettingsPage() {
     refetchOnWindowFocus: 'always',
   });
   const [chosen, setChosen] = useState<AiProvider | null>(null);
-  const activeProvider = settings.data?.find((s) => s.active || s.activeModel)?.provider;
+  const activeProvider = settings.data?.find(
+    (setting) => setting.active || setting.activeModel,
+  )?.provider;
   const provider: AiProvider = chosen ?? activeProvider ?? 'GEMINI';
   return (
     <>
       <PageHeading
         eyebrow="Trợ lý AI"
         title="Cấu hình nền tảng Chat AI"
-        description="Chọn nền tảng Gemini, Groq hoặc DeepSeek, lưu model và API key, kiểm tra kết nối rồi kích hoạt để chuyển Chat sang nền tảng đó."
+        description="Quản lý kết nối, API key và hạn mức của chatbot."
       />
       <AiMetrics />
       {settings.isPending ? (
         <Skeleton count={1} />
       ) : settings.error ? (
-        <ErrorState
-          error={settings.error}
-          retry={() => {
-            void settings.refetch();
-          }}
-        />
+        <ErrorState error={settings.error} retry={() => void settings.refetch()} />
       ) : (
         settings.data && (
           <>
-            <div className="provider-grid ai-provider-grid" role="group" aria-label="Chọn nền tảng Chat AI">
-              {settings.data.map((s) => (
+            <div
+              className="provider-grid ai-provider-grid"
+              role="group"
+              aria-label="Chọn nền tảng Chat AI"
+            >
+              {settings.data.map((setting) => (
                 <button
                   type="button"
-                  className={`card provider-card${s.provider === provider ? ' selected' : ''}`}
-                  key={s.provider}
-                  aria-pressed={s.provider === provider}
-                  onClick={() => setChosen(s.provider)}
+                  className={`card provider-card${setting.provider === provider ? ' selected' : ''}`}
+                  key={setting.provider}
+                  aria-pressed={setting.provider === provider}
+                  onClick={() => setChosen(setting.provider)}
                 >
                   <span className="flex items-center gap-4">
                     <span className="icon-tile">
-                      <Icon name={AI_PROVIDER_INFO[s.provider].icon} />
+                      <Icon name={AI_PROVIDER_INFO[setting.provider].icon} />
                     </span>
                     <span>
-                      <h2 className="!text-xl">{AI_PROVIDER_INFO[s.provider].label}</h2>
+                      <h2 className="ai-provider-name">
+                        {AI_PROVIDER_INFO[setting.provider].label}
+                      </h2>
                       <span className="help-text block mt-2">
-                        {s.model || 'Chưa cấu hình model'}
+                        {setting.activeModel || setting.model || 'Chưa cấu hình model'}
                       </span>
                     </span>
                   </span>
-                  {(s.active || s.activeModel) && (
-                    <span className="badge badge-success">
-                      Đang hoạt động: {s.activeModel || s.model}
-                    </span>
+                  {(setting.active || setting.activeModel) && (
+                    <span className="badge badge-success">Đang dùng</span>
                   )}
                 </button>
               ))}
             </div>
             <ProviderForm
               key={provider}
-              setting={settings.data.find((s) => s.provider === provider)!}
+              setting={settings.data.find((setting) => setting.provider === provider)!}
             />
           </>
         )
@@ -86,50 +90,60 @@ export default function AiSettingsPage() {
     </>
   );
 }
+
 export function AiMetrics() {
   const metrics = useQuery({
     queryKey: ['ai-metrics'],
-    queryFn: () => http<{ requests: number; failures: number; averageMillis: number }>('/admin/ai-settings/metrics'),
+    queryFn: () =>
+      http<{ requests: number; failures: number; averageMillis: number }>(
+        '/admin/ai-settings/metrics',
+      ),
     refetchInterval: 30_000,
     enabled: !isDemo,
     retry: false,
   });
   return (
-    <div className="card" style={{ marginBottom: '1.5rem' }}>
-      <h2 className="!text-xl">Hoạt động chatbot</h2>
-      <p className="help-text">Số liệu từ lần khởi động backend gần nhất. Cảnh báo key dự phòng được lưu trong thông báo quản trị.</p>
+    <section className="ai-metrics" aria-label="Hoạt động chatbot">
       {metrics.data ? (
-        <p>Yêu cầu: <strong>{metrics.data.requests}</strong> · Lỗi: <strong>{metrics.data.failures}</strong> · Thời gian trung bình: <strong>{metrics.data.averageMillis} ms</strong></p>
-      ) : <p className="help-text">{metrics.isError ? 'Không thể tải số liệu.' : 'Chưa có số liệu.'}</p>}
-    </div>
+        <>
+          <div>
+            <span>Yêu cầu</span>
+            <strong>{metrics.data.requests}</strong>
+          </div>
+          <div>
+            <span>Lỗi</span>
+            <strong>{metrics.data.failures}</strong>
+          </div>
+          <div>
+            <span>Phản hồi trung bình</span>
+            <strong>{metrics.data.averageMillis} ms</strong>
+          </div>
+        </>
+      ) : (
+        <p className="help-text">
+          {metrics.isError ? 'Không thể tải số liệu.' : 'Chưa có số liệu.'}
+        </p>
+      )}
+      <p className="help-text">Từ lần khởi động backend gần nhất.</p>
+    </section>
   );
 }
-type BackupDraft = {
-  id?: string;
-  localId: string;
-  name: string;
-  apiKey?: string;
-  maskedKey: string;
-};
-const toDraft = (setting: AiSettings): BackupDraft[] =>
-  (setting.backupKeys ?? []).map((key) => ({
-    id: key.id,
-    localId: key.id,
-    name: key.name,
-    maskedKey: key.maskedKey,
-  }));
-const statusLabels: Record<AiBackupKey['lastStatus'], string> = {
-  UNKNOWN: 'Chưa kiểm tra',
-  WORKING: 'Hoạt động',
-  KEY_ERROR: 'Lỗi key',
-  PROVIDER_ERROR: 'Lỗi nhà cung cấp',
-};
-const formatNumber = (value: number) => value.toLocaleString('vi-VN');
-export function modelOptionLabel(option: AiModelOption, source: AiModelOptions['source'], rank: number) {
+
+export function modelOptionLabel(
+  option: AiModelOption,
+  source: AiModelOptions['source'],
+  rank: number,
+) {
   const usage = [
-    option.requestsPerDay != null ? `${formatNumber(option.requestsPerDay)} lượt/ngày` : '',
-    option.tokensPerMinute != null ? `${formatNumber(option.tokensPerMinute)} token/phút` : '',
-  ].filter(Boolean).join(' · ');
+    option.requestsPerDay != null
+      ? `${option.requestsPerDay.toLocaleString('vi-VN')} lượt/ngày`
+      : '',
+    option.tokensPerMinute != null
+      ? `${option.tokensPerMinute.toLocaleString('vi-VN')} token/phút`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const suffix = usage
     ? ` — ${source === 'ESTIMATE' ? '~' : ''}${usage}${source === 'ESTIMATE' ? ' (ước tính)' : ''}`
     : '';
@@ -137,484 +151,293 @@ export function modelOptionLabel(option: AiModelOption, source: AiModelOptions['
 }
 const initialModel = (setting: AiSettings) =>
   setting.model || (!setting.id ? AI_PROVIDER_INFO[setting.provider].defaultModel : '');
+
 function ProviderForm({ setting }: { setting: AiSettings }) {
   const provider = setting.provider;
   const info = AI_PROVIDER_INFO[provider];
+  const client = useQueryClient();
+  const { notify } = useToast();
+  const [tab, setTab] = useState<'connection' | 'keys' | 'history'>('connection');
   const [baseline, setBaseline] = useState(setting);
   const [model, setModel] = useState(() => initialModel(setting));
   const [modelTouched, setModelTouched] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [keys, setKeys] = useState(() => toDraft(setting));
-  const [visible, setVisible] = useState(false);
-  const [activate, setActivate] = useState<AiSettings | null>(null);
-  const [editing, setEditing] = useState<BackupDraft | null>(null);
-  const [deleting, setDeleting] = useState<BackupDraft | null>(null);
-  // Key dùng để tải danh sách model; không đưa vào queryKey để key thô không nằm trong cache.
-  const [lookup, setLookup] = useState<{ key?: string; version: number }>({ version: 0 });
-  const client = useQueryClient();
-  const { notify } = useToast();
-  const dirty =
-    model.trim() !== initialModel(baseline) ||
-    !!apiKey.trim() ||
-    JSON.stringify(
-      keys.map((key) => ({ id: key.id, name: key.name, apiKey: key.apiKey || '' })),
-    ) !==
-      JSON.stringify(toDraft(baseline).map((key) => ({ id: key.id, name: key.name, apiKey: '' })));
+  const [activating, setActivating] = useState(false);
+  const dirty = model.trim() !== initialModel(baseline);
   useEffect(() => {
-    if (!dirty && setting.id !== baseline.id) {
+    if (
+      !dirty &&
+      (setting.id !== baseline.id ||
+        setting.active !== baseline.active ||
+        setting.tested !== baseline.tested)
+    ) {
       setBaseline(setting);
       setModel(initialModel(setting));
-      setKeys(toDraft(setting));
     }
-  }, [setting, baseline.id, dirty]);
-  const canLookup = !!setting.maskedKey || !!lookup.key;
+  }, [setting, baseline.id, baseline.active, baseline.tested, dirty]);
   const modelOptions = useQuery({
-    queryKey: ['ai-models', provider, baseline.id, lookup.version],
-    queryFn: () => api.aiModelOptions(provider, lookup.key),
-    enabled: canLookup,
+    queryKey: ['ai-models', provider, baseline.id, 0],
+    queryFn: () => api.aiModelOptions(provider),
+    enabled: !!baseline.maskedKey,
     staleTime: 10 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   });
-  const fetchedModels = modelOptions.data?.models ?? [];
   const topModel = modelOptions.data?.models[0]?.id;
   useEffect(() => {
-    // Cấu hình mới mà Admin chưa tự chọn model thì chọn model có hạn mức miễn phí lớn nhất.
     if (!baseline.id && !modelTouched && topModel) setModel(topModel);
   }, [baseline.id, modelTouched, topModel]);
-  const modelChoices = fetchedModels.map((option, index) => ({
+  const suggestedChoices = (modelOptions.data?.models || []).slice(0, 3).map((option, index) => ({
     value: option.id,
     label: modelOptionLabel(option, modelOptions.data!.source, index + 1),
   }));
-  if (model && !modelChoices.some((choice) => choice.value === model))
-    modelChoices.unshift({
-      value: model,
-      label: `${model} (${model === baseline.model && baseline.id ? 'đang lưu' : 'gợi ý mặc định'})`,
-    });
-  const loadModels = () => {
-    const key = apiKey.trim() || undefined;
-    setLookup((current) => ({ key, version: current.version + 1 }));
-  };
-  const refresh = () => {
-    void client.invalidateQueries({ queryKey: ['ai-settings'] });
-    void client.invalidateQueries({ queryKey: ['ai-quota'] });
-    void client.invalidateQueries({ queryKey: ['ai-key-alert'] });
-    void client.invalidateQueries({ queryKey: ['ai-notifications'] });
-  };
+  const hasSuggestedModel = suggestedChoices.some((choice) => choice.value === model);
+  function refresh(saved?: AiSettings) {
+    if (saved) {
+      setBaseline(saved);
+      setModel(saved.model);
+      client.setQueryData<AiSettings[]>(['ai-settings'], (previous) =>
+        previous?.map((item) =>
+          item.provider === provider
+            ? { ...saved, activeModel: saved.active ? saved.model : saved.maskedKey ? item.activeModel : undefined }
+            : item,
+        ),
+      );
+    }
+    for (const key of [
+      'ai-settings',
+      'ai-key-management',
+      'ai-quota',
+      'ai-activity',
+      'ai-notifications',
+    ])
+      void client.invalidateQueries({ queryKey: [key] });
+  }
   const save = useMutation({
     meta: { toast: { success: false } },
     mutationFn: () =>
-      api.saveAiSettings({
-        provider,
-        configId: baseline.id || undefined,
-        model: model.trim(),
-        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
-        backupKeys: keys.map((key) => ({
-          ...(key.id ? { id: key.id } : {}),
-          name: key.name,
-          ...(key.apiKey?.trim() ? { apiKey: key.apiKey.trim() } : {}),
-        })),
-      }),
+      api.saveAiSettings({ provider, configId: baseline.id || undefined, model: model.trim() }),
     onSuccess: (saved) => {
-      setApiKey('');
-      setVisible(false);
-      setBaseline(saved);
-      setModel(saved.model);
-      setKeys(toDraft(saved));
-      client.setQueryData<AiSettings[]>(['ai-settings'], (previous) =>
-        previous?.map((current) =>
-          current.provider === saved.provider
-            ? {
-                ...saved,
-                activeModel:
-                  saved.activeModel ||
-                  current.activeModel ||
-                  (current.active ? current.model : undefined),
-              }
-            : current,
-        ),
-      );
-      refresh();
-      notify('Đã lưu cấu hình AI. Hãy kiểm tra kết nối rồi kích hoạt để áp dụng.');
+      refresh(saved);
+      notify('Đã lưu model. Hãy kiểm tra kết nối và kích hoạt để áp dụng.');
     },
   });
-  const test = useMutation({
+  const testConnection = useMutation({
     meta: { toast: { success: false } },
     mutationFn: () =>
-      api.testAiConnection({
-        provider,
-        model: baseline.model,
-        configId: baseline.id || undefined,
-      }),
+      api.testAiConnection({ provider, configId: baseline.id, model: baseline.model }),
     onSuccess: (data) => {
       refresh();
-      notify(`${data.message} Hãy kích hoạt cấu hình để áp dụng.`);
+      notify(data.message);
     },
-  });
-  const individualTest = useMutation({
-    meta: { toast: { success: false } },
-    mutationFn: (keyId: string) => api.testBackupKey(baseline.id, keyId),
-    onSettled: refresh,
-    onSuccess: (data) =>
-      notify(`${data.message} Kiểm tra toàn bộ kết nối rồi kích hoạt để áp dụng.`),
+    onSettled: () => refresh(),
   });
   const activation = useMutation({
     meta: { toast: { success: false } },
-    mutationFn: () => api.activateProvider(provider, activate?.id || undefined),
+    mutationFn: () => api.activateProvider(provider, baseline.id),
     onSuccess: (data) => {
       client.setQueryData(['ai-settings'], data);
+      setActivating(false);
       refresh();
-      setActivate(null);
       notify(`Đã chuyển Chat sang ${info.label}.`);
     },
   });
-  const busy = save.isPending || test.isPending || individualTest.isPending || activation.isPending;
-  function moveKey(index: number, direction: number) {
-    setKeys((current) => {
-      const reordered = [...current];
-      [reordered[index], reordered[index + direction]] = [
-        reordered[index + direction],
-        reordered[index],
-      ];
-      return reordered;
-    });
-    notify('Đã đổi ưu tiên trong bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.');
-  }
+  const busy = save.isPending || testConnection.isPending || activation.isPending;
+  const tabs = [
+    { id: 'connection' as const, label: 'Kết nối' },
+    {
+      id: 'keys' as const,
+      label: `API key (${(baseline.backupKeys?.length || 0) + (baseline.maskedKey ? 1 : 0)})`,
+    },
+    { id: 'history' as const, label: 'Nhật ký' },
+  ];
+
   return (
-    <>
-      <form
-        className="card panel max-w-4xl"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!busy) save.mutate();
-        }}
-      >
-        <h2 className="!text-xl mb-7">Cấu hình chi tiết — {info.label}</h2>
-        <div className="form-grid">
-          <label className="form-field col-span-full">
-            Chat Model
-            <select
-              required
-              value={model}
-              onChange={(event) => {
-                setModelTouched(true);
-                setModel(event.target.value);
-              }}
-              disabled={busy || modelChoices.length === 0}
-            >
-              {modelChoices.length === 0 && <option value="">Chưa có danh sách model</option>}
-              {modelChoices.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </select>
-            <span className="help-text" aria-live="polite">
-              {modelOptions.isFetching
-                ? 'Đang tải danh sách model từ nhà cung cấp…'
-                : modelOptions.error
-                  ? `Không tải được danh sách model: ${modelOptions.error.message}`
-                  : modelOptions.data
-                    ? `Top ${fetchedModels.length} model có hạn mức miễn phí lớn nhất. ${modelOptions.data.note}`
-                    : 'Nhập API key rồi bấm Tải danh sách model để chọn model.'}
-            </span>
-          </label>
-          <label className="form-field">
-            API Key đã lưu
-            <input
-              type="password"
-              value={setting.maskedKey}
-              readOnly
-              placeholder="Chưa lưu API Key"
-            />
-            <span className="help-text">Máy chủ chỉ trả về khóa đã được che.</span>
-          </label>
-          <label className="form-field col-span-full">
-            API Key mới (để trống nếu giữ nguyên)
-            <div className="password-field">
-              <input
-                type={visible ? 'text' : 'password'}
-                autoComplete="off"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                disabled={busy}
-                placeholder="Nhập khóa mới khi cần thay đổi"
-              />
-              <button
-                className="icon-button"
-                type="button"
-                aria-label={visible ? 'Ẩn API Key mới' : 'Hiện API Key mới'}
-                onClick={() => setVisible((value) => !value)}
-              >
-                <Icon name={visible ? 'visibility_off' : 'visibility'} />
-              </button>
-            </div>
-          </label>
-          <div className="col-span-full flex flex-wrap items-center gap-3">
-            <Button
-              variant="secondary"
-              busy={modelOptions.isFetching}
-              disabled={busy || modelOptions.isFetching || (!apiKey.trim() && !setting.maskedKey)}
-              onClick={loadModels}
-            >
-              <Icon name="refresh" />
-              Tải danh sách model
-            </Button>
-            <span className="help-text">
-              Dùng API key mới nếu đã nhập, nếu không thì dùng key đã lưu.
-            </span>
-          </div>
-        </div>
-        <section className="mt-7" aria-label="Danh sách key dự phòng">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h3>Key dự phòng ({keys.length}/10)</h3>
-            <Button
-              variant="secondary"
-              disabled={busy || keys.length >= 10}
-              onClick={() => setEditing({ localId: crypto.randomUUID(), name: '', maskedKey: '' })}
-            >
-              <Icon name="add" />
-              Thêm key dự phòng
-            </Button>
-          </div>
-          {keys.length === 0 && <p className="help-text">Chưa có key dự phòng.</p>}
-          <ol className="ai-backup-list">
-            {keys.map((key, index) => {
-              const saved = setting.backupKeys?.find((savedKey) => savedKey.id === key.id);
-              const pending = !key.id || !!key.apiKey;
-              return (
-                <li className="ai-backup-row" key={key.localId}>
-                  <div className="ai-backup-summary">
-                    <strong>
-                      {index + 1}. {key.name}
-                    </strong>
-                    <span className="help-text">
-                      {pending ? 'Key mới trong bản nháp' : key.maskedKey}
-                    </span>
-                    <span
-                      className={`badge ${saved?.lastStatus === 'WORKING' && !pending ? 'badge-success' : ''}`}
-                    >
-                      {pending ? 'Chưa lưu' : statusLabels[saved?.lastStatus ?? 'UNKNOWN']}
-                    </span>
-                    {saved?.lastFailureReason && !pending && (
-                      <span className="help-text">{reasonMessage(saved.lastFailureReason)}</span>
-                    )}
-                    {saved?.lastCheckedAt && !pending && (
-                      <span className="help-text">
-                        Kiểm tra lúc {formatDate(saved.lastCheckedAt)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="ai-backup-actions">
-                    <Button
-                      variant="ghost"
-                      aria-label={`Tăng ưu tiên ${key.name}`}
-                      disabled={busy || index === 0}
-                      onClick={() => moveKey(index, -1)}
-                    >
-                      <Icon name="arrow_upward" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      aria-label={`Giảm ưu tiên ${key.name}`}
-                      disabled={busy || index === keys.length - 1}
-                      onClick={() => moveKey(index, 1)}
-                    >
-                      <Icon name="arrow_downward" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      aria-label={`Kiểm tra ${key.name}`}
-                      disabled={busy || dirty || !key.id || !baseline.id}
-                      onClick={() => individualTest.mutate(key.id!)}
-                    >
-                      Kiểm tra
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      aria-label={`Thay ${key.name}`}
-                      disabled={busy}
-                      onClick={() => setEditing(key)}
-                    >
-                      Thay
-                    </Button>
-                    <Button
-                      variant="danger"
-                      aria-label={`Xóa ${key.name}`}
-                      disabled={busy}
-                      onClick={() => setDeleting(key)}
-                    >
-                      Xóa
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-        <p className="help-text mt-4">
-          Mỗi yêu cầu ưu tiên key chính, sau đó thử các key dự phòng theo thứ tự từ trên xuống với
-          cùng model. {info.keyNote}
-        </p>
-        {setting.activeModel && !setting.active && (
-          <p className="notice mt-7">
-            Model đang hoạt động: {setting.activeModel}. Cấu hình bên dưới chưa được kích hoạt.
+    <section className="card panel ai-provider-workspace">
+      <div className="ai-section-heading">
+        <div>
+          <h2 className="!text-xl">Cấu hình chi tiết — {info.label}</h2>
+          <p className="help-text mt-2">
+            {setting.active
+              ? 'Cấu hình đang hoạt động'
+              : 'Lưu, kiểm tra kết nối rồi kích hoạt cấu hình.'}
           </p>
-        )}
-        <div className="notice mt-7">
-          Chỉ một nền tảng Chat hoạt động tại một thời điểm. Kích hoạt nền tảng này sẽ chuyển mọi
-          yêu cầu Chat mới sang {info.label}. Embedding cho kho kiến thức RAG vẫn dùng Gemini và được
-          cấu hình riêng, nên đổi nền tảng Chat không cần lập chỉ mục lại tài liệu.
         </div>
-        {save.error && <ErrorState error={save.error} />}
-        {test.error && <ErrorState error={test.error} />}
-        {individualTest.error && <ErrorState error={individualTest.error} />}
-        <div className="flex flex-wrap gap-3 justify-end mt-7">
+        {dirty && <span className="badge">Có thay đổi model chưa lưu</span>}
+      </div>
+      <div className="ai-model-context mt-5">
+        <label className="form-field">
+          Chat Model
+          <select
+            aria-label="Chat Model"
+            required
+            value={hasSuggestedModel ? model : ''}
+            disabled={busy}
+            onChange={(event) => {
+              setModelTouched(true);
+              setModel(event.target.value);
+            }}
+          >
+            {!hasSuggestedModel && (
+              <option value="" disabled>
+                {suggestedChoices.length ? 'Chọn model gợi ý' : 'Chưa có danh sách model'}
+              </option>
+            )}
+            {suggestedChoices.map((choice) => (
+              <option key={choice.value} value={choice.value}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="help-text" aria-live="polite">
+          {modelOptions.isFetching
+            ? 'Đang tải danh sách model…'
+            : modelOptions.error
+              ? 'Không tải được danh sách model. Hãy bấm Tải danh sách model để thử lại.'
+              : modelOptions.data
+                ? `Top ${suggestedChoices.length} model có hạn mức miễn phí lớn nhất. ${modelOptions.data.note}`
+                : 'Thêm API key để tải danh sách model.'}
+        </p>
+      </div>
+      <div className="ai-settings-tabs" role="tablist" aria-label="Quản lý cấu hình AI">
+        {tabs.map((item, index) => (
+          <button
+            type="button"
+            role="tab"
+            key={item.id}
+            id={`ai-tab-${provider}-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`ai-panel-${provider}-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
+            onClick={() => setTab(item.id)}
+            onKeyDown={(event) => {
+              let next = index;
+              if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+              else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+              else if (event.key === 'Home') next = 0;
+              else if (event.key === 'End') next = tabs.length - 1;
+              else return;
+              event.preventDefault();
+              setTab(tabs[next].id);
+              document.getElementById(`ai-tab-${provider}-${tabs[next].id}`)?.focus();
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        className="ai-settings-panel"
+        hidden={tab !== 'connection'}
+        id={`ai-panel-${provider}-connection`}
+        aria-labelledby={`ai-tab-${provider}-connection`}
+      >
+        <div className="ai-connection-summary">
+          <div>
+            <span className="help-text">Model đang hoạt động</span>
+            <strong>
+              {setting.activeModel || (setting.active ? setting.model : 'Chưa kích hoạt')}
+            </strong>
+          </div>
+          <div>
+            <span className="help-text">API key</span>
+            <div>
+              {baseline.maskedKey
+                ? `${(baseline.backupKeys?.length || 0) + 1} key đã lưu`
+                : 'Chưa có key'}{' '}
+              <Button variant="ghost" onClick={() => setTab('keys')}>
+                Quản lý key →
+              </Button>
+            </div>
+          </div>
+          <div>
+            <span className="help-text">Tự chuyển key</span>
+            <p>Ưu tiên key khác khi đạt 80% ước tính hoặc key đang dùng gặp lỗi.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap mt-5">
           <Button
             variant="secondary"
-            busy={test.isPending}
-            disabled={busy || dirty || !setting.maskedKey}
-            onClick={() => test.mutate()}
+            disabled={busy || !baseline.maskedKey}
+            onClick={() => void modelOptions.refetch()}
           >
-            <Icon name="network_check" />
+            <Icon name="refresh" />
+            Tải danh sách model
+          </Button>
+          <span className="help-text">Kho kiến thức RAG dùng cấu hình embedding riêng.</span>
+        </div>
+        <div className="ai-settings-footer mt-5">
+          <Button
+            variant="secondary"
+            busy={testConnection.isPending}
+            disabled={busy || dirty || !baseline.id}
+            onClick={() => testConnection.mutate()}
+          >
             Kiểm tra kết nối
           </Button>
-          <Button type="submit" busy={save.isPending} disabled={busy || !model.trim()}>
+          <Button
+            busy={save.isPending}
+            disabled={busy || !hasSuggestedModel || !baseline.maskedKey}
+            onClick={() => save.mutate()}
+          >
             Lưu cấu hình
           </Button>
           <Button
             variant="ai"
-            disabled={busy || setting.active || dirty || !setting.maskedKey || !setting.tested}
-            onClick={() => setActivate({ ...setting, id: baseline.id, model: baseline.model })}
+            disabled={busy || baseline.active || dirty || !baseline.tested}
+            onClick={() => setActivating(true)}
           >
-            {setting.active ? 'Đang hoạt động' : 'Kích hoạt'}
+            {baseline.active ? 'Đang hoạt động' : 'Kích hoạt'}
           </Button>
         </div>
-        {(dirty || !setting.tested) && (
-          <p className="help-text text-right mt-4">
-            {dirty
-              ? 'Lưu thay đổi trước khi kiểm tra và kích hoạt.'
-              : 'Kiểm tra kết nối các key đã lưu trước khi kích hoạt.'}
-          </p>
-        )}
-      </form>
-      {provider === 'GEMINI' && <AiQuotaSettings configId={baseline.id || ''} />}
-      {editing && (
-        <BackupKeyModal
-          draft={editing}
-          keyPlaceholder={info.keyPlaceholder}
-          onClose={() => setEditing(null)}
-          onSave={(updated) => {
-            setKeys((current) =>
-              current.some((key) => key.localId === updated.localId)
-                ? current.map((key) => (key.localId === updated.localId ? updated : key))
-                : [...current, updated],
-            );
-            setEditing(null);
-            notify(
-              'Đã cập nhật key trong bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.',
-            );
-          }}
+      </div>
+      <div
+        role="tabpanel"
+        className="ai-settings-panel"
+        hidden={tab !== 'keys'}
+        id={`ai-panel-${provider}-keys`}
+        aria-labelledby={`ai-tab-${provider}-keys`}
+      >
+        <AiKeyManagement
+          provider={provider}
+          configId={baseline.id || ''}
+          model={model.trim()}
+          disabled={busy || (!!baseline.id && dirty)}
+          mode="keys"
+          onSaved={refresh}
         />
-      )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Xóa ${deleting.name}?`}
-          message="Chỉ key này được xóa khỏi bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt cấu hình để áp dụng."
-          label="Xóa key"
-          onClose={() => setDeleting(null)}
-          onConfirm={() => {
-            setKeys((current) => current.filter((key) => key.localId !== deleting.localId));
-            setDeleting(null);
-            notify('Đã xóa key khỏi bản nháp. Hãy lưu, kiểm tra kết nối rồi kích hoạt để áp dụng.');
-          }}
+      </div>
+      <div
+        role="tabpanel"
+        className="ai-settings-panel"
+        hidden={tab !== 'history'}
+        id={`ai-panel-${provider}-history`}
+        aria-labelledby={`ai-tab-${provider}-history`}
+      >
+        <AiKeyManagement
+          provider={provider}
+          configId={baseline.id || ''}
+          model={model.trim()}
+          disabled={busy}
+          mode="history"
+          onSaved={refresh}
         />
-      )}
-      {activate && (
+      </div>
+      {save.error && <ErrorState error={save.error} />}
+      {testConnection.error && <ErrorState error={testConnection.error} />}
+      {activating && (
         <ConfirmDialog
           title={`Kích hoạt ${info.label}?`}
-          message={`Chat sẽ chuyển sang ${info.label}, model ${activate.model} được sử dụng cho các yêu cầu Chat mới.`}
-          onConfirm={() => activation.mutate()}
-          onClose={() => {
-            setActivate(null);
-            activation.reset();
-          }}
+          message={`Yêu cầu Chat mới sẽ dùng model ${baseline.model} và danh sách key của nền tảng này.`}
           busy={activation.isPending}
           error={activation.error}
+          onClose={() => {
+            if (!activation.isPending) setActivating(false);
+          }}
+          onConfirm={() => activation.mutate()}
         />
       )}
-    </>
-  );
-}
-function BackupKeyModal({
-  draft,
-  keyPlaceholder,
-  onSave,
-  onClose,
-}: {
-  draft: BackupDraft;
-  keyPlaceholder: string;
-  onSave: (key: BackupDraft) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState(draft.name);
-  const [secret, setSecret] = useState('');
-  const [visible, setVisible] = useState(false);
-  return (
-    <Modal title={draft.name ? 'Thay key dự phòng' : 'Thêm key dự phòng'} onClose={onClose}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSave({ ...draft, name: name.trim(), apiKey: secret.trim() || draft.apiKey });
-        }}
-      >
-        <label className="form-field">
-          Tên key
-          <input
-            required
-            maxLength={100}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Ví dụ Project dự phòng"
-          />
-        </label>
-        <label className="form-field mt-4">
-          API key mới
-          <div className="password-field">
-            <input
-              aria-label="API key mới"
-              required={!draft.id && !draft.apiKey}
-              type={visible ? 'text' : 'password'}
-              autoComplete="off"
-              value={secret}
-              onChange={(event) => setSecret(event.target.value)}
-              placeholder={draft.id ? 'Để trống để giữ key đã lưu' : keyPlaceholder}
-            />
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={visible ? 'Ẩn key dự phòng mới' : 'Hiện key dự phòng mới'}
-              onClick={() => setVisible((value) => !value)}
-            >
-              <Icon name={visible ? 'visibility_off' : 'visibility'} />
-            </button>
-          </div>
-        </label>
-        <p className="help-text mt-4">
-          Thay đổi được giữ trong bản nháp. Lưu cấu hình, kiểm tra kết nối rồi kích hoạt để áp dụng.
-        </p>
-        <div className="modal-actions">
-          <Button variant="secondary" onClick={onClose}>
-            Quay lại
-          </Button>
-          <Button
-            type="submit"
-            disabled={!name.trim() || (!draft.id && !draft.apiKey && !secret.trim())}
-          >
-            Áp dụng vào bản nháp
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    </section>
   );
 }

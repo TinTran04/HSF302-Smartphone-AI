@@ -63,20 +63,22 @@ export default function CheckoutPage() {
         return api.placeOrder(data, savedKey);
       }
       const selected = selectedIds.length ? selectedIds : cart.cart?.items.map(i => i.variantId) ?? [];
+      const displayedItems: OrderPreview['items'] = preview?.items ?? cart.cart!.items.filter(i => selected.includes(i.variantId));
+      const displayedTotal = preview?.total ?? displayedItems.reduce((sum, item) =>
+        sum + item.variant!.price * item.quantity, 0);
       const latest = await api.previewOrder(shipping, selected);
-      const changed =
-        !preview ? latest.priceChanged : latest.total !== preview.total ||
-          JSON.stringify(preview.items.map((i) => [i.variantId, i.quantity, i.currentUnitPrice ?? i.variant?.price])) !==
-            JSON.stringify(latest.items.map((i) => [i.variantId, i.quantity, i.currentUnitPrice ?? i.variant?.price]));
+      const changed = latest.total !== displayedTotal || latest.items.length !== displayedItems.length ||
+        latest.items.some(item => {
+          const displayed = displayedItems.find(i => i.variantId === item.variantId);
+          const original = cart.cart!.items.find(i => i.variantId === item.variantId);
+          return !displayed || item.quantity !== displayed.quantity ||
+            (item.currentUnitPrice ?? item.variant?.price ?? original?.variant.price) !==
+            (displayed.currentUnitPrice ?? displayed.variant?.price ?? original?.variant.price);
+        });
       setPreview(latest);
-      if (!preview || changed) {
-        setPriceChanged(!!changed);
-        notify(
-          changed
-            ? 'Giá sản phẩm đã thay đổi. Vui lòng kiểm tra lại trước khi đặt hàng.'
-            : 'Đã kiểm tra đơn hàng. Vui lòng xác nhận để đặt hàng.',
-          changed ? 'error' : 'success',
-        );
+      setPriceChanged(changed);
+      if (changed) {
+        notify('Giá hoặc thông tin đơn đã thay đổi. Vui lòng kiểm tra lại trước khi đặt mua.', 'error');
         return null;
       }
       const data = { previewId: latest.previewId, shipping, paymentMethod: 'COD' as const };
@@ -95,7 +97,7 @@ export default function CheckoutPage() {
         notify('Đã đặt hàng thành công.');
       }
     },
-    onError: (error) => {
+    onError: async (error) => {
       if (attempt.current && (!(error instanceof ApiError) || error.status === 0 || error.status >= 500)) {
         setUncertain(true);
         return;
@@ -107,6 +109,12 @@ export default function CheckoutPage() {
         setPreview(null);
         setPriceChanged(true);
         key.current = crypto.randomUUID();
+        try {
+          const selected = selectedIds.length ? selectedIds : cart.cart?.items.map(i => i.variantId) ?? [];
+          setPreview(await api.previewOrder(shipping, selected));
+        } catch {
+          // Keep the placement error visible if the updated order cannot be loaded.
+        }
       }
     },
   });
@@ -246,19 +254,14 @@ export default function CheckoutPage() {
           <CartSummary total={preview?.total ?? cart.cart.items.filter(i => !selectedIds.length || selectedIds.includes(i.variantId)).reduce((sum, i) => sum + i.variant.price * i.quantity, 0)} count={cart.cart.items.filter(i => !selectedIds.length || selectedIds.includes(i.variantId)).reduce((sum, i) => sum + i.quantity, 0)}>
             {priceChanged && (
               <div className="notice mb-5" role="alert">
-                Giá hoặc thông tin đơn đã thay đổi. Hãy kiểm tra tổng tiền mới và xác nhận lại.
+                Giá hoặc thông tin đơn đã thay đổi. Hãy kiểm tra tổng tiền mới rồi bấm Đặt mua.
               </div>
             )}
             {uncertain && <p className="notice mb-5">Chưa nhận được kết quả. Thử lại sẽ kiểm tra đúng yêu cầu đặt hàng trước đó.</p>}
-            {preview && (
-              <p className="text-sm text-green-700 mb-5" role="status">
-                Đã kiểm tra giá với máy chủ. Vui lòng xác nhận đặt hàng.
-              </p>
-            )}
             {submit.error && <ErrorState error={submit.error} />}
             <Button type="submit" busy={submit.isPending} disabled={mapAddress.resolving} className="w-full">
               <Icon name="verified_user" />
-              {uncertain ? 'Thử lại xác nhận' : preview ? 'Xác nhận đặt hàng' : 'Kiểm tra đơn hàng'}
+              {uncertain ? 'Thử lại xác nhận' : 'Đặt mua'}
             </Button>
             <Link className="block text-link text-xs text-center mt-5" to="/cart">
               Quay lại giỏ hàng

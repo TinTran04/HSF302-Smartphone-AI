@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Icon } from '../../../shared/components/Icon';
 import { Button, ErrorState, Modal, Skeleton } from '../../../shared/components/Ui';
 import { formatDate } from '../../../shared/utils/format';
+import { providerLabel } from '../../../shared/constants/aiProviders';
 import { notificationTitle, outcomes, reasonMessage } from './AdminAiKeyAlert';
 import './AdminAiNotifications.css';
 
@@ -91,7 +92,7 @@ export function AdminAiNotifications() {
                 {item.backupKeyName && <p>Key dự phòng {item.backupKeyName}</p>}
                 {item.backupFailureReason && <p>{reasonMessage(item.backupFailureReason)}</p>}
                 <p className="help-text">
-                  Model {item.model} · {formatDate(item.detectedAt)}
+                  {item.provider && `${providerLabel(item.provider)} · `}Model {item.model} · {formatDate(item.detectedAt)}
                 </p>
               </li>
             ))}

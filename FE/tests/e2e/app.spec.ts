@@ -95,7 +95,7 @@ async function mockMapTiles(page: Page) {
   );
 }
 
-test('selecting a map point fills profile and shipping addresses and requires checkout recheck', async ({
+test('selecting a map point fills profile and shipping addresses before checkout', async ({
   page,
 }) => {
   await mockMapTiles(page);
@@ -120,16 +120,14 @@ test('selecting a map point fills profile and shipping addresses and requires ch
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng', exact: true }).click();
   await page.goto('/cart');
   await page.getByRole('link', { name: 'Tiến hành đặt hàng' }).click();
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
   await picker.getByRole('button', { name: 'Xem vị trí trên bản đồ', exact: true }).click();
   await expect(map.locator('.leaflet-control-attribution')).toBeVisible();
   await map.click({ position: { x: 310, y: 190 } });
   const shipping = page.getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true });
   await expect(shipping).toHaveValue(/^Địa chỉ minh họa tại /);
   await expect(shipping).not.toHaveValue(label);
-  await expect(page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
 });
 
 test('admin selects product and variant images, keeps them after invalid input, and permanently deletes with confirmation', async ({
@@ -235,13 +233,12 @@ test('address suggestions select a saved profile point and update checkout map w
   await page.goto('/cart');
   await page.getByRole('link', { name: 'Tiến hành đặt hàng' }).click();
   const shipping = page.getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true });
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
   await shipping.fill('Bến Thành');
   await page
     .getByRole('option', { name: 'Chợ Bến Thành, TP. Hồ Chí Minh, Việt Nam', exact: true })
     .click();
-  await expect(page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
   await expect(map.locator('path.leaflet-interactive')).toBeVisible();
   await expect(page.locator('.location-picker')).toContainText('10.772500, 106.698000');
   await page.screenshot({ path: 'test-results/address-autocomplete-checkout.png', fullPage: true });
@@ -364,12 +361,11 @@ test('customer saves a map pin, clears stale pins on address edits and uses ship
   await expect(picker).toContainText('Chưa chọn vị trí trên bản đồ.');
   await picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
   await expect(picker).toContainText('10.776900, 106.700900');
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
   await picker.getByRole('button', { name: 'Xem vị trí trên bản đồ' }).click();
   await expect(map.locator('.leaflet-control-attribution')).toBeVisible();
   await map.click({ position: { x: 240, y: 110 } });
-  await expect(page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Đặt mua', exact: true })).toBeEnabled();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
@@ -378,8 +374,7 @@ test('customer saves a map pin, clears stale pins on address edits and uses ship
   await expect(map.locator('path.leaflet-interactive')).toBeInViewport({ ratio: 0.9 });
   await page.screenshot({ path: 'test-results/checkout-map-mobile.png', fullPage: true });
   const shippingPoint = await picker.getByRole('status').textContent();
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
-  await page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true }).click();
+  await page.getByRole('button', { name: 'Đặt mua', exact: true }).click();
   await expect(page).toHaveURL(/\/orders\//);
   await expect(picker.getByRole('status')).toHaveText(shippingPoint!);
   await expect(picker.getByRole('button', { name: 'Vị trí hiện tại', exact: true })).toHaveCount(0);
@@ -430,11 +425,7 @@ test('catalog filters, variant selection, guest cart persistence, login merge an
   await page
     .getByRole('combobox', { name: 'Địa chỉ nhận hàng', exact: true })
     .fill('123 Nguyễn Huệ, TP. Hồ Chí Minh');
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng', exact: true }).click();
-  await expect(
-    page.getByText('Đã kiểm tra giá với máy chủ. Vui lòng xác nhận đặt hàng.'),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Xác nhận đặt hàng', exact: true }).click();
+  await page.getByRole('button', { name: 'Đặt mua', exact: true }).click();
   await expect(page).toHaveURL(/\/orders\/SMAI-/);
   await expect(page.getByText(/Đặt hàng thành công!/)).toBeVisible();
   await page.getByRole('button', { name: 'Hủy đơn hàng', exact: true }).click();
@@ -497,9 +488,11 @@ test('unified AI confirms topic switch without resending the question', async ({
   await expect(page).not.toHaveURL(oldUrl);
   await expect(page.locator('.message.user')).toHaveCount(1);
   await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.locator('.message.assistant')).toContainText('Đây là nội dung minh họa');
   await expect(
     page.getByText('Chinh-sach-minh-hoa.txt · Tài liệu mẫu', { exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(page.locator('.message.assistant .source-card')).toHaveCount(0);
   await page.goto(oldUrl);
   await expect(page.locator('.message.user')).toHaveCount(1);
   await expect(page.locator('.message.assistant')).toHaveCount(0);
@@ -605,7 +598,7 @@ test('admin stays in the portal and has personal settings there', async ({ page 
   await expect(page.locator('.location-picker')).toHaveCount(0);
 });
 
-test('comparison opens unified phone advice with selected products', async ({ page }) => {
+test('comparison displays selected products in its specification table', async ({ page }) => {
   await login(page);
   await page.goto('/products');
   await page
@@ -617,13 +610,9 @@ test('comparison opens unified phone advice with selected products', async ({ pa
     .first()
     .click();
   await page.getByRole('link', { name: 'So sánh', exact: true }).click();
-  await page.getByRole('link', { name: 'So sánh cùng AI' }).click();
-  await expect(page).toHaveURL(/topic=PHONE_CONSULTATION/);
-  await expect(page.locator('.topic-grid .topic-card')).toHaveCount(2);
-  await page.getByRole('button', { name: /Tư vấn mua điện thoại/ }).click();
-  await page.getByLabel('Nhập câu hỏi cho trợ lý AI').fill('So sánh hai máy đã chọn.');
-  await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
-  await expect(page.locator('.message.assistant table')).toBeVisible();
+  await expect(page).toHaveURL(/\/compare$/);
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByRole('table').getByRole('columnheader')).toHaveCount(3);
 });
 test('admin product editing, provider form, document upload and status', async ({ page }) => {
   await login(page, true);
@@ -642,7 +631,9 @@ test('admin product editing, provider form, document upload and status', async (
   await page.getByRole('textbox', { name: 'Tìm sản phẩm quản trị' }).press('Enter');
   await expect(page.getByText('Điện thoại kiểm thử', { exact: true })).toBeVisible();
   await page.goto('/admin/ai-settings');
-  await expect(page.getByLabel('API Key đã lưu')).toHaveValue('••••••••');
+  await page.getByRole('tab', { name: /API key/ }).click();
+  await expect(page.locator('.ai-key-primary')).toContainText('••••••••');
+  await page.getByRole('tab', { name: 'Kết nối', exact: true }).click();
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
   await expect(
     page.getByText(/Chế độ demo: đã mô phỏng kiểm tra kết nối/),
@@ -727,51 +718,58 @@ test('admin manages multiple backup keys with priority, single delete and indivi
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, true);
   await page.goto('/admin/ai-settings');
+  await page.getByRole('tab', { name: /^API key/ }).click();
+  async function menu(name: string) {
+    await page.keyboard.press('Escape');
+    await page.locator('summary[aria-label="Thao tác ' + name + '"]').click();
+  }
   async function addKey(name: string, secret: string) {
     await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
     const modal = page.getByRole('dialog');
-    await modal.getByLabel('Tên key', { exact: true }).fill(name);
-    const input = modal.getByLabel('API key mới', { exact: true });
+    await modal.getByLabel('Tên nhận diện', { exact: true }).fill(name);
+    const input = modal.getByLabel('API key', { exact: true });
     await expect(input).toHaveAttribute('type', 'password');
     await input.fill(secret);
-    await modal.getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+    await modal.getByRole('button', { name: 'Kiểm tra và lưu' }).click();
+    await expect(modal).not.toBeVisible();
   }
   await addKey('Project A', 'backup-test-secret-a');
   await addKey('Project B', 'backup-test-secret-b');
-  const list = page.getByRole('region', { name: 'Danh sách key dự phòng' });
-  await expect(list).toContainText('Key dự phòng (2/10)');
-  await expect(page.getByRole('button', { name: 'Kiểm tra Project A', exact: true })).toBeDisabled();
+  const list = page.getByRole('tabpanel', { name: /^API key/ });
+  await expect(list.getByRole('heading', { name: 'Key dự phòng (2/10)' })).toBeVisible();
+  await menu('Project A');
+  await expect(page.getByRole('button', { name: 'Kiểm tra Project A', exact: true })).toBeEnabled();
+  await menu('Project B');
   await page.getByRole('button', { name: 'Tăng ưu tiên Project B', exact: true }).click();
-  await expect(list.locator('li').first()).toContainText('Project B');
-  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await expect(list.locator('.ai-backup-table tbody tr').first()).toContainText('Project B');
+  await menu('Project B');
   await expect(page.getByRole('button', { name: 'Kiểm tra Project B', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Kiểm tra Project B', exact: true }).click();
-  await expect(list.locator('li').first()).toContainText('Hoạt động');
+  await expect(list.locator('.ai-backup-table tbody tr').first()).toContainText('Sẵn sàng');
   await page.reload();
-  await expect(list.locator('li').first()).toContainText('Project B');
-  const stored = await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }));
-  expect(stored).not.toContain('backup-test-secret');
-  await page.getByRole('button', { name: 'Thay Project B', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('replacement-secret');
-  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.getByRole('tab', { name: /^API key/ }).click();
+  await expect(list.locator('.ai-backup-table tbody tr').first()).toContainText('Project B');
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('backup-test-secret');
+  await page.getByRole('button', { name: 'Sửa Project B', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Thay API key', { exact: true }).fill('replacement-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Kiểm tra và lưu' }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await menu('Project A');
   await page.getByRole('button', { name: 'Xóa Project A', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Xóa key', exact: true }).click();
-  await expect(list.locator('li')).toHaveCount(1);
-  await expect(list).toContainText('Project B');
+  await expect(list.locator('.ai-backup-table tbody tr')).toHaveCount(1);
+  await expect(list).not.toContainText('Project A');
+  await page.getByRole('tab', { name: 'Kết nối', exact: true }).click();
+  await page.getByLabel('Chat Model', { exact: true }).selectOption('gemini-3.6-flash-lite');
   await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Kích hoạt', exact: true })).toBeEnabled();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('replacement-secret');
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Chọn nền tảng Chat AI' })).toContainText('Đang dùng');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('replacement-secret');
   await expect(page.locator('.toast')).toHaveCount(0);
-  await page.getByRole('heading', { name: 'Cấu hình nền tảng Chat AI', exact: true }).click();
   await page.screenshot({ path: 'test-results/admin-ai-keys-mobile.png', fullPage: true });
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({ path: 'test-results/admin-ai-keys-desktop.png', fullPage: true });
 });
 
 test('admin switches the chat platform from Gemini to Groq and back', async ({ page }) => {
@@ -781,9 +779,15 @@ test('admin switches the chat platform from Gemini to Groq and back', async ({ p
   await expect(platforms.getByRole('button')).toHaveCount(3);
   await platforms.getByRole('button', { name: /Groq/ }).click();
   await expect(page.getByRole('heading', { name: 'Cấu hình chi tiết — Groq' })).toBeVisible();
-  await expect(page.getByLabel('Chat Model')).toHaveValue('llama-3.3-70b-versatile');
+  await expect(page.getByLabel('Chat Model')).toHaveValue('');
   await expect(page.getByRole('region', { name: 'Quota Gemini theo project' })).toHaveCount(0);
-  await page.getByPlaceholder('Nhập khóa mới khi cần thay đổi').fill('gsk-demo-secret');
+  await page.getByRole('tab', { name: /^API key/ }).click();
+  await page.getByRole('button', { name: 'Thêm key chính', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Tên nhận diện', { exact: true }).fill('Groq primary');
+  await page.getByRole('dialog').getByLabel('API key', { exact: true }).fill('gsk-demo-secret');
+  await page.getByRole('dialog').getByRole('button', { name: 'Kiểm tra và lưu', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.getByRole('tab', { name: 'Kết nối', exact: true }).click();
   await page.getByRole('button', { name: 'Tải danh sách model', exact: true }).click();
   const modelSelect = page.getByLabel('Chat Model');
   await expect(modelSelect.locator('option')).toContainText([
@@ -792,7 +796,7 @@ test('admin switches the chat platform from Gemini to Groq and back', async ({ p
     '3. openai/gpt-oss-120b — 1.000 lượt/ngày · 8.000 token/phút',
   ]);
   await expect(page.getByText(/Top 3 model có hạn mức miễn phí lớn nhất/)).toBeVisible();
-  await expect(modelSelect).toHaveValue('llama-3.1-8b-instant');
+  await expect(modelSelect).toHaveValue('llama-3.3-70b-versatile');
   await modelSelect.selectOption('llama-3.3-70b-versatile');
   await expect(modelSelect).toHaveValue('llama-3.3-70b-versatile');
   await modelSelect.selectOption('llama-3.1-8b-instant');
@@ -801,31 +805,38 @@ test('admin switches the chat platform from Gemini to Groq and back', async ({ p
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
   await page.getByRole('dialog', { name: 'Kích hoạt Groq?' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Đang hoạt động', exact: true })).toBeVisible();
-  await expect(platforms.getByRole('button', { name: /Groq/ })).toContainText('Đang hoạt động: llama-3.1-8b-instant');
-  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).not.toContainText('Đang hoạt động');
+  await expect(platforms.getByRole('button', { name: /Groq/ })).toContainText('Đang dùng');
+  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).not.toContainText('Đang dùng');
   expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('gsk-demo-secret');
   await platforms.getByRole('button', { name: /Google Gemini/ }).click();
   await expect(page.getByRole('heading', { name: 'Cấu hình chi tiết — Google Gemini' })).toBeVisible();
   await page.getByRole('button', { name: 'Kích hoạt', exact: true }).click();
   await page.getByRole('dialog', { name: 'Kích hoạt Google Gemini?' }).getByRole('button', { name: 'Xác nhận', exact: true }).click();
-  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).toContainText('Đang hoạt động');
-  await expect(platforms.getByRole('button', { name: /Groq/ })).not.toContainText('Đang hoạt động');
+  await expect(platforms.getByRole('button', { name: /Google Gemini/ })).toContainText('Đang dùng');
+  await expect(platforms.getByRole('button', { name: /Groq/ })).not.toContainText('Đang dùng');
 });
 
-test('AI settings polling preserves unsaved model and backup drafts', async ({ page }) => {
+test('AI settings polling preserves unsaved model and an open key editor', async ({ page }) => {
   await page.clock.install();
   await login(page, true);
   await page.goto('/admin/ai-settings');
   await page.getByLabel('Chat Model').selectOption('gemini-3.6-flash-lite');
-  await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('Tên key', { exact: true }).fill('Draft project');
-  await page.getByRole('dialog').getByLabel('API key mới', { exact: true }).fill('unsaved-secret');
-  await page.getByRole('dialog').getByRole('button', { name: 'Áp dụng vào bản nháp' }).click();
+  await page.getByRole('tab', { name: /^API key/ }).click();
+  await expect(page.getByRole('button', { name: 'Thêm key dự phòng', exact: true })).toBeDisabled();
   await page.clock.fastForward(16_000);
   await page.clock.runFor(500);
   await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-3.6-flash-lite');
-  await expect(page.getByRole('region', { name: 'Danh sách key dự phòng' })).toContainText('Draft project');
-  await expect(page.getByRole('button', { name: 'Kiểm tra Draft project', exact: true })).toBeDisabled();
+  await page.getByRole('tab', { name: 'Kết nối', exact: true }).click();
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click();
+  await page.getByRole('tab', { name: /^API key/ }).click();
+  await page.getByRole('button', { name: 'Thêm key dự phòng', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Tên nhận diện', { exact: true }).fill('Draft project');
+  await page.getByRole('dialog').getByLabel('API key', { exact: true }).fill('unsaved-secret');
+  await page.clock.fastForward(16_000);
+  await page.clock.runFor(500);
+  await expect(page.getByLabel('Chat Model')).toHaveValue('gemini-3.6-flash-lite');
+  await expect(page.getByRole('dialog').getByLabel('Tên nhận diện', { exact: true })).toHaveValue('Draft project');
+  await expect(page.getByRole('dialog').getByLabel('API key', { exact: true })).toHaveValue('unsaved-secret');
   expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('unsaved-secret');
 });
 

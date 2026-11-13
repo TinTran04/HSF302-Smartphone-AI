@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useComparison } from '../../features/comparison/ComparisonProvider';
 import { ComparisonTable } from '../../features/comparison/ComparisonTable';
 import { useProducts } from '../../features/products/useProducts';
@@ -38,25 +37,6 @@ export default function ComparePage() {
           </Button>
         }
       />
-      <div className="notice flex flex-wrap items-center justify-between gap-5 mb-8">
-        <div>
-          <h3 className="!text-base">Bạn muốn AI phân tích sâu hơn?</h3>
-          <p className="text-sm mt-2">Chọn ít nhất 2 máy để bắt đầu cuộc trò chuyện so sánh.</p>
-        </div>
-        {products.length >= 2 ? (
-          <Link
-            className="button button-ai"
-            to={`/ai?topic=PHONE_CONSULTATION&productIds=${products.map((p) => p.id).join(',')}`}
-          >
-            <Icon name="auto_awesome" />
-            So sánh cùng AI
-          </Link>
-        ) : (
-          <Button variant="ai" disabled>
-            So sánh cùng AI
-          </Button>
-        )}
-      </div>
       {products.length ? (
         <>
           <div className="flex flex-wrap gap-3 mb-6">

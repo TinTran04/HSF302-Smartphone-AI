@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../shared/components/Ui';
-import { AiQuotaSettings, quotaPayload } from './AiQuotaSettings';
+import { AiQuotaSettings, QuotaUsage, quotaPayload } from './AiQuotaSettings';
 
 vi.mock('../../shared/api', () => ({ isDemo: false }));
 
@@ -41,13 +41,71 @@ function render(configId = '42') {
 }
 
 describe('Gemini quota settings', () => {
+  it('shows only the daily estimate without repeated explanations or technical details', () => {
+    const html = renderToStaticMarkup(
+      <QuotaUsage
+        usage={{
+          ...quota.keys[0],
+          requestsToday: 7,
+          dailyRequestLimit: 500,
+          dailyLimitSource: 'MANUAL',
+          dailyResetAt: '2026-11-14T08:00:00Z',
+          dailyTrackingSince: '2026-11-13T09:00:00Z',
+        }}
+      />,
+    );
+    expect(html).toContain('Ước tính còn 493 / 500 yêu cầu/ngày');
+    expect(html).not.toContain('do ứng dụng ghi nhận');
+    expect(html).not.toContain('Một tin nhắn');
+    expect(html).not.toContain('Giới hạn ngày do admin thiết lập');
+    expect(html).not.toContain('Đặt lại ngày');
+    expect(html).not.toContain('Bắt đầu ghi nhận');
+    expect(html).not.toContain('<details>');
+    expect(html).not.toContain('<progress');
+  });
+  it.each([
+    { requestsToday: 0 },
+    { dailyRequestLimit: 500 },
+    { requestsToday: 9, dailyRequestLimit: null },
+  ])('keeps unknown daily values unknown for %s', (daily) => {
+    const html = renderToStaticMarkup(<QuotaUsage usage={{ ...quota.keys[0], ...daily }} />);
+    expect(html).toContain('Ước tính còn lại/ngày · Chưa xác định');
+    expect(html).not.toContain('Ước tính còn 0');
+  });
+  it('clamps exhausted daily estimates to zero', () => {
+    expect(
+      renderToStaticMarkup(
+        <QuotaUsage usage={{ ...quota.keys[0], requestsToday: 501, dailyRequestLimit: 500 }} />,
+      ),
+    ).toContain('Ước tính còn 0 / 500 yêu cầu/ngày');
+  });
+  it.each([7999, 8000, 10000, 12000])(
+    'keeps minute usage out of the compact estimate for %s tokens',
+    (tokens) => {
+      const html = renderToStaticMarkup(
+        <QuotaUsage usage={{ ...quota.keys[0], estimatedInputTokens: tokens }} />,
+      );
+      expect(html).toContain('Ước tính còn lại/ngày · Chưa xác định');
+      expect(html).not.toContain('token mỗi phút');
+      expect(html).not.toContain('TPM');
+    },
+  );
+  it('shows an unknown state when no limit or usage data is available', () => {
+    expect(renderToStaticMarkup(<QuotaUsage usage={quota.keys[1]} />)).toContain('Chưa xác định');
+    expect(renderToStaticMarkup(<QuotaUsage />)).toContain('Chưa có số liệu');
+  });
+  it('offers quota setup for a newly replaced key without reusing another key limit', () => {
+    const html = renderToStaticMarkup(<QuotaUsage usage={quota.keys[1]} onConfigure={() => {}} />);
+    expect(html).toContain('Cấu hình giới hạn');
+    expect(html).not.toContain('10000');
+    expect(html).not.toContain('<progress');
+  });
   it('shows masked keys, project fields, live usage and the shared quota estimate explanation', () => {
     const html = render();
     expect(html).toContain('***1234');
     expect(html).toContain('Project ID');
     expect(html).toContain('10000');
-    expect(html).toContain('8100');
-    expect(html).toContain('80%');
+    expect(html).toContain('Ước tính còn lại/ngày · Chưa xác định');
     expect(html).toContain('khi mức sử dụng ước tính đạt 80%');
     expect(html).toContain('maxLength="100"');
     expect(html).toContain('max="1000000000"');

@@ -179,8 +179,6 @@ test('real BE: admin catalog, guest cart, authenticated chat and profile', async
   await expect(page.locator('.location-picker')).toContainText('Chưa chọn vị trí trên bản đồ.');
   await page.getByRole('button', { name: 'Vị trí hiện tại', exact: true }).click();
   await expect(page.locator('.location-picker')).toContainText('10.776900, 106.700900');
-  await page.getByRole('button', { name: 'Kiểm tra đơn hàng' }).click();
-  await expect(page.getByText('Đã kiểm tra giá với máy chủ. Vui lòng xác nhận đặt hàng.')).toBeVisible();
   let dropped = false;
   await page.route('**/api/orders', async route => {
     if (route.request().method() === 'POST' && !dropped) {
@@ -189,7 +187,7 @@ test('real BE: admin catalog, guest cart, authenticated chat and profile', async
       await route.abort('connectionreset');
     } else await route.continue();
   });
-  await page.getByRole('button', { name: 'Xác nhận đặt hàng' }).click();
+  await page.getByRole('button', { name: 'Đặt mua', exact: true }).click();
   await expect(page.getByRole('alert').last()).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: /Thử lại xác nhận/ })).toBeVisible({ timeout: 3000 });

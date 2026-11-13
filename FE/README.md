@@ -90,7 +90,17 @@ Khi bật bảo trì, phần shop hiển thị màn hình riêng **Shop đang b�
 
 Thời gian chờ gửi tin nhắn và xác nhận chuyển chủ đề là tối đa 6 phút 40 giây. Kiểm tra kết nối cấu hình AI có thời gian chờ 130 giây. Các giới hạn này bao gồm nhiều bước gọi AI, chuyển key khi HTTP 429 và một lần thử lại khi HTTP 503 trên mỗi key.
 
-Trong **Cấu hình AI**, Admin quản lý danh sách tối đa 10 key dự phòng cho Gemini, có tên, số lượng, thứ tự ưu tiên và trạng thái từng key. Nút **Thêm key dự phòng** mở form tên/key, nút **Thay key** chỉ cập nhật mục được chọn, nút **Xóa** xác nhận gỡ riêng mục đó. Mũi tên thay đổi ưu tiên. Các thay đổi nằm trong bản nháp đến khi thực hiện **Lưu cấu hình → Kiểm tra kết nối → Kích hoạt**. Có thể kiểm tra riêng từng key đã lưu. Key mới được ẩn/hiện khi nhập, key đã lưu chỉ hiện phần che. Khi key chính hết hiệu lực, bị từ chối truy cập hoặc chạm quota, BE thử danh sách dự phòng theo thứ tự. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+Trong **Cấu hình AI**, Admin chọn Gemini, Groq hoặc DeepSeek và quản lý qua ba tab.
+
+- **Kết nối** lưu model, kiểm tra các key rồi kích hoạt. Ô Chat Model chỉ hiển thị tối đa 3 model gợi ý. Khi đổi lựa chọn, số liệu key được tải theo model đó. Lưu model trước khi sửa key.
+- **API key** ghim key chính, phân trang tối đa 10 key dự phòng với 5 mục/trang. Một hộp thoại lưu tên, bí mật mới, nhóm/project và hạn mức của model. Thay bí mật được kiểm tra trước khi lưu. Thao tác lưu áp dụng ngay cho cấu hình đang hoạt động. Đặt dự phòng làm chính hoán đổi vị trí và giữ tên nhận diện theo từng key.
+- **Nhật ký** hiển thị 10 sự kiện/trang, mới nhất trước, gồm thao tác quản trị và sự cố/chuyển key khi chạy.
+
+Nút **Xóa key** hiển thị trực tiếp trên key chính và từng dự phòng. Xóa chính cần chọn key thay thế khi có dự phòng. Xóa key cuối cùng tắt nền tảng đó. Hộp thoại sửa, xóa, hoán đổi giữ phiên bản cấu hình lúc mở và tự đóng nếu cấu hình hoặc model đổi.
+
+Mỗi key hiển thị trạng thái từ BE và yêu cầu/ngày còn lại theo ước tính của ứng dụng. Danh sách dùng cách trình bày ngắn gọn và nhật ký có phân trang. Giới hạn chưa xác định có nhãn riêng. Hộp thoại **Sửa** cho chọn mặc định hoặc nhập giới hạn ngày và giới hạn token mỗi phút để chuyển key. Các số liệu ngày chỉ gồm những lượt gọi do ứng dụng ghi nhận từ khi bật tính năng, một tin nhắn có thể tạo nhiều lượt gọi AI.
+
+Mức sử dụng và trạng thái lỗi gắn với nền tảng, nhóm/project và model. Gemini có mặc định ước tính, Groq có thể nhận giới hạn từ header phản hồi, giới hạn Admin nhập được ưu tiên. DeepSeek hiển thị lỗi hết số dư khi được nhà cung cấp báo. Key cùng project Gemini dùng chung quota. Mốc 80% ưu tiên nhóm khác, các key còn khả dụng vẫn được dùng khi mọi nhóm đều vượt mốc này. Key mới có nút ẩn/hiện, key đã lưu chỉ hiển thị phần che. Thông báo và nhật ký được lưu ở backend. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 Chuông **Thông báo AI** trên thanh Admin hiển thị số chưa đọc, mở lịch sử có thời điểm, lý do, tên key được chuyển sang và trạng thái đã xử lý. Dữ liệu được kiểm tra mỗi 15 giây và khi quay lại tab. **Đánh dấu tất cả đã đọc** chỉ cập nhật số chưa đọc của Admin đang đăng nhập, lịch sử vẫn xem lại được sau khi tải lại trang. Banner giữ cảnh báo của cấu hình đang chạy. Các thao tác thêm, thay, xóa key có toast kết quả. Chế độ demo mô phỏng dữ liệu và chỉ lưu thông tin key đã che.
 

@@ -13,6 +13,25 @@ describe('real backend contract', () => {
   beforeEach(() => vi.resetAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
+  it('uses saved key references for name changes and promotion without resending secrets', async () => {
+    vi.mocked(http).mockResolvedValue(undefined);
+    await realApi.renameAiKey('42', 'PRIMARY', 'Project A');
+    expect(http).toHaveBeenCalledWith(
+      '/admin/ai-settings/key-management/42/name',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ keyRef: 'PRIMARY', name: 'Project A' }),
+      }),
+    );
+    await realApi.promoteAiKey('42', '12');
+    expect(http).toHaveBeenCalledWith(
+      '/admin/ai-settings/key-management/42/promote/12',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await realApi.aiKeyManagement('GEMINI', 8);
+    expect(http).toHaveBeenCalledWith('/admin/ai-settings/key-management?provider=GEMINI&before=8');
+  });
+
   it('reverse geocodes exact selected coordinates through the backend with cancellation', async () => {
     const signal = new AbortController().signal;
     vi.mocked(http).mockResolvedValue({ label: 'Địa chỉ từ điểm đã chọn' });
@@ -189,6 +208,19 @@ describe('real backend contract', () => {
     expect(vi.mocked(http)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(http).mock.calls[0][1]?.headers).toBeUndefined();
     expect(storage.has('smartphone-ai-guest-session')).toBe(false);
+  });
+  it('encodes the selected replacement when deleting a primary key', async () => {
+    vi.mocked(http).mockResolvedValue({});
+    await realApi.removeAiKey('config/1', 'PRIMARY', 'backup/2');
+    expect(http).toHaveBeenCalledWith(
+      '/admin/ai-settings/key-management/config%2F1/key/PRIMARY?replacementKeyRef=backup%2F2',
+      { method: 'DELETE' },
+    );
+    await realApi.removeAiKey('config/1', 'PRIMARY');
+    expect(http).toHaveBeenLastCalledWith(
+      '/admin/ai-settings/key-management/config%2F1/key/PRIMARY',
+      { method: 'DELETE' },
+    );
   });
   it('deletes a conversation through the owned resource endpoint', async () => {
     vi.mocked(http).mockResolvedValueOnce(undefined);

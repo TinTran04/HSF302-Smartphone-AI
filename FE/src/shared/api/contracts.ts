@@ -5,6 +5,7 @@ import type {
   AiModelOptions,
   AiNotifications,
   AiSettings,
+  AiKeyManagementState,
   Brand,
   Cart,
   CartEntry,
@@ -66,6 +67,16 @@ export interface Api {
   uploadDocument(file: File): Promise<KnowledgeDocument>;
   documentAction(id: string, action: 'reindex' | 'enable' | 'disable' | 'delete'): Promise<void>;
   aiSettings(): Promise<AiSettings[]>;
+  aiKeyManagement(provider: AiProvider, before?: number): Promise<AiKeyManagementState>;
+  renameAiKey(configId: string, keyRef: string, name: string): Promise<void>;
+  promoteAiKey(configId: string, keyId: string): Promise<void>;
+  saveAiKey(input: import('../types/models').AiKeyEditInput): Promise<AiSettings>;
+  checkAiKey(configId: string, keyRef: string): Promise<void>;
+  removeAiKey(configId: string, keyRef: string, replacementKeyRef?: string): Promise<AiSettings>;
+  moveAiKey(configId: string, keyRef: string, direction: number): Promise<AiSettings>;
+  aiQuota(provider: AiProvider, model?: string): Promise<import('../types/models').AiQuotaSettings>;
+  aiActivity(provider: AiProvider, page: number): Promise<import('../types/models').AiActivityPage>;
+  aiSavedModels(provider: AiProvider): Promise<string[]>;
   aiKeyAlert(): Promise<AiKeyAlert | null>;
   aiNotifications(): Promise<AiNotifications>;
   markAiNotificationsRead(throughId: string): Promise<void>;
