@@ -41,6 +41,7 @@ export interface Api {
   resolveCart(entries: CartEntry[]): Promise<Cart>;
   addCart(entry: CartEntry): Promise<Cart>;
   updateCart(variantId: string, quantity: number): Promise<Cart>;
+  changeCartVariant(variantId: string, targetVariantId: string): Promise<Cart>;
   removeCart(variantId: string): Promise<Cart>;
   previewOrder(shipping: ShippingInfo, variantIds?: string[]): Promise<OrderPreview>;
   placeOrder(

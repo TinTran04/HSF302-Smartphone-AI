@@ -437,6 +437,22 @@ export const mockApi: Api = {
     save();
     return delay(resolveCart(cart));
   },
+  changeCartVariant: (id, targetVariantId) => {
+    const cart = myCart();
+    const current = cart.find((entry) => entry.variantId === id);
+    const target = resolveCart([{ variantId: targetVariantId, quantity: 1 }]).items[0];
+    if (!current || !target) throw new ApiError(409, 'Phiên bản mới không khả dụng.');
+    const currentProduct = products.find((product) => product.variants.some((variant) => variant.id === id));
+    if (!currentProduct || currentProduct.id !== target.product.id)
+      throw new ApiError(400, 'Chỉ có thể đổi sang phiên bản khác của cùng sản phẩm.');
+    if (id === targetVariantId) return delay(resolveCart(cart));
+    const existingTarget = cart.find((entry) => entry.variantId === targetVariantId);
+    if (existingTarget) existingTarget.quantity += current.quantity;
+    else cart.push({ variantId: targetVariantId, quantity: current.quantity });
+    carts[signedIn().id] = cart.filter((entry) => entry.variantId !== id);
+    save();
+    return delay(resolveCart(myCart()));
+  },
   removeCart: (id) => {
     carts[signedIn().id] = myCart().filter((i) => i.variantId !== id);
     save();

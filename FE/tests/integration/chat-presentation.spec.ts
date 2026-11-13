@@ -127,6 +127,7 @@ for (const viewport of [
     const stream = page.getByRole('log', { name: 'Tin nhắn cuộc hội thoại' });
     const composer = page.locator('.chat-composer');
     const toolbar = page.locator('.chat-toolbar');
+    const sidebar = page.locator('.chat-sidebar');
     await expect
       .poll(() =>
         page.evaluate(() => ({
@@ -139,6 +140,12 @@ for (const viewport of [
     const toolbarBefore = await toolbar.boundingBox();
     expect(composerBefore).not.toBeNull();
     expect(composerBefore!.y + composerBefore!.height).toBeLessThanOrEqual(viewport.height);
+    if (viewport.width > 800) {
+      expect(toolbarBefore).toBeNull();
+      expect(await sidebar.boundingBox()).not.toBeNull();
+    } else {
+      expect(toolbarBefore).not.toBeNull();
+    }
     await expect.poll(() => stream.evaluate((element) => element.clientHeight)).toBeGreaterThan(0);
     expect(await stream.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await stream.evaluate((element) => element.clientHeight),
@@ -154,7 +161,11 @@ for (const viewport of [
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await expect(page.locator('.store-footer')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('chat-layout.png') });
-    await page.getByRole('link', { name: 'Đổi chủ đề' }).click();
+    if (viewport.width > 800) {
+      await page.getByRole('link', { name: 'Cuộc trò chuyện mới' }).click();
+    } else {
+      await page.getByRole('link', { name: 'Trò chuyện mới', exact: true }).click();
+    }
     await expect(
       page.getByRole('heading', { name: 'Xin chào! Mình có thể giúp gì cho bạn hôm nay?' }),
     ).toBeVisible();

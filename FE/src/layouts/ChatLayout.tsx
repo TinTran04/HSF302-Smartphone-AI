@@ -4,7 +4,7 @@ import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/
 import { api } from '../shared/api';
 import { useAuth } from '../features/auth/AuthProvider';
 import { Icon } from '../shared/components/Icon';
-import { topicInfo } from '../features/ai-chat/constants/chatTopics';
+import { chatTopics, topicInfo } from '../features/ai-chat/constants/chatTopics';
 import { ConfirmDialog, ErrorState, Modal } from '../shared/components/Ui';
 import type { Conversation } from '../shared/types/models';
 import './ChatLayout.css';
@@ -52,6 +52,27 @@ export function ChatLayout() {
         <Icon name="add_circle" />
         Cuộc trò chuyện mới
       </Link>
+      <div className="chat-topic-nav" aria-label="Chủ đề trợ lý">
+        <p className="eyebrow !mt-7 !mb-0">Chủ đề trợ lý</p>
+        <nav aria-label="Chọn chủ đề chat">
+          {chatTopics.map((topic) => (
+            <Link
+              key={topic.id}
+              to={`/ai?topic=${topic.id}`}
+              className="chat-topic-link"
+              onClick={() => setHistoryOpen(false)}
+            >
+              <span className="icon-tile">
+                <Icon name={topic.icon} />
+              </span>
+              <span>
+                <strong>{topic.title}</strong>
+                <small>{topic.description}</small>
+              </span>
+            </Link>
+          ))}
+        </nav>
+      </div>
       <p className="eyebrow !mt-7 !mb-0">Hội thoại gần đây</p>
       <div className="chat-history">
         {chats.data?.map((c) => (

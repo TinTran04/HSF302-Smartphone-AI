@@ -51,6 +51,16 @@ beforeEach(() => {
 afterEach(() => client.clear());
 
 describe('conversation history controls', () => {
+  it('shows chat topics in the sidebar for quick context switching', () => {
+    const html = renderChat();
+
+    expect(html).toContain('Chủ đề trợ lý');
+    expect(html).toContain('href="/ai?topic=PHONE_CONSULTATION"');
+    expect(html).toContain('href="/ai?topic=SHOP_SUPPORT"');
+    expect(html).toContain('Tư vấn mua điện thoại');
+    expect(html).toContain('Hỗ trợ cửa hàng');
+  });
+
   it('gives each conversation a separately labelled delete control outside its link', () => {
     const html = renderChat();
 

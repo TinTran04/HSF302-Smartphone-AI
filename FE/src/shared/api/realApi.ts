@@ -89,6 +89,11 @@ export const realApi: Api = {
       method: 'PATCH',
       body: jsonBody({ quantity }),
     }).then(mapCart),
+  changeCartVariant: (id, targetVariantId) =>
+    http<ServerCart>(`/cart/items/${encodeURIComponent(id)}/variant`, {
+      method: 'PATCH',
+      body: jsonBody({ variantId: targetVariantId }),
+    }).then(mapCart),
   removeCart: (id) => http<ServerCart>(`/cart/items/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(mapCart),
   previewOrder: (shipping, variantIds) => post<OrderPreview>('/orders/preview', { variantIds, shipping, paymentMethod: 'COD' }),
   placeOrder: (data, key) =>

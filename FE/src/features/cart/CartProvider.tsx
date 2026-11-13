@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { readGuestCart, saveGuestCart } from './guestCart';
 import type { Cart, CartEntry } from '../../shared/types/models';
 import { useToast } from '../../shared/components/Ui';
+import { errorMessage } from '../../shared/utils/format';
 interface CartValue {
   cart?: Cart;
   count: number;
@@ -14,6 +15,7 @@ interface CartValue {
   retry: () => void;
   add: (entry: CartEntry) => Promise<void>;
   update: (variantId: string, quantity: number) => Promise<void>;
+  changeVariant: (variantId: string, targetVariantId: string) => Promise<void>;
   remove: (variantId: string) => Promise<void>;
 }
 const Context = createContext<CartValue | null>(null);
@@ -41,14 +43,17 @@ export function CartProvider({ children }: PropsWithChildren) {
   const mutation = useMutation({
     meta: { toast: { success: false } },
     mutationFn: async (action: {
-      kind: 'add' | 'update' | 'remove';
+      kind: 'add' | 'update' | 'remove' | 'changeVariant';
       variantId: string;
+      targetVariantId?: string;
       quantity?: number;
     }) => {
       if (customer) {
         const cart =
           action.kind === 'add'
             ? await api.addCart({ variantId: action.variantId, quantity: action.quantity! })
+            : action.kind === 'changeVariant'
+              ? await api.changeCartVariant(action.variantId, action.targetVariantId!)
             : action.kind === 'update'
               ? await api.updateCart(action.variantId, action.quantity!)
               : await api.removeCart(action.variantId);
@@ -58,6 +63,23 @@ export function CartProvider({ children }: PropsWithChildren) {
         let next: CartEntry[];
         if (action.kind === 'remove')
           next = current.filter((i) => i.variantId !== action.variantId);
+        else if (action.kind === 'changeVariant') {
+          const currentEntry = current.find((i) => i.variantId === action.variantId);
+          if (!currentEntry) throw new Error('Không tìm thấy sản phẩm trong giỏ hàng.');
+          const targetEntry = current.find((i) => i.variantId === action.targetVariantId);
+          if (targetEntry) {
+            const quantity = targetEntry.quantity + currentEntry.quantity;
+            if (!Number.isSafeInteger(quantity)) throw new Error('Số lượng vượt quá giới hạn.');
+            next = current.filter((i) => i.variantId !== action.variantId).map((i) =>
+              i.variantId === action.targetVariantId ? { ...i, quantity } : i,
+            );
+          } else {
+            next = current.map((i) => i.variantId === action.variantId
+              ? { ...i, variantId: action.targetVariantId! }
+              : i,
+            );
+          }
+        }
         else {
           const existing = current.find((i) => i.variantId === action.variantId);
           if (!existing && current.length >= 100) throw new Error('Giỏ hàng chỉ hỗ trợ tối đa 100 phiên bản.');
@@ -78,9 +100,11 @@ export function CartProvider({ children }: PropsWithChildren) {
         add: 'Đã thêm sản phẩm vào giỏ hàng.',
         update: 'Đã cập nhật số lượng sản phẩm.',
         remove: 'Đã xóa sản phẩm khỏi giỏ hàng.',
+        changeVariant: 'Đã đổi màu sắc và dung lượng sản phẩm.',
       };
       notify(messages[action.kind]);
     },
+    onError: (error) => notify(errorMessage(error), 'error'),
   });
   const value: CartValue = {
     cart: query.data,
@@ -93,6 +117,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     },
     add: (entry) => mutation.mutateAsync({ kind: 'add', ...entry }),
     update: (variantId, quantity) => mutation.mutateAsync({ kind: 'update', variantId, quantity }),
+    changeVariant: (variantId, targetVariantId) => mutation.mutateAsync({ kind: 'changeVariant', variantId, targetVariantId }),
     remove: (variantId) => mutation.mutateAsync({ kind: 'remove', variantId }),
   };
   return <Context value={value}>{children}</Context>;
