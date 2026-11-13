@@ -119,12 +119,20 @@ Sửa `VITE_API_TARGET` theo địa chỉ backend và khởi động lại Vite.
 
 ## Cấu hình AI và RAG
 
-1. Đăng nhập Admin, mở **Cấu hình AI**, chọn thẻ Google Gemini, Groq hoặc DeepSeek, lưu model và API key, kiểm tra kết nối rồi kích hoạt. Kích hoạt nền tảng khác để hoán chuyển nền tảng Chat.
+1. Đăng nhập Admin, mở **Cấu hình AI**, chọn Google Gemini, Groq hoặc DeepSeek. Thêm key chính trong tab **API key**, sau đó chọn model, lưu, kiểm tra kết nối và kích hoạt trong tab **Kết nối**. Ô Chat Model chỉ hiển thị tối đa 3 model gợi ý của nền tảng đang chọn. Kích hoạt nền tảng khác để hoán chuyển nền tảng Chat.
 2. Mở **Cấu hình embedding**. Hệ thống đặt sẵn Gemini `gemini-embedding-001` với 768 chiều cho cấu hình mới. Nhập API key Gemini rồi bấm **Kiểm tra và lưu**.
 3. Vào **Kho kiến thức AI**, tải tài liệu PDF/TXT và đợi trạng thái `READY`. PDF dạng ảnh không được OCR trong phạm vi hiện tại.
 4. Vào AI Chat và chọn **Hỗ trợ cửa hàng** để hỏi theo tài liệu. Nếu không đủ căn cứ, hệ thống thông báo không thể xác nhận; khi có nguồn, hãy đối chiếu câu trả lời với tài liệu.
 
-Mỗi cấu hình Chat hỗ trợ một API key chính và tối đa 10 key dự phòng có tên, thứ tự ưu tiên và trạng thái riêng. Admin có thể thêm, thay, kiểm tra hoặc xác nhận xóa từng key, sau đó lưu, kiểm tra và kích hoạt cấu hình. Khi key chính gặp lỗi xác thực hoặc quota, BE thử các key dự phòng theo thứ tự và ghi rõ tên key đã dùng. Chuông **Thông báo AI** hiển thị số chưa đọc và lịch sử lưu trong DB, có thao tác đánh dấu đã đọc và mở trang quản lý key. Banner giữ cảnh báo đang cần xử lý. Với Gemini, các key cùng project dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+Mỗi nền tảng hỗ trợ một key chính và tối đa 10 key dự phòng. Tab **API key** ghim key chính và phân trang dự phòng 5 mục/trang. Hộp thoại **Sửa** lưu tên, key, nhóm hạn mức và giới hạn của model trong một lần. Key mới được kiểm tra trước khi thay, thay đổi key của cấu hình đang hoạt động được áp dụng ngay. Hoán đổi giữ tên và hạn mức theo key. Tab **Nhật ký** hiển thị 10 sự kiện/trang, mới nhất trước.
+
+Mỗi key có nút **Xóa key**. Xóa key chính cần chọn một dự phòng thay thế khi còn dự phòng. Xóa key cuối cùng tắt Chat của nền tảng đó đến khi thêm key mới. Hộp thoại đang mở sẽ đóng khi cấu hình hoặc model thay đổi để tránh thao tác vào phiên bản cũ.
+
+Admin thấy trạng thái từ phản hồi nhà cung cấp và số yêu cầu/ngày còn lại do ứng dụng ước tính theo nhóm hạn mức, model. Một tin nhắn có thể gọi AI nhiều lần. Bộ đếm lưu trong database từ khi bật tính năng, gồm lượt Chat, thử lại, kiểm tra kết nối và lượt thử model. Giới hạn ngày và giới hạn token mỗi phút có thể sửa trong hộp thoại **Sửa**. Khởi động lại BE để áp dụng migration `V37` và `V38`.
+
+Mức sử dụng, hạn mức và lỗi được theo dõi theo nền tảng, nhóm/project và model. Đổi model sẽ tải lại các số liệu tương ứng, quay lại model cũ vẫn thấy lỗi quota đã ghi nhận. Khi đạt 80% mức ước tính, hệ thống ưu tiên nhóm khác và tiếp tục dùng key còn khả dụng nếu tất cả đều vượt ngưỡng này. Gemini dùng hạn mức mặc định ước tính, Groq cập nhật từ header khi nhà cung cấp trả về, giới hạn do Admin nhập được ưu tiên. DeepSeek ghi nhận lỗi hết số dư, chưa có số dư còn lại để hiển thị phần trăm. Key cùng project Gemini dùng chung quota. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+
+Chuông **Thông báo AI** hiển thị số chưa đọc và lịch sử lưu trong DB, có thao tác đánh dấu đã đọc và mở trang quản lý key. Banner giữ cảnh báo đang cần xử lý. Với trạng thái bị chặn, Admin có thể kiểm tra lại từng key. Thời điểm thử lại chỉ được hiển thị khi nhà cung cấp cung cấp thông tin này.
 
 Tư vấn điện thoại kết hợp catalog, tài liệu phù hợp và kiến thức Gemini. Hỗ trợ cửa hàng truy xuất tài liệu và kiểm chứng căn cứ ở BE, Customer nhận nội dung trả lời và các gợi ý sản phẩm. Email Gmail, nhà cung cấp AI và dữ liệu thực tế cần được kiểm thử trong môi trường của bạn.
 

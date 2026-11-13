@@ -1,6 +1,6 @@
 # SmartPhone AI — User Guide
 
-Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 12/11/2026 cho phép Admin hoán chuyển nền tảng Chat giữa Google Gemini, Groq và DeepSeek bằng API key; Embedding Model cho RAG dùng Google Gemini.
+Hướng dẫn cài đặt, sử dụng và giải thích code phục vụ demo project cuối kỳ. Phiên bản cập nhật ngày 13/11/2026 cho phép Admin hoán chuyển nền tảng Chat giữa Google Gemini, Groq và DeepSeek bằng API key, quản lý hạn mức theo model và từng nhóm key. Embedding Model cho RAG dùng Google Gemini.
 
 ## 1. Phạm vi và tài khoản
 
@@ -143,7 +143,7 @@ Trang **Cấu hình AI** tại `/admin/ai-settings` có ba thẻ nền tảng: *
 | Groq | [Groq Console](https://console.groq.com/keys), key dạng `gsk_...` | `llama-3.3-70b-versatile` | API tương thích OpenAI tại `api.groq.com/openai` |
 | DeepSeek | [DeepSeek Platform](https://platform.deepseek.com/api_keys), key dạng `sk-...` | `deepseek-chat` | API tương thích OpenAI tại `api.deepseek.com`; tài khoản cần còn số dư |
 
-Ô **Chat Model** là danh sách chọn. Bấm **Tải danh sách model** để BE gọi API của nền tảng bằng API key mới vừa nhập (hoặc key đã lưu nếu để trống), lọc model chat và đưa ra **3 model có hạn mức dùng miễn phí lớn nhất**. Cấu hình mới tự chọn model đứng đầu; model đang lưu luôn có trong danh sách với nhãn "đang lưu". Kết quả được BE nhớ 10 phút.
+Ô **Chat Model** chỉ hiển thị tối đa 3 model gợi ý của nền tảng đang chọn. Khi cấu hình đang chạy dùng model ngoài danh sách, chọn một gợi ý rồi lưu, kiểm tra và kích hoạt để chuyển sang model đó. Bấm **Tải danh sách model** để BE sử dụng key chính đã lưu, lọc model chat và xếp tối đa 3 model theo hạn mức có sẵn. Kết quả được nhớ 10 phút. Quyền dùng model được kiểm tra riêng trên từng key khi kiểm tra kết nối.
 
 | Nền tảng | Nguồn danh sách model | Cách xếp hạng hạn mức miễn phí |
 | --- | --- | --- |
@@ -156,13 +156,17 @@ Nhà cung cấp có thể đổi danh sách model và hạn mức bất cứ lú
 1. Tạo API key ở trang của nền tảng muốn dùng theo bảng trên.
 2. Đăng nhập Admin bằng `ROOT_ADMIN_EMAIL` và mật khẩu khởi tạo, mở **Cấu hình AI** tại `/admin/ai-settings`.
 3. Bấm thẻ nền tảng cần cấu hình. Form bên dưới đổi sang nền tảng đó.
-4. Nhập API key vào ô key mới, bấm **Tải danh sách model** rồi chọn model trong ô Chat Model.
-5. Bấm **Lưu cấu hình**, sau đó **Kiểm tra kết nối**. BE gửi một yêu cầu thử tới nền tảng đã chọn bằng key chính và từng key dự phòng.
+4. Mở tab **API key**, bấm **Thêm key chính**, nhập tên và key rồi **Kiểm tra và lưu**. Lần đầu dùng model mặc định để kiểm tra key, sau đó tải danh sách gợi ý. Có thể nhập nhóm/project và dùng hạn mức mặc định hoặc nhập giới hạn riêng trong cùng hộp thoại.
+5. Quay lại **Kết nối**, tải danh sách model nếu cần đổi lựa chọn. Bấm **Lưu cấu hình**, sau đó **Kiểm tra kết nối**. BE kiểm tra từng key với model đã lưu và cập nhật trạng thái tương ứng. Cấu hình có thể kích hoạt khi có key dùng được.
 6. Khi kiểm tra thành công, bấm **Kích hoạt** và xác nhận. Thẻ nền tảng hiển thị **Đang hoạt động** và các yêu cầu chat mới dùng nền tảng này.
 
 Để đổi nền tảng khi demo, chọn thẻ nền tảng khác đã được kiểm tra rồi bấm **Kích hoạt**. Cấu hình của nền tảng cũ vẫn được giữ, có thể kích hoạt lại bất cứ lúc nào. Embedding cho kho kiến thức RAG vẫn dùng Gemini nên đổi nền tảng Chat không cần lập chỉ mục lại tài liệu.
 
-Để trống ô key mới khi muốn dùng key đã lưu. Ô key đã lưu hiển thị giá trị che. Key dự phòng là tùy chọn, dùng cùng model. Khi key chính trả HTTP 401/403/429, BE thử các key dự phòng của cùng nền tảng theo thứ tự. DeepSeek trả HTTP 402 khi tài khoản hết số dư, BE xử lý như hết hạn mức và chuyển sang key dự phòng. Các key Gemini trong cùng project dùng chung hạn mức, các key Groq trong cùng tổ chức cũng dùng chung giới hạn yêu cầu. [Tài liệu API key](https://ai.google.dev/gemini-api/docs/api-key), [Model Gemini](https://ai.google.dev/gemini-api/docs/models), [Giới hạn sử dụng](https://ai.google.dev/gemini-api/docs/rate-limits)
+Tab **API key** ghim key chính, hiển thị 5 dự phòng/trang và tối đa 10 dự phòng. Bấm **Sửa** trên đúng key để đổi tên, bí mật hoặc giới hạn. Để trống bí mật để giữ key đã lưu. Bí mật mới được kiểm tra trước khi thay, thay đổi của cấu hình đang hoạt động áp dụng ngay. **Đặt làm chính** hoán đổi vai trò và giữ tên nhận diện theo key. Tab **Nhật ký** hiển thị 10 sự kiện/trang, mới nhất trước, gồm thao tác quản trị và sự cố khi chạy. Thao tác xóa có hộp thoại xác nhận.
+
+Bấm **Xóa key** trên key cần xóa. Với key chính, chọn dự phòng thay thế nếu còn dự phòng rồi xác nhận. Khi xóa key cuối cùng, nền tảng đó dừng Chat đến khi thêm key mới. Nếu cấu hình được thay đổi trong lúc đang mở hộp thoại sửa, xóa hoặc hoán đổi, hộp thoại sẽ đóng để bạn mở lại trên dữ liệu mới.
+
+Key dự phòng dùng cùng model và nền tảng của yêu cầu. Khi key chính trả HTTP 401/403/404/429, hệ thống thử key khả dụng tiếp theo. Key không có quyền dùng model được đánh dấu riêng cho model đó. DeepSeek trả HTTP 402 được ghi nhận là hết số dư. Key Gemini cùng project hoặc Groq cùng tổ chức cần đặt cùng mã nhóm để chia sẻ bộ đếm. [Tài liệu API key](https://ai.google.dev/gemini-api/docs/api-key), [Model Gemini](https://ai.google.dev/gemini-api/docs/models), [Giới hạn sử dụng](https://ai.google.dev/gemini-api/docs/rate-limits)
 
 ### 3.2. Embedding Model
 
@@ -205,9 +209,17 @@ Trong Hỗ trợ cửa hàng, khách có thể hỏi “Đơn hàng của tôi �
 
 Trang Cấu hình AI hiển thị số yêu cầu chat, số lỗi và thời gian trung bình tính từ lần khởi động BE gần nhất. Cảnh báo chuyển sang key dự phòng nằm trong thông báo quản trị và được lưu lại.
 
-Để tự chuyển key trước khi chạm hạn mức input TPM, mở **Cấu hình AI → Tự chuyển key theo quota project**, nhập Google Cloud Project ID và giới hạn input token/phút tương ứng với model đang chọn cho mỗi key, rồi chọn **Lưu quota**. Các key cùng project phải ghi cùng Project ID và giới hạn. Khi mức ứng dụng ghi nhận trong 60 giây gần nhất đạt 80%, hệ thống ưu tiên key thuộc project khác còn dưới ngưỡng và thông báo cho admin. Nếu tất cả đều trên ngưỡng, hệ thống vẫn thử theo thứ tự ưu tiên; khi Google trả lỗi 429, hệ thống chuyển sang project khác nếu có. Để trống hai trường để tắt dự đoán cho key đó.
+Hạn mức và trạng thái lỗi được lưu theo nền tảng, nhóm và model. Đổi **Chat Model** sẽ tải lại số liệu của model đó cho mọi key, quay về model từng hết quota vẫn thấy trạng thái đã ghi nhận. Trạng thái nhà cung cấp được hiển thị riêng với **Ước tính còn N / hạn mức yêu cầu/ngày**. Khi lỗi quota có đủ thông tin, giao diện phân biệt chạm giới hạn ngày và giới hạn phút. Ước tính còn lượt vẫn có thể đi kèm lỗi thực tế nếu tài khoản bị giới hạn khác.
 
-Con số này chỉ là ước tính cho các lượt **Chat** do backend ghi nhận, không phải số dư chính thức của Google. Các lượt kiểm tra kết nối, embedding, ứng dụng khác, các giới hạn RPM/RPD và số token thiếu metadata có thể làm chênh lệch; hãy đối chiếu hạn mức trong Google AI Studio. Project ID phải được nhập chính xác: hệ thống không tự xác minh hai key có cùng Google Cloud project hay không. Nếu dùng nhiều BE, các BE cần dùng chung database để chia sẻ bộ đếm.
+Trong hộp thoại **Sửa**, bỏ chọn **Dùng hạn mức ngày mặc định** để nhập **Giới hạn yêu cầu mỗi ngày** theo tài khoản của bạn. Mặc định ưu tiên giới hạn quan sát từ nhà cung cấp khi có, sau đó dùng ước tính theo model. Giới hạn Admin nhập được giữ đến khi chọn lại mặc định. Gemini có mặc định ước tính, Groq đọc giới hạn từ header khi có. DeepSeek hiển thị chưa xác định khi chưa có giới hạn ngày và ghi nhận lỗi hết số dư khi được provider báo.
+
+Danh sách key hiển thị trạng thái và số yêu cầu/ngày còn lại ước tính. Xem thao tác quản trị và sự cố trong tab **Nhật ký**. Để sửa giới hạn token mỗi phút, mở **Hạn mức token mỗi phút để chuyển key** trong hộp thoại **Sửa**.
+
+Khi mức ứng dụng ghi nhận trong 60 giây gần nhất đạt 80%, hệ thống ưu tiên nhóm khác. Nếu tất cả đều trên ngưỡng, hệ thống vẫn dùng key khả dụng. Lỗi quota thực tế được lưu riêng, thời điểm thử lại dựa trên thông tin nhà cung cấp. Khi chưa xác định thời điểm khôi phục, Admin bấm **Kiểm tra lại**. Kiểm tra thành công cập nhật trạng thái, lỗi đã ghi nhận vẫn được giữ qua các lần đổi model.
+
+Số yêu cầu/ngày gồm từng lượt gọi Chat, phân loại, thử lại, kiểm tra kết nối và thử model mà ứng dụng ghi nhận. Một tin nhắn có thể tạo nhiều lượt gọi AI. Bộ đếm này lưu trong database từ khi bật tính năng. Gemini đổi ngày lúc nửa đêm theo giờ Pacific, Groq và DeepSeek dùng ngày UTC của ứng dụng. Lưu lượng trước khi bật tính năng, embedding và ứng dụng khác cần đối chiếu riêng. Mã nhóm/project do Admin nhập cần chính xác để gộp các key cùng hạn mức. Nếu dùng nhiều BE, các BE cần dùng chung database để chia sẻ bộ đếm. [Giới hạn Gemini](https://ai.google.dev/gemini-api/docs/rate-limits)
+
+Số token trong cửa sổ 60 giây phục vụ chuyển key được ghi từ các lượt Chat. Gemini tính token đầu vào, Groq dùng tổng token khi có metadata. Các lượt thiếu metadata có thể làm chênh lệch với nhà cung cấp.
 
 Khi gửi chat, hệ thống chỉ giữ giao dịch database trong lúc lưu hoặc lấy dữ liệu; thời gian chờ Gemini không giữ giao dịch chat. Nếu mạng bị gián đoạn, dùng nút thử lại trong hội thoại: cùng một lượt gửi có mã riêng để hệ thống trả lại kết quả đã lưu thay vì tạo tin nhắn trùng. Nếu hội thoại đang xử lý, đợi phản hồi hoặc thử lại sau. BE cần được khởi động cùng phiên bản FE mới để hỗ trợ cơ chế này.
 
