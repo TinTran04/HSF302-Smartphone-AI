@@ -20,5 +20,6 @@ public class CartItem {
     public ProductVariant getVariant() { return variant; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; this.priceAtAdd = variant.getPrice(); }
+    public void changeVariant(ProductVariant variant) { this.variant = variant; this.priceAtAdd = variant.getPrice(); }
     public long getPriceAtAdd() { return priceAtAdd; }
 }

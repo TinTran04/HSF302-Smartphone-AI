@@ -2,6 +2,7 @@ package com.smartphoneai.controller;
 
 import com.smartphoneai.dto.request.CartItemRequest;
 import com.smartphoneai.dto.request.CartQuantityRequest;
+import com.smartphoneai.dto.request.CartVariantChangeRequest;
 import com.smartphoneai.dto.request.ResolveCartRequest;
 import com.smartphoneai.dto.response.CartResponse;
 import com.smartphoneai.service.CartService;
@@ -24,6 +25,9 @@ public class CartController {
     }
     @PatchMapping("/items/{id}") public CartResponse update(Authentication auth, @PathVariable Long id, @Valid @RequestBody CartQuantityRequest input) {
         return carts.update(UUID.fromString(auth.getName()), id, input.quantity());
+    }
+    @PatchMapping("/items/{id}/variant") public CartResponse changeVariant(Authentication auth, @PathVariable Long id, @Valid @RequestBody CartVariantChangeRequest input) {
+        return carts.changeVariant(UUID.fromString(auth.getName()), id, input.variantId());
     }
     @DeleteMapping("/items/{id}") public CartResponse remove(Authentication auth, @PathVariable Long id) {
         return carts.remove(UUID.fromString(auth.getName()), id);

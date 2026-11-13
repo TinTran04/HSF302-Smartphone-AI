@@ -14,6 +14,8 @@ public interface CartService {
 
     CartResponse update(UUID userId, Long variantId, int quantity);
 
+    CartResponse changeVariant(UUID userId, Long currentVariantId, Long targetVariantId);
+
     CartResponse remove(UUID userId, Long variantId);
 
     void merge(UUID userId, List<CartItemRequest> guestItems);

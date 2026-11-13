@@ -84,6 +84,35 @@ public class CartServiceImpl implements CartService {
     }
     @Override
     @Transactional
+    public CartResponse changeVariant(UUID userId, Long currentVariantId, Long targetVariantId) {
+        lockUser(userId);
+        if (currentVariantId.equals(targetVariantId)) return response(userId);
+
+        long firstId = Math.min(currentVariantId, targetVariantId);
+        long secondId = Math.max(currentVariantId, targetVariantId);
+        var first = variants.findLocked(firstId).orElseThrow(CartActionException::new);
+        var second = variants.findLocked(secondId).orElseThrow(CartActionException::new);
+        var currentVariant = currentVariantId.equals(firstId) ? first : second;
+        var targetVariant = targetVariantId.equals(firstId) ? first : second;
+        var currentItem = items.findByUserIdAndVariantId(userId, currentVariantId).orElseThrow(CartActionException::new);
+
+        if (!currentVariant.getProduct().getId().equals(targetVariant.getProduct().getId())
+                || !targetVariant.isActive() || !targetVariant.getProduct().isActive())
+            throw new CartActionException();
+
+        var targetItem = items.findByUserIdAndVariantId(userId, targetVariantId).orElse(null);
+        if (targetItem == null) {
+            currentItem.changeVariant(targetVariant);
+        } else {
+            try { targetItem.setQuantity(Math.addExact(targetItem.getQuantity(), currentItem.getQuantity())); }
+            catch (ArithmeticException ex) { throw new CartActionException(); }
+            items.delete(currentItem);
+        }
+        items.flush();
+        return response(userId);
+    }
+    @Override
+    @Transactional
     public CartResponse remove(UUID userId, Long variantId) {
         lockUser(userId);
         var item = items.findByUserIdAndVariantId(userId, variantId).orElseThrow(CartActionException::new);
